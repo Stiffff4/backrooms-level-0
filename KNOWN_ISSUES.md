@@ -8,7 +8,7 @@
 
 ## Activos
 
-- Ningún defecto bloqueante o no bloqueante conocido tras la Fase 3.
+- Ningún defecto bloqueante o no bloqueante conocido tras la Fase 4.
 
 ## Pendientes de QA manual acumulativos
 
@@ -26,3 +26,6 @@
 - Aunque las capturas E2E verifican ambos lados de una conexión, la percepción subjetiva de bumps,
   seams o z-fighting en todas las combinaciones de módulos queda en la pasada manual acumulativa de
   Fase 9.
+- La estabilidad equivalente a 30 minutos se cubre con simulación lógica acelerada y un recorrido
+  WebGL de 180 entradas. El soak de navegador a tiempo real y la percepción humana de pop-in/rebase
+  permanecen en la pasada acumulativa de rendimiento de Fase 9.

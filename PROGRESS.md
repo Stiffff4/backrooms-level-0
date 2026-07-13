@@ -6,18 +6,18 @@ Implementación activa. La fuente de verdad es `MASTER_PLAN.md`.
 
 ## Fases
 
-| Fase | Estado | Checkpoint |
-| --- | --- | --- |
+| Fase                        | Estado     | Checkpoint                                  |
+| --------------------------- | ---------- | ------------------------------------------- |
 | 0 — Repositorio y fundación | Completada | `chore: initialize babylon game foundation` |
-| 1 — Movimiento | Completada | `feat: implement first person movement` |
-| 2 — Audio | Completada | `feat: add environmental audio system` |
-| 3 — Módulos | Completada | `feat: add procedural room generation` |
-| 4 — Streaming | Pendiente | — |
-| 5 — Visual pixelado | Pendiente | — |
-| 6 — Iluminación | Pendiente | — |
-| 7 — Tensión | Pendiente | — |
-| 8 — Salida y final | Pendiente | — |
-| 9 — Optimización y QA | Pendiente | — |
+| 1 — Movimiento              | Completada | `feat: implement first person movement`     |
+| 2 — Audio                   | Completada | `feat: add environmental audio system`      |
+| 3 — Módulos                 | Completada | `feat: add procedural room generation`      |
+| 4 — Streaming               | Completada | `feat: add streamed infinite world`         |
+| 5 — Visual pixelado         | Pendiente  | —                                           |
+| 6 — Iluminación             | Pendiente  | —                                           |
+| 7 — Tensión                 | Pendiente  | —                                           |
+| 8 — Salida y final          | Pendiente  | —                                           |
+| 9 — Optimización y QA       | Pendiente  | —                                           |
 
 ## Fase 0 — Repositorio y fundación
 
@@ -127,3 +127,50 @@ en 1,100 kB, después de medir el bundle y sin modificar los presupuestos de pro
 - Capturas inspeccionadas a ambos lados de una unión: 45–61 FPS en la captura headless, 5–38 draw
   calls y 720–5,796 triángulos activos según la habitación visible.
 - Bundle: 1,079.27 kB JS sin comprimir, 260.34 kB gzip; build en 404 ms y dentro del budget.
+
+## Fase 4 — Streaming e infinito aparente
+
+- Horizonte lógico determinista de 1,024 habitaciones sin geometría eager y estrategia `deep` que
+  conserva ramificaciones mientras prioriza una espina larga de exploración.
+- `ChunkStreamer` independiente del renderer con BFS cacheado, radio activo 3, precarga 4, cap duro
+  de 60 habitaciones, tiers, métricas y deltas reproducibles.
+- Descarga antes de carga en swaps llenos y rollback de handles/tier si falla una materialización;
+  el límite tampoco se sobrepasa de forma transitoria.
+- Historial compacto de salas visitadas sin meshes, colliders, luces ni transforms renderizados.
+- `ModularWorld` incremental con registro lógico, carga/descarga idempotente, sincronización de sets,
+  offset persistente y LRU acotada a ocho vistas deshabilitadas para backtracking rentable.
+- `StreamingVisibilityGuard` pull-based: protege frustum antes del fin de niebla, distancia de
+  seguridad y vecinos tras entradas visibles; verifica después de cada swap que no desapareció nada
+  protegido y publica un contador de violaciones.
+- Niebla lineal coherente con el fondo entre 16 y 44 m para cerrar líneas visuales y ocultar el borde
+  de precarga sin depender de pasillos infinitos.
+- Floating origin horizontal a 240 m en producción: mueve mundo y jugador en el mismo frame,
+  conserva velocidad, coordenadas lógicas y listener, y aplica el offset a cargas futuras.
+- Reset completo de streamer, historial, LRU activa, origen, visitas y spawn al reiniciar o volver al
+  título; la seed y la firma topológica permanecen estables.
+- HUD/dataset con posición local y lógica, active/preload/protected/pool, cargas/descargas, historial,
+  rebases, offset, fog, recursos de escena y violaciones de visibilidad.
+
+### Validación
+
+- `npm run validate`: correcto; TypeScript strict, ESLint, 18 archivos/75 tests y build de producción.
+- Simulación lógica equivalente a 30 minutos y recorrido determinista repetido: materialización y
+  pico siempre ≤ 60, secuencia load/unload idéntica e historial sin geometría.
+- Grafos `deep` de 1,024 habitaciones validados sin solapes y con 1,023 conexiones; seis seeds
+  representativas superaron profundidad 500 en Vitest. En una auditoría separada de 128 seeds, la
+  profundidad fue 458–773 (media 640) y 96.09% superó 500, siempre de forma determinista.
+- Auditoría ampliada: 568 seeds/196,608 habitaciones, incluidas 48 generaciones de producción y
+  ocho al máximo de 2,048; 0 fallos, 78/78 regeneraciones idénticas, pico global 36/60 y 10,000
+  rebases sin error relativo. La generación de 1,024 promedió 606 ms.
+- Smokes `NullEngine`: swap al cap, rollback del streamer y de sincronización del renderer,
+  LRU/reuse/eviction, diez ciclos, carga después de rebase, posiciones relativas y dispose hasta el
+  baseline sin leaks.
+- `npm run test:e2e`: 8/8 en Chromium; incluye cruce real, streaming acelerado de 180 habitaciones,
+  fog, 19 rebases de prueba, cap/pool, cero descargas visibles y restart posterior al rebase.
+- Captura final tras 180 entradas: 181 visitas, 12 salas activas, 1 preload, 8 pooled, 63 meshes
+  activos, 3,396 triángulos visibles y 63 draw calls; el avance QA cede al navegador cada ocho salas.
+- Soak frame-like de 5 × 180 swaps: heap post-GC 39.1–48.0 MiB y estabilizado en los ciclos 4–5;
+  `purgePool`/`dispose` dejaron meshes, nodes, geometrías y materiales en cero. El pico transitorio
+  detectado al avanzar 180 salas en una sola tarea se eliminó troceando el helper debug; el recorrido
+  normal ya materializaba entre frames.
+- Bundle: 1,107.59 kB JS sin comprimir, 267.58 kB gzip; build en 398 ms y dentro del budget.

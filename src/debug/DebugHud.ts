@@ -26,7 +26,7 @@ export class DebugHud {
 
     const fps = this.scene.getEngine().getFps();
     const meshes = this.scene.getActiveMeshes().length;
-    const triangles = this.scene.getActiveIndices();
+    const triangles = Math.floor(this.scene.getActiveIndices() / 3);
     this.element.textContent = [
       `FPS ${fps.toFixed(0)}`,
       `FRAME ${this.instrumentation.frameTimeCounter.current.toFixed(1)} ms`,

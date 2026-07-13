@@ -1,9 +1,10 @@
-import type { Scene } from '@babylonjs/core/scene';
+import { Scene } from '@babylonjs/core/scene';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { AmbientDirector } from '../audio/AmbientDirector';
 import { FootstepSystem } from '../audio/FootstepSystem';
 import { GameAudioEngine } from '../audio/GameAudioEngine';
 import { ProceduralAudioBank, hashAudioSeed } from '../audio/ProceduralAudioBank';
+import { gameConfig } from '../config/game.config';
 import { GameClock } from '../game/GameClock';
 import { SessionStats } from '../game/SessionStats';
 import { DebugHud } from '../debug/DebugHud';
@@ -13,13 +14,21 @@ import { createGameplayScene } from '../engine/SceneFactory';
 import { PlayerController } from '../player/PlayerController';
 import { assertValidRoomGraph, generateRoomGraph } from '../procedural/RoomGraphGenerator';
 import { hashSeed } from '../procedural/SeedBank';
-import type { RoomGraph } from '../procedural/procedural.types';
+import type { RoomGraph, RoomInstance } from '../procedural/procedural.types';
 import { ModularWorld } from '../rooms/ModularWorld';
+import type { BuiltModularRoom } from '../rooms/rendering/rendering.types';
 import { renderErrorScreen } from '../ui/ErrorScreen';
 import { CreditsDialog } from '../ui/CreditsDialog';
 import { PauseMenu } from '../ui/PauseMenu';
 import { SettingsStore } from '../ui/SettingsStore';
 import { TitleScreen } from '../ui/TitleScreen';
+import { ChunkStreamer } from '../world/ChunkStreamer';
+import { FloatingOrigin } from '../world/FloatingOrigin';
+import {
+  StreamingVisibilityGuard,
+  type StreamingVisibilityResult,
+} from '../world/StreamingVisibilityGuard';
+import type { ChunkStreamingResult } from '../world/world.types';
 import { GameEventBus } from './GameEventBus';
 import { GameStateMachine, type GameState } from './GameStateMachine';
 
@@ -34,11 +43,21 @@ export class App {
   private readonly audioEngine: GameAudioEngine;
   private readonly audioLocalForward = Vector3.Forward();
   private readonly audioForward = Vector3.Zero();
+  private readonly floatingOrigin = new FloatingOrigin({
+    rebaseThreshold: this.debugOptions.debug ? 40 : gameConfig.world.floatingOriginThreshold,
+  });
 
   private engineBootstrap: EngineBootstrap | null = null;
   private scene: Scene | null = null;
   private roomGraph: RoomGraph | null = null;
   private modularWorld: ModularWorld | null = null;
+  private chunkStreamer: ChunkStreamer<BuiltModularRoom> | null = null;
+  private visibilityGuard: StreamingVisibilityGuard | null = null;
+  private lastVisibility: StreamingVisibilityResult | null = null;
+  private roomsById = new Map<string, RoomInstance>();
+  private streamingRoute: readonly string[] = [];
+  private streamingRouteIndex = 0;
+  private readonly recentlyLeftRooms = new Map<string, number>();
   private player: PlayerController | null = null;
   private titleScreen: TitleScreen | null = null;
   private pauseMenu: PauseMenu | null = null;
@@ -50,7 +69,25 @@ export class App {
   private footstepCount = 0;
   private layoutSignature = '';
   private currentRoomDefinitionId: string | null = null;
+  private debugStreamingAdvanceToken = 0;
   private disposed = false;
+
+  private readonly handleDebugAdvanceStreaming = (event: Event): void => {
+    if (!this.debugOptions.debug) {
+      return;
+    }
+    const requested = (event as CustomEvent<{ steps?: number }>).detail?.steps ?? 1;
+    const steps = Number.isFinite(requested)
+      ? Math.max(1, Math.min(512, Math.floor(requested)))
+      : 1;
+    const token = ++this.debugStreamingAdvanceToken;
+    this.root.dataset.debugStreamingPending = 'true';
+    void this.advanceDebugStreamingInBatches(steps, token).catch((error: unknown) => {
+      if (!this.disposed) {
+        this.showFatalError(error);
+      }
+    });
+  };
 
   private readonly handleWindowBlur = (): void => {
     this.audioEngine.setFocused(false);
@@ -95,12 +132,20 @@ export class App {
   }
 
   public async start(): Promise<void> {
+    const bootStartedAt = performance.now();
     try {
       this.stateMachine.transition('loading');
       this.engineBootstrap = EngineBootstrap.create(this.canvas);
       this.scene = createGameplayScene(this.engineBootstrap.engine);
-      this.roomGraph = generateRoomGraph({ seed: this.debugOptions.seed, targetRooms: 18 });
+      this.roomGraph = generateRoomGraph({
+        seed: this.debugOptions.seed,
+        targetRooms: gameConfig.world.logicalRoomCount,
+        frontierStrategy: 'deep',
+      });
       assertValidRoomGraph(this.roomGraph);
+      this.roomsById = new Map(this.roomGraph.rooms.map((room) => [room.id, room]));
+      this.streamingRoute = this.buildDeepStreamingRoute(this.roomGraph);
+      this.streamingRouteIndex = 0;
       this.layoutSignature = hashSeed(
         JSON.stringify({
           rooms: this.roomGraph.rooms.map((room) => ({
@@ -111,8 +156,19 @@ export class App {
           connections: this.roomGraph.connections,
         }),
       ).toString(16);
-      this.modularWorld = new ModularWorld(this.scene);
-      this.modularWorld.build(this.roomGraph);
+      this.modularWorld = new ModularWorld(this.scene, undefined, {
+        maxLoadedRooms: gameConfig.world.maxMaterializedRooms,
+        pooledRoomLimit: gameConfig.world.pooledRoomViews,
+      });
+      this.modularWorld.setGraph(this.roomGraph);
+      this.visibilityGuard = new StreamingVisibilityGuard(
+        this.roomGraph,
+        this.modularWorld,
+        this.scene,
+        { fogEnd: gameConfig.world.fogEnd },
+      );
+      this.chunkStreamer = this.createChunkStreamer();
+      this.streamAround(this.roomGraph.startRoomId);
       this.player = new PlayerController(
         this.scene,
         this.canvas,
@@ -132,10 +188,15 @@ export class App {
 
       if (this.debugOptions.debug) {
         this.debugHud = new DebugHud(this.root, this.scene);
+        this.root.addEventListener(
+          'backrooms:debug-advance-streaming',
+          this.handleDebugAdvanceStreaming,
+        );
       }
 
       this.engineBootstrap.start(() => this.renderFrame());
       this.root.querySelector('#boot-status')?.remove();
+      this.root.dataset.bootDurationMs = (performance.now() - bootStartedAt).toFixed(2);
       this.stateMachine.transition('title');
       this.titleScreen?.setReady();
       await Promise.resolve();
@@ -149,6 +210,7 @@ export class App {
       return;
     }
     this.disposed = true;
+    this.debugStreamingAdvanceToken += 1;
 
     for (const unsubscribe of this.unsubscribers.splice(0)) {
       unsubscribe();
@@ -157,6 +219,10 @@ export class App {
     window.removeEventListener('blur', this.handleWindowBlur);
     window.removeEventListener('focus', this.handleWindowFocus);
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    this.root.removeEventListener(
+      'backrooms:debug-advance-streaming',
+      this.handleDebugAdvanceStreaming,
+    );
     this.debugHud?.dispose();
     this.debugHud = null;
     this.pauseMenu?.dispose();
@@ -173,9 +239,16 @@ export class App {
     this.audioBank = null;
     this.player?.dispose();
     this.player = null;
+    this.chunkStreamer?.dispose();
+    this.chunkStreamer = null;
+    this.visibilityGuard = null;
+    this.lastVisibility = null;
     this.modularWorld?.dispose();
     this.modularWorld = null;
     this.roomGraph = null;
+    this.roomsById.clear();
+    this.streamingRoute = [];
+    this.recentlyLeftRooms.clear();
     this.scene?.dispose();
     this.scene = null;
     this.engineBootstrap?.dispose();
@@ -238,6 +311,8 @@ export class App {
       `AUDIO ${audioSnapshot.state} / ${this.getAudioNodeCount()} NODES`,
       `STEPS ${this.footstepCount}`,
       `ROOM ${this.modularWorld?.activeRoomId ?? 'none'} / ${this.stats.snapshot(this.clock.elapsedSeconds).roomsVisited} VISITED`,
+      `STREAM ${this.chunkStreamer?.metrics.activeRoomCount ?? 0} ACTIVE / ${this.chunkStreamer?.metrics.preloadRoomCount ?? 0} PRELOAD / ${this.modularWorld?.pooledRoomCount ?? 0} POOLED`,
+      `ORIGIN ${this.floatingOrigin.metrics.rebaseCount} REBASES`,
       `SEED ${this.debugOptions.seed}`,
     ]);
     this.scene.render();
@@ -249,8 +324,15 @@ export class App {
     }
     const transition = this.modularWorld.updatePlayerPosition(this.player.position);
     if (transition.changed) {
+      if (transition.previousRoomId) {
+        this.recentlyLeftRooms.set(transition.previousRoomId, this.clock.elapsedSeconds);
+      }
       this.recordRoomEntry(transition.roomId);
+      if (transition.roomId) {
+        this.streamAround(transition.roomId);
+      }
     }
+    this.applyFloatingOrigin();
   }
 
   private recordRoomEntry(roomId: string | null): void {
@@ -258,7 +340,7 @@ export class App {
       this.currentRoomDefinitionId = null;
       return;
     }
-    const instance = this.roomGraph.rooms.find((room) => room.id === roomId);
+    const instance = this.roomsById.get(roomId);
     if (!instance) {
       this.currentRoomDefinitionId = null;
       return;
@@ -267,6 +349,10 @@ export class App {
     const firstVisit = this.stats.recordRoomVisit(roomId);
     instance.visitState = 'visited';
     this.currentRoomDefinitionId = instance.definitionId;
+    const routeIndex = this.streamingRoute.indexOf(roomId);
+    if (routeIndex >= 0) {
+      this.streamingRouteIndex = routeIndex;
+    }
     this.events.emit('roomEntered', { roomId, definitionId: instance.definitionId, firstVisit });
     this.syncWorldDebugSnapshot();
   }
@@ -277,6 +363,186 @@ export class App {
     }
     for (const room of this.roomGraph.rooms) {
       room.visitState = room.id === this.roomGraph.startRoomId ? 'visible' : 'unvisited';
+    }
+  }
+
+  private createChunkStreamer(): ChunkStreamer<BuiltModularRoom> {
+    if (!this.roomGraph || !this.modularWorld) {
+      throw new Error('Cannot create streaming before the logical and rendered worlds exist.');
+    }
+    const world = this.modularWorld;
+    return new ChunkStreamer<BuiltModularRoom>(
+      this.roomGraph,
+      {
+        materialize: (room) => world.loadRoom(room.id),
+        dematerialize: (room) => {
+          world.unloadRoom(room.id);
+        },
+      },
+      {
+        activeRadius: gameConfig.world.activeGraphRadius,
+        preloadRadius: gameConfig.world.preloadGraphRadius,
+        maxMaterializedRooms: gameConfig.world.maxMaterializedRooms,
+      },
+    );
+  }
+
+  private streamAround(roomId: string): ChunkStreamingResult {
+    if (!this.chunkStreamer) {
+      throw new Error('Chunk streaming is not initialized.');
+    }
+    const recentCutoff = this.clock.elapsedSeconds - gameConfig.world.recentlyLeftProtectionSeconds;
+    for (const [recentRoomId, leftAt] of this.recentlyLeftRooms) {
+      if (leftAt < recentCutoff) {
+        this.recentlyLeftRooms.delete(recentRoomId);
+      }
+    }
+
+    const visibility =
+      this.visibilityGuard && this.player
+        ? (() => {
+            this.player.camera.computeWorldMatrix();
+            return this.visibilityGuard.evaluate({
+              camera: this.player.camera,
+              playerPosition: this.player.position,
+            });
+          })()
+        : null;
+    this.lastVisibility = visibility;
+    const result = this.chunkStreamer.update({
+      currentRoomId: roomId,
+      visibleRoomIds: visibility?.visibleRoomIds ?? [],
+      visibleEntranceRoomIds: visibility?.visibleEntranceRoomIds ?? [],
+      exitRoomId: null,
+      recentlyLeftRoomIds: [...this.recentlyLeftRooms.keys()],
+    });
+    if (visibility && this.visibilityGuard) {
+      const verification = this.visibilityGuard.verifyRetention(visibility, {
+        // Verify the renderer independently from the streamer's intended set.
+        // A bookkeeping bug must not be able to prove its own correctness.
+        materializedRoomIds: this.modularWorld?.loadedRoomIds ?? [],
+      });
+      if (verification.violationCount > 0) {
+        throw new Error(
+          `Streaming removed protected rooms: ${verification.missingRoomIds.join(', ')}.`,
+        );
+      }
+    }
+    return result;
+  }
+
+  private applyFloatingOrigin(): void {
+    if (!this.player || !this.modularWorld) {
+      return;
+    }
+    const rebase = this.floatingOrigin.update(this.player.position);
+    if (!rebase) {
+      return;
+    }
+
+    const delta = new Vector3(rebase.worldDelta.x, rebase.worldDelta.y, rebase.worldDelta.z);
+    this.modularWorld.translate(delta);
+    this.player.setPosition(
+      new Vector3(rebase.playerLocalAfter.x, rebase.playerLocalAfter.y, rebase.playerLocalAfter.z),
+      false,
+    );
+    this.footsteps?.resetAfterRebase();
+    this.events.emit('originRebased', {
+      sequence: rebase.sequence,
+      worldDelta: rebase.worldDelta,
+      originOffset: rebase.originOffset,
+    });
+    this.syncWorldDebugSnapshot();
+  }
+
+  private buildDeepStreamingRoute(graph: RoomGraph): readonly string[] {
+    const roomsById = new Map(graph.rooms.map((room) => [room.id, room]));
+    const adjacency = new Map<string, string[]>();
+    for (const room of graph.rooms) {
+      adjacency.set(room.id, []);
+    }
+    for (const connection of graph.connections) {
+      adjacency.get(connection.roomAId)?.push(connection.roomBId);
+      adjacency.get(connection.roomBId)?.push(connection.roomAId);
+    }
+
+    const deepest = [...graph.rooms].sort(
+      (left, right) => right.depth - left.depth || right.spawnedAt - left.spawnedAt,
+    )[0];
+    if (!deepest) {
+      throw new Error('Cannot build a streaming route from an empty room graph.');
+    }
+
+    const reversedRoute = [deepest.id];
+    let current = deepest;
+    while (current.id !== graph.startRoomId) {
+      const parentId = (adjacency.get(current.id) ?? []).find(
+        (candidateId) => roomsById.get(candidateId)?.depth === current.depth - 1,
+      );
+      const parent = parentId ? roomsById.get(parentId) : undefined;
+      if (!parent) {
+        throw new Error(`Deep streaming route lost the parent of ${current.id}.`);
+      }
+      reversedRoute.push(parent.id);
+      current = parent;
+    }
+    return Object.freeze(reversedRoute.reverse());
+  }
+
+  private advanceDebugStreaming(steps: number): void {
+    if (!this.player || !this.modularWorld || this.streamingRoute.length === 0) {
+      return;
+    }
+    for (let index = 0; index < steps; index += 1) {
+      const nextIndex = Math.min(this.streamingRouteIndex + 1, this.streamingRoute.length - 1);
+      if (nextIndex === this.streamingRouteIndex) {
+        break;
+      }
+      const nextRoomId = this.streamingRoute[nextIndex];
+      if (!nextRoomId) {
+        break;
+      }
+      const previousRoomId = this.modularWorld.activeRoomId;
+      // The debug traversal represents several seconds of real walking per
+      // room; keep only the immediately previous room inside the grace window.
+      this.recentlyLeftRooms.clear();
+      if (previousRoomId) {
+        this.recentlyLeftRooms.set(previousRoomId, this.clock.elapsedSeconds);
+      }
+      this.streamAround(nextRoomId);
+      const view = this.modularWorld.getLoadedRoom(nextRoomId);
+      if (!view) {
+        throw new Error(`Debug streaming did not materialize ${nextRoomId}.`);
+      }
+      this.player.setPosition(
+        new Vector3(
+          view.trigger.center.x,
+          view.trigger.center.y - view.definition.footprint.height / 2 + 0.04,
+          view.trigger.center.z,
+        ),
+      );
+      const transition = this.modularWorld.updatePlayerPosition(this.player.position);
+      this.recordRoomEntry(transition.roomId);
+      this.streamingRouteIndex = nextIndex;
+      this.applyFloatingOrigin();
+    }
+    this.syncWorldDebugSnapshot();
+  }
+
+  private async advanceDebugStreamingInBatches(steps: number, token: number): Promise<void> {
+    let remaining = steps;
+    while (remaining > 0 && token === this.debugStreamingAdvanceToken && !this.disposed) {
+      const batchSize = Math.min(8, remaining);
+      this.advanceDebugStreaming(batchSize);
+      remaining -= batchSize;
+      if (remaining > 0) {
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+      }
+    }
+
+    if (token === this.debugStreamingAdvanceToken && !this.disposed) {
+      this.root.dataset.debugStreamingPending = 'false';
+      this.root.dispatchEvent(new CustomEvent('backrooms:debug-streaming-advance-complete'));
     }
   }
 
@@ -303,10 +569,14 @@ export class App {
     }
 
     const position = this.player.position;
+    const logicalPosition = this.floatingOrigin.localToLogical(position);
     const movement = this.player.movementFrame;
     this.root.dataset.playerX = position.x.toFixed(4);
     this.root.dataset.playerY = position.y.toFixed(4);
     this.root.dataset.playerZ = position.z.toFixed(4);
+    this.root.dataset.playerLogicalX = logicalPosition.x.toFixed(4);
+    this.root.dataset.playerLogicalY = logicalPosition.y.toFixed(4);
+    this.root.dataset.playerLogicalZ = logicalPosition.z.toFixed(4);
     this.root.dataset.playerMoving = String(movement.moving);
     this.root.dataset.playerSprinting = String(movement.sprinting);
     this.root.dataset.playerGrounded = String(movement.grounded);
@@ -320,6 +590,8 @@ export class App {
     const graph = this.roomGraph;
     const world = this.modularWorld;
     const stats = this.stats.snapshot(this.clock.elapsedSeconds);
+    const streaming = this.chunkStreamer?.metrics;
+    const origin = this.floatingOrigin.metrics;
     this.root.dataset.seed = this.debugOptions.seed;
     this.root.dataset.layoutValid = graph ? 'true' : 'false';
     this.root.dataset.layoutSignature = this.layoutSignature;
@@ -334,6 +606,38 @@ export class App {
     this.root.dataset.worldMeshes = String(world?.metrics.meshCount ?? 0);
     this.root.dataset.worldColliders = String(world?.metrics.colliderCount ?? 0);
     this.root.dataset.worldTriangles = String(world?.metrics.triangleCount ?? 0);
+    this.root.dataset.worldActiveRooms = String(world?.metrics.activeRoomCount ?? 0);
+    this.root.dataset.worldPooledRooms = String(world?.metrics.pooledRoomCount ?? 0);
+    this.root.dataset.streamActiveRooms = String(streaming?.activeRoomCount ?? 0);
+    this.root.dataset.streamPreloadRooms = String(streaming?.preloadRoomCount ?? 0);
+    this.root.dataset.streamProtectedRooms = String(streaming?.protectedRoomCount ?? 0);
+    this.root.dataset.streamMaterializedRooms = String(streaming?.materializedRoomCount ?? 0);
+    this.root.dataset.streamPeakMaterializedRooms = String(
+      streaming?.peakMaterializedRoomCount ?? 0,
+    );
+    this.root.dataset.streamHistoryRooms = String(streaming?.historyRoomCount ?? 0);
+    this.root.dataset.streamMaterializations = String(streaming?.totalMaterializations ?? 0);
+    this.root.dataset.streamDematerializations = String(streaming?.totalDematerializations ?? 0);
+    this.root.dataset.streamBudget = String(
+      streaming?.budget ?? gameConfig.world.maxMaterializedRooms,
+    );
+    this.root.dataset.streamVisibleRooms = String(this.lastVisibility?.visibleRoomIds.length ?? 0);
+    this.root.dataset.streamVisibleEntrances = String(
+      this.lastVisibility?.visibleEntranceRoomIds.length ?? 0,
+    );
+    this.root.dataset.visibleUnloadViolations = String(this.visibilityGuard?.violationCount ?? 0);
+    this.root.dataset.streamingRouteIndex = String(this.streamingRouteIndex);
+    this.root.dataset.streamingRouteLength = String(this.streamingRoute.length);
+    this.root.dataset.floatingOriginRebases = String(origin.rebaseCount);
+    this.root.dataset.floatingOriginThreshold = String(this.floatingOrigin.config.rebaseThreshold);
+    this.root.dataset.floatingOriginX = origin.originOffset.x.toFixed(4);
+    this.root.dataset.floatingOriginZ = origin.originOffset.z.toFixed(4);
+    this.root.dataset.fogMode = this.scene?.fogMode === Scene.FOGMODE_LINEAR ? 'linear' : 'other';
+    this.root.dataset.fogStart = String(this.scene?.fogStart ?? 0);
+    this.root.dataset.fogEnd = String(this.scene?.fogEnd ?? 0);
+    this.root.dataset.sceneMeshes = String(this.scene?.meshes.length ?? 0);
+    this.root.dataset.sceneMaterials = String(this.scene?.materials.length ?? 0);
+    this.root.dataset.sceneTransformNodes = String(this.scene?.transformNodes.length ?? 0);
   }
 
   private syncAudioDebugSnapshot(): void {
@@ -470,15 +774,7 @@ export class App {
       return;
     }
 
-    this.stats.reset();
-    this.resetRoomVisits();
-    this.clock.reset();
-    this.footstepCount = 0;
-    this.footsteps?.resetAfterRebase();
-    this.player.setPosition(this.modularWorld.spawnPoint);
-    this.player.setLookRotation(this.modularWorld.spawnYaw);
-    this.modularWorld.updatePlayerPosition(this.player.position);
-    this.recordRoomEntry(this.modularWorld.activeRoomId);
+    this.resetStreamingSessionState();
     await this.resumeGame();
   }
 
@@ -489,19 +785,42 @@ export class App {
 
     this.player.releasePointerLock();
     this.player.setEnabled(false);
-    this.player.setPosition(this.modularWorld.spawnPoint);
-    this.player.setLookRotation(this.modularWorld.spawnYaw);
+    this.resetStreamingSessionState();
+    this.pauseMenu?.hide();
+    this.titleScreen?.show();
+    this.titleScreen?.setReady();
+    this.stateMachine.transition('title');
+  }
+
+  private resetStreamingSessionState(): void {
+    if (!this.roomGraph || !this.modularWorld || !this.player) {
+      return;
+    }
+
+    this.debugStreamingAdvanceToken += 1;
+    this.root.dataset.debugStreamingPending = 'false';
+
+    const reset = this.floatingOrigin.reset();
+    this.modularWorld.translate(
+      new Vector3(reset.worldDelta.x, reset.worldDelta.y, reset.worldDelta.z),
+    );
+    this.chunkStreamer?.dispose();
+    this.chunkStreamer = this.createChunkStreamer();
+    this.visibilityGuard?.resetViolationCount();
+    this.lastVisibility = null;
+    this.recentlyLeftRooms.clear();
+    this.streamingRouteIndex = 0;
     this.stats.reset();
     this.resetRoomVisits();
     this.clock.reset();
     this.footstepCount = 0;
     this.footsteps?.resetAfterRebase();
-    this.modularWorld.updatePlayerPosition(this.player.position);
-    this.recordRoomEntry(this.modularWorld.activeRoomId);
-    this.pauseMenu?.hide();
-    this.titleScreen?.show();
-    this.titleScreen?.setReady();
-    this.stateMachine.transition('title');
+    this.streamAround(this.roomGraph.startRoomId);
+    this.player.setPosition(this.modularWorld.spawnPoint);
+    this.player.setLookRotation(this.modularWorld.spawnYaw);
+    const transition = this.modularWorld.updatePlayerPosition(this.player.position);
+    this.recordRoomEntry(transition.roomId);
+    this.syncWorldDebugSnapshot();
   }
 
   private showFatalError(error: unknown): void {

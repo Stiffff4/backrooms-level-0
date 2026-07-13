@@ -19,4 +19,15 @@ export const gameConfig = {
     maxFov: 100,
     defaultSensitivity: 0.5,
   },
+  world: {
+    logicalRoomCount: 1024,
+    activeGraphRadius: 3,
+    preloadGraphRadius: 4,
+    maxMaterializedRooms: 60,
+    pooledRoomViews: 8,
+    recentlyLeftProtectionSeconds: 4,
+    floatingOriginThreshold: 240,
+    fogStart: 16,
+    fogEnd: 44,
+  },
 } as const;

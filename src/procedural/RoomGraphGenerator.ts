@@ -43,6 +43,7 @@ interface AttemptState {
   seedBank: SeedBank;
   specialCooldown: number;
   maxPlacementAttempts: number;
+  frontierStrategy: 'balanced' | 'deep';
 }
 
 const MAX_GENERATION_RESTARTS = 12;
@@ -81,8 +82,8 @@ function validateOptions(options: GenerateRoomGraphOptions): void {
   if (!Number.isInteger(options.targetRooms) || options.targetRooms < 1) {
     throw new Error('targetRooms must be a positive integer.');
   }
-  if (options.targetRooms > 512) {
-    throw new Error('targetRooms cannot exceed the logical safety limit of 512.');
+  if (options.targetRooms > 2048) {
+    throw new Error('targetRooms cannot exceed the logical safety limit of 2048.');
   }
   if (
     options.maxPlacementAttempts !== undefined &&
@@ -331,7 +332,15 @@ function orderFrontiers(
     }
   }
 
-  return state.rng.shuffle(frontiers);
+  const shuffled = state.rng.shuffle(frontiers);
+  // Keep occasional side-branch growth so the maze does not collapse into one
+  // corridor, while making the production strategy reliably expose a long
+  // traversal spine for streaming and the eventual exit director.
+  if (state.frontierStrategy !== 'deep' || state.graph.rooms.length % 8 === 0) {
+    return shuffled;
+  }
+
+  return shuffled.sort((left, right) => right.room.depth - left.room.depth);
 }
 
 function createAttemptState(
@@ -369,6 +378,7 @@ function createAttemptState(
     seedBank,
     specialCooldown: 0,
     maxPlacementAttempts: options.maxPlacementAttempts ?? Number.POSITIVE_INFINITY,
+    frontierStrategy: options.frontierStrategy ?? 'balanced',
   };
 
   const startRoom = createRoom(state, startDefinition, 0, 0, {
@@ -485,6 +495,9 @@ export function validateRoomGraph(
     if (firstSocket === undefined || secondSocket === undefined) {
       issues.push(`${connection.id}: connection references an unknown socket.`);
       continue;
+    }
+    if (!areSocketsCompatible(firstSocket, secondSocket)) {
+      issues.push(`${connection.id}: sockets are not compatible.`);
     }
 
     const firstSocketKey = `${firstRoom.id}\u0000${firstSocket.id}`;

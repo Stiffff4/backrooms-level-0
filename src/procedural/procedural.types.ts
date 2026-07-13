@@ -145,4 +145,10 @@ export interface GenerateRoomGraphOptions {
   targetRooms: number;
   definitions?: readonly RoomDefinition[];
   maxPlacementAttempts?: number;
+  /**
+   * `deep` reserves most placements for the furthest frontier, producing a
+   * long explorable spine while still spending every fourth placement on a
+   * branch. `balanced` retains the compact phase-3 embedding.
+   */
+  frontierStrategy?: 'balanced' | 'deep';
 }

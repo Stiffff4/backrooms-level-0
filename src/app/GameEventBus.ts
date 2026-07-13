@@ -1,9 +1,15 @@
 import type { GameState } from './GameStateMachine';
+import type { Vector3Like } from '../procedural/procedural.types';
 
 export interface GameEvents {
   stateChanged: { next: GameState; previous: GameState };
   pointerLockChanged: { locked: boolean };
   roomEntered: { roomId: string; definitionId: string; firstVisit: boolean };
+  originRebased: {
+    sequence: number;
+    worldDelta: Vector3Like;
+    originOffset: Vector3Like;
+  };
   settingsChanged: { key: string };
   fatalError: { error: unknown };
 }

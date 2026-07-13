@@ -125,4 +125,42 @@ describe('RoomGraphGenerator', () => {
       /empty catalog/,
     );
   });
+
+  it('detecta conexiones cuyos tags de paso son incompatibles', () => {
+    const graph = generateRoomGraph({ seed: 'incompatible-validator', targetRooms: 2 });
+    const connection = graph.connections[0];
+    const firstRoom = graph.rooms.find((room) => room.id === connection?.roomAId);
+    const secondRoom = graph.rooms.find((room) => room.id === connection?.roomBId);
+    expect(connection).toBeDefined();
+    expect(firstRoom).toBeDefined();
+    expect(secondRoom).toBeDefined();
+    if (!connection || !firstRoom || !secondRoom) {
+      return;
+    }
+
+    const firstDefinition = getRoomDefinition(firstRoom.definitionId);
+    const secondDefinition = getRoomDefinition(secondRoom.definitionId);
+    const secondDefinitionId = `${secondDefinition.id}-incompatible-test`;
+    secondRoom.definitionId = secondDefinitionId;
+
+    const definitions = [
+      {
+        ...firstDefinition,
+        sockets: firstDefinition.sockets.map((socket) =>
+          socket.id === connection.socketAId ? { ...socket, tags: ['passage:test-a'] } : socket,
+        ),
+      },
+      {
+        ...secondDefinition,
+        id: secondDefinitionId,
+        sockets: secondDefinition.sockets.map((socket) =>
+          socket.id === connection.socketBId ? { ...socket, tags: ['passage:test-b'] } : socket,
+        ),
+      },
+    ];
+
+    expect(validateRoomGraph(graph, definitions)).toContain(
+      `${connection.id}: sockets are not compatible.`,
+    );
+  });
 });

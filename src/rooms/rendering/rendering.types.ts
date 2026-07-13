@@ -41,7 +41,10 @@ export interface BuiltModularRoom {
 }
 
 export interface ModularWorldMetrics {
+  /** Backwards-compatible alias for activeRoomCount. */
   readonly roomCount: number;
+  readonly activeRoomCount: number;
+  readonly pooledRoomCount: number;
   readonly meshCount: number;
   readonly colliderCount: number;
   readonly triggerCount: number;

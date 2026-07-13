@@ -4,7 +4,7 @@ import type { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { Scene } from '@babylonjs/core/scene';
 import { getRoomDefinition } from '../procedural/RoomCatalog';
 import { transformDirection } from '../procedural/SocketMath';
-import type { RoomGraph, RoomInstance } from '../procedural/procedural.types';
+import type { RoomDefinition, RoomGraph, RoomInstance } from '../procedural/procedural.types';
 import { ModularRoomBuilder, MODULAR_PLAYER_BASE_HEIGHT } from './builders/ModularRoomBuilder';
 import type {
   BuiltModularRoom,
@@ -15,8 +15,13 @@ import type {
 } from './rendering/rendering.types';
 import { RoomMaterialLibrary } from './RoomMaterialLibrary';
 
+const DEFAULT_MAX_LOADED_ROOMS = 60;
+const DEFAULT_POOLED_ROOM_LIMIT = 8;
+
 const EMPTY_METRICS: ModularWorldMetrics = Object.freeze({
   roomCount: 0,
+  activeRoomCount: 0,
+  pooledRoomCount: 0,
   meshCount: 0,
   colliderCount: 0,
   triggerCount: 0,
@@ -25,30 +30,60 @@ const EMPTY_METRICS: ModularWorldMetrics = Object.freeze({
   triangleCount: 0,
 });
 
+export interface ModularWorldOptions {
+  readonly maxLoadedRooms?: number;
+  readonly pooledRoomLimit?: number;
+}
+
+export interface ModularWorldSyncResult {
+  readonly loadedRoomIds: readonly string[];
+  readonly unloadedRoomIds: readonly string[];
+  readonly retainedRoomIds: readonly string[];
+}
+
 /**
- * Materializes a complete logical RoomGraph and provides the cheap spatial
- * queries needed by gameplay. It deliberately has no ActionManagers or per-room
- * render observers; one player-position query drives every entry trigger.
+ * Materializes a bounded subset of a logical RoomGraph and provides the cheap
+ * spatial queries needed by gameplay. The graph remains authoritative while
+ * room views may be loaded, unloaded and reconstructed independently.
  */
 export class ModularWorld {
   private readonly materials: RoomMaterialLibrary;
   private readonly builder: ModularRoomBuilder;
   private readonly ownsMaterials: boolean;
   private readonly views = new Map<string, BuiltModularRoom>();
+  private readonly pooledViews = new Map<string, BuiltModularRoom>();
+  private readonly instancesById = new Map<string, RoomInstance>();
+  private readonly renderKeysById = new Map<string, string>();
+  private readonly renderOffset = Vector3.Zero();
+  private readonly loadLimit: number;
+  private readonly poolLimit: number;
+  private graph: RoomGraph | null = null;
   private spawn = Vector3.Zero();
   private yaw = 0;
   private currentRoomId: string | null = null;
   private metricsSnapshot: ModularWorldMetrics = EMPTY_METRICS;
   private disposed = false;
 
-  public constructor(scene: Scene, materials?: RoomMaterialLibrary) {
+  public constructor(
+    scene: Scene,
+    materials?: RoomMaterialLibrary,
+    options: ModularWorldOptions = {},
+  ) {
+    const maxLoadedRooms = options.maxLoadedRooms ?? DEFAULT_MAX_LOADED_ROOMS;
+    const pooledRoomLimit = options.pooledRoomLimit ?? DEFAULT_POOLED_ROOM_LIMIT;
+    if (!Number.isInteger(maxLoadedRooms) || maxLoadedRooms < 1) {
+      throw new RangeError('maxLoadedRooms must be a positive integer.');
+    }
+    if (!Number.isInteger(pooledRoomLimit) || pooledRoomLimit < 0) {
+      throw new RangeError('pooledRoomLimit must be a non-negative integer.');
+    }
+
     this.materials = materials ?? new RoomMaterialLibrary(scene);
     this.ownsMaterials = materials === undefined;
     this.builder = new ModularRoomBuilder(scene, this.materials);
-    this.metricsSnapshot = Object.freeze({
-      ...EMPTY_METRICS,
-      materialCount: this.materials.materialCount,
-    });
+    this.loadLimit = maxLoadedRooms;
+    this.poolLimit = pooledRoomLimit;
+    this.metricsSnapshot = this.emptyMetrics();
   }
 
   public get spawnPoint(): Vector3 {
@@ -61,6 +96,34 @@ export class ModularWorld {
 
   public get activeRoomId(): string | null {
     return this.currentRoomId;
+  }
+
+  public get maxLoadedRooms(): number {
+    return this.loadLimit;
+  }
+
+  public get loadedRoomCount(): number {
+    return this.views.size;
+  }
+
+  public get pooledRoomCount(): number {
+    return this.pooledViews.size;
+  }
+
+  public get registeredRoomCount(): number {
+    return this.instancesById.size;
+  }
+
+  public get loadedRoomIds(): readonly string[] {
+    return Object.freeze([...this.views.keys()]);
+  }
+
+  public get pooledRoomIds(): readonly string[] {
+    return Object.freeze([...this.pooledViews.keys()]);
+  }
+
+  public get maxPooledRooms(): number {
+    return this.poolLimit;
   }
 
   public get roomRoots(): readonly TransformNode[] {
@@ -91,48 +154,287 @@ export class ModularWorld {
     return this.materials;
   }
 
-  public build(graph: RoomGraph): void {
+  /** Registers a logical graph without eagerly creating any missing room views. */
+  public setGraph(graph: RoomGraph): void {
     this.assertActive();
     if (graph.rooms.length === 0) {
-      throw new Error('A modular world cannot be built from an empty room graph.');
+      throw new Error('A modular world cannot use an empty room graph.');
+    }
+
+    const nextInstances = new Map<string, RoomInstance>();
+    const nextRenderKeys = new Map<string, string>();
+    for (const instance of graph.rooms) {
+      if (nextInstances.has(instance.id)) {
+        throw new Error(`Room graph contains duplicate room id ${instance.id}.`);
+      }
+      const definition = getRoomDefinition(instance.definitionId);
+      nextInstances.set(instance.id, instance);
+      nextRenderKeys.set(instance.id, this.createRenderKey(instance, definition));
+    }
+
+    const startInstance = nextInstances.get(graph.startRoomId);
+    if (startInstance === undefined) {
+      throw new Error(`Room graph is missing start room ${graph.startRoomId}.`);
+    }
+    const startDefinition = getRoomDefinition(startInstance.definitionId);
+
+    const retainedViews = new Map<string, BuiltModularRoom>();
+    for (const [roomId, view] of this.views) {
+      const nextInstance = nextInstances.get(roomId);
+      const previousRenderKey = this.renderKeysById.get(roomId);
+      const nextRenderKey = nextRenderKeys.get(roomId);
+      if (
+        nextInstance === undefined ||
+        previousRenderKey === undefined ||
+        previousRenderKey !== nextRenderKey
+      ) {
+        view.dispose();
+        if (this.currentRoomId === roomId) {
+          this.currentRoomId = null;
+        }
+        continue;
+      }
+
+      retainedViews.set(
+        roomId,
+        view.instance === nextInstance
+          ? view
+          : {
+              ...view,
+              instance: nextInstance,
+            },
+      );
+    }
+
+    const retainedPooledViews = new Map<string, BuiltModularRoom>();
+    for (const [roomId, view] of this.pooledViews) {
+      const nextInstance = nextInstances.get(roomId);
+      const previousRenderKey = this.renderKeysById.get(roomId);
+      const nextRenderKey = nextRenderKeys.get(roomId);
+      if (
+        nextInstance === undefined ||
+        previousRenderKey === undefined ||
+        previousRenderKey !== nextRenderKey
+      ) {
+        view.dispose();
+        continue;
+      }
+      retainedPooledViews.set(
+        roomId,
+        view.instance === nextInstance
+          ? view
+          : {
+              ...view,
+              instance: nextInstance,
+            },
+      );
+    }
+
+    this.views.clear();
+    for (const [roomId, view] of retainedViews) {
+      this.views.set(roomId, view);
+    }
+    this.pooledViews.clear();
+    for (const [roomId, view] of retainedPooledViews) {
+      this.pooledViews.set(roomId, view);
+    }
+    this.instancesById.clear();
+    this.renderKeysById.clear();
+    for (const [roomId, instance] of nextInstances) {
+      this.instancesById.set(roomId, instance);
+    }
+    for (const [roomId, renderKey] of nextRenderKeys) {
+      this.renderKeysById.set(roomId, renderKey);
+    }
+
+    this.graph = graph;
+    this.spawn.set(
+      startInstance.worldTransform.position.x + this.renderOffset.x,
+      startInstance.worldTransform.position.y + MODULAR_PLAYER_BASE_HEIGHT + this.renderOffset.y,
+      startInstance.worldTransform.position.z + this.renderOffset.z,
+    );
+    this.yaw = this.calculateSpawnYaw(startInstance, startDefinition);
+    this.metricsSnapshot = this.calculateMetrics();
+  }
+
+  /** Compatibility helper: registers the graph and loads every room within the configured limit. */
+  public build(graph: RoomGraph): void {
+    if (graph.rooms.length > this.loadLimit) {
+      throw new RangeError(
+        `Cannot build ${graph.rooms.length} room views with a limit of ${this.loadLimit}.`,
+      );
+    }
+    this.setGraph(graph);
+    this.syncLoadedRooms(graph.rooms.map((room) => room.id));
+  }
+
+  public isRoomLoaded(roomId: string): boolean {
+    this.assertActive();
+    return this.views.has(roomId);
+  }
+
+  public getLoadedRoom(roomId: string): BuiltModularRoom | null {
+    this.assertActive();
+    return this.views.get(roomId) ?? null;
+  }
+
+  public loadRoom(roomId: string): BuiltModularRoom {
+    this.assertActive();
+    const existing = this.views.get(roomId);
+    if (existing !== undefined) {
+      return existing;
+    }
+    if (this.views.size >= this.loadLimit) {
+      throw new RangeError(`Cannot load more than ${this.loadLimit} room views.`);
+    }
+
+    const pooled = this.pooledViews.get(roomId);
+    if (pooled !== undefined) {
+      this.pooledViews.delete(roomId);
+      pooled.root.setEnabled(true);
+      this.views.set(roomId, pooled);
+      this.metricsSnapshot = this.calculateMetrics();
+      return pooled;
+    }
+
+    const view = this.createView(roomId);
+    this.views.set(roomId, view);
+    this.metricsSnapshot = this.calculateMetrics();
+    return view;
+  }
+
+  public unloadRoom(roomId: string): boolean {
+    this.assertActive();
+    const view = this.views.get(roomId);
+    if (view === undefined) {
+      return false;
+    }
+
+    this.views.delete(roomId);
+    this.cacheView(roomId, view);
+    if (this.currentRoomId === roomId) {
+      this.currentRoomId = null;
+    }
+    this.metricsSnapshot = this.calculateMetrics();
+    return true;
+  }
+
+  /** Replaces the loaded subset without ever exceeding the active-room limit. */
+  public syncLoadedRooms(roomIds: Iterable<string>): ModularWorldSyncResult {
+    this.assertActive();
+    this.requireGraph();
+
+    const requested = [...new Set(roomIds)];
+    if (requested.length > this.loadLimit) {
+      throw new RangeError(
+        `Requested ${requested.length} room views, exceeding the limit of ${this.loadLimit}.`,
+      );
+    }
+    for (const roomId of requested) {
+      if (!this.instancesById.has(roomId)) {
+        throw new Error(`Unknown room instance: ${roomId}`);
+      }
+    }
+
+    const requestedSet = new Set(requested);
+    const retainedRoomIds = requested.filter((roomId) => this.views.has(roomId));
+    const unloadedRoomIds = [...this.views.keys()].filter((roomId) => !requestedSet.has(roomId));
+    const loadedRoomIds = requested.filter((roomId) => !this.views.has(roomId));
+    const originalViews = new Map(this.views);
+    const originalPooledViews = new Map(this.pooledViews);
+    const originalCurrentRoomId = this.currentRoomId;
+    const retiredViews = new Map<string, BuiltModularRoom>();
+    const newlyCreatedViews = new Map<string, BuiltModularRoom>();
+    const reservedPooledViews = new Map<string, BuiltModularRoom>();
+    for (const roomId of loadedRoomIds) {
+      const pooled = this.pooledViews.get(roomId);
+      if (pooled !== undefined) {
+        this.pooledViews.delete(roomId);
+        reservedPooledViews.set(roomId, pooled);
+      }
+    }
+
+    for (const roomId of unloadedRoomIds) {
+      const view = this.views.get(roomId);
+      if (view !== undefined) {
+        this.views.delete(roomId);
+        view.root.setEnabled(false);
+        retiredViews.set(roomId, view);
+      }
+      if (this.currentRoomId === roomId) {
+        this.currentRoomId = null;
+      }
+    }
+
+    try {
+      for (const roomId of loadedRoomIds) {
+        const reserved = reservedPooledViews.get(roomId);
+        const view = reserved ?? this.createView(roomId);
+        if (reserved === undefined) {
+          newlyCreatedViews.set(roomId, view);
+        }
+        view.root.setEnabled(true);
+        this.views.set(roomId, view);
+        reservedPooledViews.delete(roomId);
+      }
+    } catch (error: unknown) {
+      this.views.clear();
+      for (const [roomId, view] of originalViews) {
+        view.root.setEnabled(true);
+        this.views.set(roomId, view);
+      }
+      for (const view of newlyCreatedViews.values()) {
+        view.dispose();
+      }
+      this.pooledViews.clear();
+      for (const [roomId, view] of originalPooledViews) {
+        view.root.setEnabled(false);
+        this.pooledViews.set(roomId, view);
+      }
+      this.currentRoomId = originalCurrentRoomId;
+      this.metricsSnapshot = this.calculateMetrics();
+      throw error;
+    }
+
+    for (const [roomId, view] of retiredViews) {
+      this.cacheView(roomId, view);
     }
 
     const nextViews = new Map<string, BuiltModularRoom>();
-    try {
-      for (const instance of graph.rooms) {
-        if (nextViews.has(instance.id)) {
-          throw new Error(`Room graph contains duplicate room id ${instance.id}.`);
-        }
-        const definition = getRoomDefinition(instance.definitionId);
-        nextViews.set(instance.id, this.builder.build(instance, definition));
+    for (const roomId of requested) {
+      const view = this.views.get(roomId);
+      if (view === undefined) {
+        throw new Error(`Room ${roomId} was not available after streaming synchronization.`);
       }
-
-      const startInstance = this.requireStartInstance(graph);
-      const startView = nextViews.get(startInstance.id);
-      if (startView === undefined) {
-        throw new Error(`Start room ${graph.startRoomId} was not rendered.`);
-      }
-      const nextSpawn = new Vector3(
-        startView.root.position.x,
-        startView.root.position.y + MODULAR_PLAYER_BASE_HEIGHT,
-        startView.root.position.z,
-      );
-      const nextYaw = this.calculateSpawnYaw(startInstance, startView);
-
-      this.clearRoomViews();
-      for (const [id, view] of nextViews) {
-        this.views.set(id, view);
-      }
-      this.spawn = nextSpawn;
-      this.yaw = nextYaw;
-      this.currentRoomId = null;
-      this.metricsSnapshot = this.calculateMetrics();
-    } catch (error: unknown) {
-      for (const view of nextViews.values()) {
-        view.dispose();
-      }
-      throw error;
+      nextViews.set(roomId, view);
     }
+    this.views.clear();
+    for (const [roomId, view] of nextViews) {
+      this.views.set(roomId, view);
+    }
+    this.metricsSnapshot = this.calculateMetrics();
+
+    return Object.freeze({
+      loadedRoomIds: Object.freeze(loadedRoomIds),
+      unloadedRoomIds: Object.freeze(unloadedRoomIds),
+      retainedRoomIds: Object.freeze(retainedRoomIds),
+    });
+  }
+
+  public unloadAllRooms(): void {
+    this.assertActive();
+    for (const [roomId, view] of this.views) {
+      this.cacheView(roomId, view);
+    }
+    this.views.clear();
+    this.currentRoomId = null;
+    this.metricsSnapshot = this.calculateMetrics();
+  }
+
+  public purgePool(): void {
+    this.assertActive();
+    this.disposePooledViews();
+    this.metricsSnapshot = this.calculateMetrics();
   }
 
   public getRoomAtPosition(position: Vector3): BuiltModularRoom | null {
@@ -171,13 +473,18 @@ export class ModularWorld {
     });
   }
 
-  /** Applies a floating-origin shift without mutating the logical room graph. */
+  /** Applies a floating-origin shift to loaded views and every later reconstruction. */
   public translate(delta: Vector3): void {
     this.assertActive();
     if (delta.lengthSquared() === 0) {
       return;
     }
+    this.renderOffset.addInPlace(delta);
     for (const view of this.views.values()) {
+      view.root.position.addInPlace(delta);
+      view.trigger.translate(delta);
+    }
+    for (const view of this.pooledViews.values()) {
       view.root.position.addInPlace(delta);
       view.trigger.translate(delta);
     }
@@ -189,22 +496,46 @@ export class ModularWorld {
       return;
     }
     this.disposed = true;
-    this.clearRoomViews();
+    this.disposeLoadedViews();
+    this.disposePooledViews();
+    this.instancesById.clear();
+    this.renderKeysById.clear();
+    this.graph = null;
     if (this.ownsMaterials) {
       this.materials.dispose();
     }
+    this.metricsSnapshot = EMPTY_METRICS;
   }
 
-  private requireStartInstance(graph: RoomGraph): RoomInstance {
-    const start = graph.rooms.find((room) => room.id === graph.startRoomId);
-    if (start === undefined) {
-      throw new Error(`Room graph is missing start room ${graph.startRoomId}.`);
+  private createView(roomId: string): BuiltModularRoom {
+    this.requireGraph();
+    const instance = this.instancesById.get(roomId);
+    if (instance === undefined) {
+      throw new Error(`Unknown room instance: ${roomId}`);
     }
-    return start;
+    const definition = getRoomDefinition(instance.definitionId);
+    const view = this.builder.build(instance, definition);
+    if (this.renderOffset.lengthSquared() > 0) {
+      view.root.position.addInPlace(this.renderOffset);
+      view.trigger.translate(this.renderOffset);
+    }
+    return view;
   }
 
-  private calculateSpawnYaw(instance: RoomInstance, view: BuiltModularRoom): number {
-    const socket = view.definition.sockets.find(
+  private createRenderKey(instance: RoomInstance, definition: RoomDefinition): string {
+    return JSON.stringify({
+      definitionId: instance.definitionId,
+      seed: instance.seed,
+      transform: instance.worldTransform,
+      sockets: definition.sockets.map((socket) => [
+        socket.id,
+        instance.socketStates[socket.id]?.status ?? 'missing',
+      ]),
+    });
+  }
+
+  private calculateSpawnYaw(instance: RoomInstance, definition: RoomDefinition): number {
+    const socket = definition.sockets.find(
       (candidate) => instance.socketStates[candidate.id]?.status === 'connected',
     );
     if (socket === undefined) {
@@ -222,6 +553,8 @@ export class ModularWorld {
     const roomViews = [...this.views.values()];
     return Object.freeze({
       roomCount: roomViews.length,
+      activeRoomCount: roomViews.length,
+      pooledRoomCount: this.pooledViews.size,
       meshCount: roomViews.reduce((total, view) => total + view.meshes.length, 0),
       colliderCount: roomViews.reduce((total, view) => total + view.colliders.length, 0),
       triggerCount: roomViews.length,
@@ -231,16 +564,52 @@ export class ModularWorld {
     });
   }
 
-  private clearRoomViews(): void {
+  private emptyMetrics(): ModularWorldMetrics {
+    return Object.freeze({
+      ...EMPTY_METRICS,
+      materialCount: this.disposed ? 0 : this.materials.materialCount,
+    });
+  }
+
+  private disposeLoadedViews(): void {
     for (const view of this.views.values()) {
       view.dispose();
     }
     this.views.clear();
     this.currentRoomId = null;
-    this.metricsSnapshot = Object.freeze({
-      ...EMPTY_METRICS,
-      materialCount: this.disposed ? 0 : this.materials.materialCount,
-    });
+  }
+
+  private cacheView(roomId: string, view: BuiltModularRoom): void {
+    view.root.setEnabled(false);
+    const previous = this.pooledViews.get(roomId);
+    if (previous !== undefined && previous !== view) {
+      previous.dispose();
+    }
+    this.pooledViews.delete(roomId);
+    this.pooledViews.set(roomId, view);
+    while (this.pooledViews.size > this.poolLimit) {
+      const oldestRoomId = this.pooledViews.keys().next().value as string | undefined;
+      if (oldestRoomId === undefined) {
+        break;
+      }
+      const oldest = this.pooledViews.get(oldestRoomId);
+      this.pooledViews.delete(oldestRoomId);
+      oldest?.dispose();
+    }
+  }
+
+  private disposePooledViews(): void {
+    for (const view of this.pooledViews.values()) {
+      view.dispose();
+    }
+    this.pooledViews.clear();
+  }
+
+  private requireGraph(): RoomGraph {
+    if (this.graph === null) {
+      throw new Error('Register a room graph before loading room views.');
+    }
+    return this.graph;
   }
 
   private assertActive(): void {

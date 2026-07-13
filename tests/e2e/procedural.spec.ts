@@ -4,10 +4,11 @@ test('la misma seed conserva el grafo y otra seed altera el layout', async ({ pa
   const app = page.locator('#app');
   await page.goto('/?debug=1&noAudio=1&seed=phase-3-repeatable');
   await expect(app).toHaveAttribute('data-layout-valid', 'true');
-  await expect
-    .poll(async () => Number(await app.getAttribute('data-room-count')))
-    .toBe(18);
-  expect(Number(await app.getAttribute('data-connection-count'))).toBe(17);
+  await expect.poll(async () => Number(await app.getAttribute('data-room-count'))).toBe(1024);
+  expect(Number(await app.getAttribute('data-connection-count'))).toBe(1023);
+  expect(Number(await app.getAttribute('data-stream-materialized-rooms'))).toBeLessThanOrEqual(60);
+  expect(Number(await app.getAttribute('data-world-active-rooms'))).toBeLessThanOrEqual(60);
+  expect(Number(await app.getAttribute('data-world-pooled-rooms'))).toBeLessThanOrEqual(8);
   expect(Number(await app.getAttribute('data-world-meshes'))).toBeLessThan(250);
   expect(Number(await app.getAttribute('data-world-colliders'))).toBeLessThan(100);
   expect(Number(await app.getAttribute('data-world-triangles'))).toBeLessThan(250_000);

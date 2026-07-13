@@ -129,3 +129,58 @@ La integración actual materializa un grafo determinista de 18 habitaciones para
 movimiento y visitas de extremo a extremo. No se presenta como mundo infinito: la Fase 4 sustituirá
 la materialización total por generación incremental, ventana activa, archivo lógico y floating origin
 sin cambiar el contrato de módulos ya probado.
+
+## D-017 — Horizonte lógico largo con espina profunda
+
+**Estado:** aceptada — Fase 4.
+
+La sesión genera 1,024 `RoomInstance` sin representación Babylon y selecciona la frontera más
+profunda en siete de cada ocho expansiones; la octava mantiene ramificaciones. El resultado conserva
+la sensación de exploración abierta y ofrece rutas de cientos de módulos sin prometer una profundidad
+idéntica para cada seed (458–773 en la auditoría de 128 seeds). Una seguridad lógica de 2,048 limita
+el grafo; la experiencia final termina antes de agotar ese horizonte.
+
+## D-018 — Burbuja por distancia de grafo y presupuesto duro
+
+**Estado:** aceptada — Fase 4.
+
+El streamer materializa tres saltos como activos y el cuarto como precarga, con máximo 60. Salas
+actuales o protegidas son obligatorias; el preload restante se prioriza determinísticamente. Los swaps
+descargan primero y restauran recursos previos si una carga falla, evitando picos y estados parciales.
+La sincronización directa del renderer conserva snapshots de vistas activas y pooled para ofrecer el
+mismo rollback si Babylon falla al construir una vista entrante.
+
+## D-019 — Visibilidad conservadora limitada por niebla
+
+**Estado:** aceptada — Fase 4.
+
+Solo se inspeccionan las vistas cargadas cuando cambia la sala. Se conservan geometrías dentro del
+frustum y antes de `fogEnd`, dentro de una distancia de seguridad, y vecinos detrás de sockets cuya
+entrada puede verse. Una verificación posterior convierte cualquier desaparición protegida en error
+observable en vez de aceptar pop-in silencioso. Esa verificación consulta las vistas realmente
+cargadas por `ModularWorld`, de forma independiente al set pretendido por `ChunkStreamer`.
+
+## D-020 — LRU pequeña para backtracking, materiales compartidos fuera del pool
+
+**Estado:** aceptada — Fase 4.
+
+Hasta ocho vistas descargadas permanecen deshabilitadas y se reutilizan al volver; la novena expulsa
+la menos reciente. El pool nunca cuenta como habitación activa y está incluido en los budgets de
+recursos de escena. Texturas/materiales procedurales siguen compartidos y se liberan solo con el mundo.
+
+## D-021 — Floating origin conserva el espacio lógico
+
+**Estado:** aceptada — Fase 4.
+
+Al alcanzar 240 m locales, el origen acumula la posición lógica del jugador y devuelve el delta
+opuesto para mundo y jugador. El grafo no se modifica. `ModularWorld` conserva ese offset para vistas
+pooled y futuras cargas. En `debug` se usa 40 m para cubrir múltiples rebases en E2E; producción
+mantiene 240 m. El reset devuelve el delta inverso y pone métricas/offset a cero.
+
+## D-022 — Niebla lineal como frontera de streaming verificable
+
+**Estado:** aceptada — Fase 4.
+
+La escena usa fog lineal del mismo tono que `clearColor`, de 16 a 44 m. Su final es también el límite
+de protección por frustum/entradas, por lo que renderer, visibilidad y streaming comparten una frontera
+mensurable que podrá ser afinada por el pipeline visual sin cambiar el contrato lógico.
