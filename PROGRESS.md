@@ -13,7 +13,7 @@ Implementación activa. La fuente de verdad es `MASTER_PLAN.md`.
 | 2 — Audio                   | Completada | `feat: add environmental audio system`      |
 | 3 — Módulos                 | Completada | `feat: add procedural room generation`      |
 | 4 — Streaming               | Completada | `feat: add streamed infinite world`         |
-| 5 — Visual pixelado         | Pendiente  | —                                           |
+| 5 — Visual pixelado         | Completada | `feat: implement pixel rendering pipeline`  |
 | 6 — Iluminación             | Pendiente  | —                                           |
 | 7 — Tensión                 | Pendiente  | —                                           |
 | 8 — Salida y final          | Pendiente  | —                                           |
