@@ -8,11 +8,18 @@ describe('SessionStats', () => {
     stats.recordMovement(2.5, true);
     stats.recordMovement(Number.NaN, true);
     stats.recordMovement(-2, false);
+    expect(stats.recordRoomVisit('room-1')).toBe(true);
+    expect(stats.recordRoomVisit('room-1')).toBe(false);
+    expect(stats.recordRoomVisit(' ')).toBe(false);
 
     expect(stats.snapshot(4)).toEqual({
       elapsedSeconds: 4,
       distanceWalked: 1.25,
       distanceSprinted: 2.5,
+      roomsVisited: 1,
     });
+
+    stats.reset();
+    expect(stats.snapshot(0).roomsVisited).toBe(0);
   });
 });

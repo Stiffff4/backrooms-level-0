@@ -94,3 +94,38 @@ variación sin acoplar audio y generación espacial.
 Los pasos consumen la distancia horizontal posterior a colisiones, no timers ni velocidad
 solicitada. Esto conserva sincronía al chocar, pausar o rebasar el origen. Un límite por frame y un
 límite global de ocho voces evitan ráfagas y crecimiento transitorio aun ante deltas anómalos.
+
+## D-013 — El grafo lógico es la autoridad del mundo
+
+**Estado:** aceptada — Fase 3.
+
+`RoomGraphGenerator` produce instancias, transformaciones, sockets y conexiones sin depender de
+Babylon. `ModularWorld` solo materializa ese resultado. Esta frontera permite probar centenares de
+seeds sin WebGL y permitirá que streaming archive representación visual sin perder estado lógico.
+
+## D-014 — Sockets cardinales y transformaciones discretas
+
+**Estado:** aceptada — Fase 3.
+
+Los módulos se conectan mediante sockets locales con posición, forward, ancho, alto y tags. Solo se
+permiten rotaciones de cuarto de vuelta; la transformación candidata se deriva de la pose de ambos
+sockets y se acepta después de comprobar compatibilidad, alineación y AABB. Se evita así acumular
+error flotante y se conserva una prueba exacta de reciprocidad.
+
+## D-015 — Geometría por habitación con seams físicos separados de los visuales
+
+**Estado:** aceptada — Fase 3.
+
+Los materiales se comparten globalmente y las piezas estáticas se combinan por categoría dentro de
+cada habitación. El suelo visible termina en el footprint; un collider invisible sobresale 6 cm por
+lado para proteger el cruce, mientras paredes, linteles y zócalos quedan completamente dentro de su
+módulo. Así no hay z-fighting en juntas y el streaming puede disponer una habitación como unidad.
+
+## D-016 — Fase 3 finita, preparada para streaming incremental
+
+**Estado:** aceptada — Fase 3.
+
+La integración actual materializa un grafo determinista de 18 habitaciones para validar catálogo,
+movimiento y visitas de extremo a extremo. No se presenta como mundo infinito: la Fase 4 sustituirá
+la materialización total por generación incremental, ventana activa, archivo lógico y floating origin
+sin cambiar el contrato de módulos ya probado.

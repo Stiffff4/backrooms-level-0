@@ -8,7 +8,7 @@
 
 ## Activos
 
-- Ningún defecto bloqueante o no bloqueante conocido tras la Fase 0.
+- Ningún defecto bloqueante o no bloqueante conocido tras la Fase 3.
 
 ## Pendientes de QA manual acumulativos
 
@@ -21,5 +21,8 @@
 - Headless Chromium no siempre enruta Escape, una tecla reservada por el navegador, hacia pointer
   lock. El E2E intenta Escape y, si el navegador no lo libera, dispara `exitPointerLock()` para
   verificar la misma transición. El flujo real sigue el API estándar y requiere matriz manual final.
-- La sala de Fase 1 usa materiales procedurales simples encapsulados; no se consideran arte final y
-  serán sustituidos por las texturas/pipeline de Fase 5.
+- Los módulos usan materiales procedurales simples encapsulados; no se consideran arte final y
+  serán sustituidos por las texturas y el pipeline pixelado de Fase 5.
+- Aunque las capturas E2E verifican ambos lados de una conexión, la percepción subjetiva de bumps,
+  seams o z-fighting en todas las combinaciones de módulos queda en la pasada manual acumulativa de
+  Fase 9.

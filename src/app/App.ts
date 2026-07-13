@@ -11,8 +11,10 @@ import { parseDebugOptions } from '../debug/QueryParams';
 import { EngineBootstrap } from '../engine/EngineBootstrap';
 import { createGameplayScene } from '../engine/SceneFactory';
 import { PlayerController } from '../player/PlayerController';
-import { SimpleRoomBuilder } from '../rooms/builders/SimpleRoomBuilder';
-import type { BuiltRoom } from '../rooms/room.types';
+import { assertValidRoomGraph, generateRoomGraph } from '../procedural/RoomGraphGenerator';
+import { hashSeed } from '../procedural/SeedBank';
+import type { RoomGraph } from '../procedural/procedural.types';
+import { ModularWorld } from '../rooms/ModularWorld';
 import { renderErrorScreen } from '../ui/ErrorScreen';
 import { CreditsDialog } from '../ui/CreditsDialog';
 import { PauseMenu } from '../ui/PauseMenu';
@@ -35,7 +37,8 @@ export class App {
 
   private engineBootstrap: EngineBootstrap | null = null;
   private scene: Scene | null = null;
-  private room: BuiltRoom | null = null;
+  private roomGraph: RoomGraph | null = null;
+  private modularWorld: ModularWorld | null = null;
   private player: PlayerController | null = null;
   private titleScreen: TitleScreen | null = null;
   private pauseMenu: PauseMenu | null = null;
@@ -45,6 +48,8 @@ export class App {
   private ambientDirector: AmbientDirector | null = null;
   private footsteps: FootstepSystem | null = null;
   private footstepCount = 0;
+  private layoutSignature = '';
+  private currentRoomDefinitionId: string | null = null;
   private disposed = false;
 
   private readonly handleWindowBlur = (): void => {
@@ -94,14 +99,31 @@ export class App {
       this.stateMachine.transition('loading');
       this.engineBootstrap = EngineBootstrap.create(this.canvas);
       this.scene = createGameplayScene(this.engineBootstrap.engine);
-      this.room = new SimpleRoomBuilder(this.scene).build();
+      this.roomGraph = generateRoomGraph({ seed: this.debugOptions.seed, targetRooms: 18 });
+      assertValidRoomGraph(this.roomGraph);
+      this.layoutSignature = hashSeed(
+        JSON.stringify({
+          rooms: this.roomGraph.rooms.map((room) => ({
+            definitionId: room.definitionId,
+            transform: room.worldTransform,
+            sockets: room.socketStates,
+          })),
+          connections: this.roomGraph.connections,
+        }),
+      ).toString(16);
+      this.modularWorld = new ModularWorld(this.scene);
+      this.modularWorld.build(this.roomGraph);
       this.player = new PlayerController(
         this.scene,
         this.canvas,
-        this.room.spawnPoint,
+        this.modularWorld.spawnPoint,
         this.settings.value,
       );
+      this.player.setLookRotation(this.modularWorld.spawnYaw);
       this.player.setEnabled(false);
+      const initialTransition = this.modularWorld.updatePlayerPosition(this.player.position);
+      this.recordRoomEntry(initialTransition.roomId);
+      this.syncWorldDebugSnapshot();
       this.installUi();
       this.installSubscriptions();
       window.addEventListener('blur', this.handleWindowBlur);
@@ -151,8 +173,9 @@ export class App {
     this.audioBank = null;
     this.player?.dispose();
     this.player = null;
-    this.room?.dispose();
-    this.room = null;
+    this.modularWorld?.dispose();
+    this.modularWorld = null;
+    this.roomGraph = null;
     this.scene?.dispose();
     this.scene = null;
     this.engineBootstrap?.dispose();
@@ -206,6 +229,7 @@ export class App {
 
     if (this.stateMachine.state === 'playing') {
       this.player?.update(this.engineBootstrap.engine.getDeltaTime() / 1000);
+      this.updateWorldFrame();
       this.updateAudioFrame();
     }
     this.updateDebugSnapshot();
@@ -213,8 +237,47 @@ export class App {
     this.debugHud?.update(performance.now(), [
       `AUDIO ${audioSnapshot.state} / ${this.getAudioNodeCount()} NODES`,
       `STEPS ${this.footstepCount}`,
+      `ROOM ${this.modularWorld?.activeRoomId ?? 'none'} / ${this.stats.snapshot(this.clock.elapsedSeconds).roomsVisited} VISITED`,
+      `SEED ${this.debugOptions.seed}`,
     ]);
     this.scene.render();
+  }
+
+  private updateWorldFrame(): void {
+    if (!this.player || !this.modularWorld) {
+      return;
+    }
+    const transition = this.modularWorld.updatePlayerPosition(this.player.position);
+    if (transition.changed) {
+      this.recordRoomEntry(transition.roomId);
+    }
+  }
+
+  private recordRoomEntry(roomId: string | null): void {
+    if (!roomId || !this.roomGraph) {
+      this.currentRoomDefinitionId = null;
+      return;
+    }
+    const instance = this.roomGraph.rooms.find((room) => room.id === roomId);
+    if (!instance) {
+      this.currentRoomDefinitionId = null;
+      return;
+    }
+
+    const firstVisit = this.stats.recordRoomVisit(roomId);
+    instance.visitState = 'visited';
+    this.currentRoomDefinitionId = instance.definitionId;
+    this.events.emit('roomEntered', { roomId, definitionId: instance.definitionId, firstVisit });
+    this.syncWorldDebugSnapshot();
+  }
+
+  private resetRoomVisits(): void {
+    if (!this.roomGraph) {
+      return;
+    }
+    for (const room of this.roomGraph.rooms) {
+      room.visitState = room.id === this.roomGraph.startRoomId ? 'visible' : 'unvisited';
+    }
   }
 
   private updateAudioFrame(): void {
@@ -250,6 +313,27 @@ export class App {
     this.root.dataset.elapsedSeconds = this.clock.elapsedSeconds.toFixed(2);
     this.root.dataset.fps = (this.engineBootstrap?.engine.getFps() ?? 0).toFixed(1);
     this.syncAudioDebugSnapshot();
+    this.syncWorldDebugSnapshot();
+  }
+
+  private syncWorldDebugSnapshot(): void {
+    const graph = this.roomGraph;
+    const world = this.modularWorld;
+    const stats = this.stats.snapshot(this.clock.elapsedSeconds);
+    this.root.dataset.seed = this.debugOptions.seed;
+    this.root.dataset.layoutValid = graph ? 'true' : 'false';
+    this.root.dataset.layoutSignature = this.layoutSignature;
+    this.root.dataset.roomCount = String(graph?.rooms.length ?? 0);
+    this.root.dataset.connectionCount = String(graph?.connections.length ?? 0);
+    this.root.dataset.generationAttempts = String(graph?.generationStats.attemptedPlacements ?? 0);
+    this.root.dataset.generationRejections = String(graph?.generationStats.rejectedOverlaps ?? 0);
+    this.root.dataset.sealedSockets = String(graph?.generationStats.sealedSockets ?? 0);
+    this.root.dataset.currentRoomId = world?.activeRoomId ?? '';
+    this.root.dataset.currentRoomDefinition = this.currentRoomDefinitionId ?? '';
+    this.root.dataset.visitedRooms = String(stats.roomsVisited);
+    this.root.dataset.worldMeshes = String(world?.metrics.meshCount ?? 0);
+    this.root.dataset.worldColliders = String(world?.metrics.colliderCount ?? 0);
+    this.root.dataset.worldTriangles = String(world?.metrics.triangleCount ?? 0);
   }
 
   private syncAudioDebugSnapshot(): void {
@@ -382,32 +466,38 @@ export class App {
   }
 
   private async restartSession(): Promise<void> {
-    if (!this.room || !this.player) {
+    if (!this.modularWorld || !this.player) {
       return;
     }
 
     this.stats.reset();
+    this.resetRoomVisits();
     this.clock.reset();
     this.footstepCount = 0;
     this.footsteps?.resetAfterRebase();
-    this.player.setPosition(this.room.spawnPoint);
-    this.player.setLookRotation(0);
+    this.player.setPosition(this.modularWorld.spawnPoint);
+    this.player.setLookRotation(this.modularWorld.spawnYaw);
+    this.modularWorld.updatePlayerPosition(this.player.position);
+    this.recordRoomEntry(this.modularWorld.activeRoomId);
     await this.resumeGame();
   }
 
   private returnToTitle(): void {
-    if (!this.room || !this.player || this.stateMachine.state !== 'paused') {
+    if (!this.modularWorld || !this.player || this.stateMachine.state !== 'paused') {
       return;
     }
 
     this.player.releasePointerLock();
     this.player.setEnabled(false);
-    this.player.setPosition(this.room.spawnPoint);
-    this.player.setLookRotation(0);
+    this.player.setPosition(this.modularWorld.spawnPoint);
+    this.player.setLookRotation(this.modularWorld.spawnYaw);
     this.stats.reset();
+    this.resetRoomVisits();
     this.clock.reset();
     this.footstepCount = 0;
     this.footsteps?.resetAfterRebase();
+    this.modularWorld.updatePlayerPosition(this.player.position);
+    this.recordRoomEntry(this.modularWorld.activeRoomId);
     this.pauseMenu?.hide();
     this.titleScreen?.show();
     this.titleScreen?.setReady();

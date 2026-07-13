@@ -17,6 +17,13 @@ test('persisten FOV y sensibilidad entre recargas', async ({ page }) => {
 
 test('pointer lock inicia la partida, WASD mueve y Escape pausa', async ({ page }) => {
   const runtimeErrors: string[] = [];
+  const dispatchKey = async (type: 'keydown' | 'keyup', code: string): Promise<void> => {
+    await page.evaluate(
+      ({ eventType, eventCode }) =>
+        window.dispatchEvent(new KeyboardEvent(eventType, { code: eventCode })),
+      { eventType: type, eventCode: code },
+    );
+  };
   page.on('console', (message) => {
     if (message.type() === 'error') {
       runtimeErrors.push(message.text());
@@ -24,16 +31,16 @@ test('pointer lock inicia la partida, WASD mueve y Escape pausa', async ({ page 
   });
   page.on('pageerror', (error) => runtimeErrors.push(error.message));
 
-  await page.goto('/?debug=1&noAudio=1');
+  await page.goto('/?debug=1&noAudio=1&seed=phase-3-crossing');
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page.locator('#app')).toHaveAttribute('data-game-state', 'playing');
   await page.waitForTimeout(350);
   await page.screenshot({ path: 'test-results/phase1-gameplay.png' });
 
   const before = Number(await page.locator('#app').getAttribute('data-player-z'));
-  await page.keyboard.down('w');
+  await dispatchKey('keydown', 'KeyW');
   await page.waitForTimeout(500);
-  await page.keyboard.up('w');
+  await dispatchKey('keyup', 'KeyW');
 
   await expect
     .poll(async () => Number(await page.locator('#app').getAttribute('data-player-z')))
@@ -50,45 +57,42 @@ test('pointer lock inicia la partida, WASD mueve y Escape pausa', async ({ page 
   await page.getByRole('button', { name: 'Reanudar' }).click();
   await expect(page.locator('#app')).toHaveAttribute('data-game-state', 'playing');
 
-  await page.keyboard.down('Shift');
-  await page.keyboard.down('w');
+  await dispatchKey('keydown', 'ShiftLeft');
+  await dispatchKey('keydown', 'KeyW');
   await page.waitForTimeout(3_000);
-  await page.keyboard.up('w');
-  await page.keyboard.up('Shift');
+  await dispatchKey('keyup', 'KeyW');
+  await dispatchKey('keyup', 'ShiftLeft');
 
   const finalZ = Number(await page.locator('#app').getAttribute('data-player-z'));
   const finalY = Number(await page.locator('#app').getAttribute('data-player-y'));
-  expect(finalZ).toBeGreaterThan(4);
-  expect(finalZ).toBeLessThan(5.8);
+  expect(finalZ).toBeGreaterThan(before + 5);
   expect(finalY).toBeGreaterThanOrEqual(-0.05);
   expect(finalY).toBeLessThan(0.15);
 
-  await page.keyboard.down('Shift');
-  await page.keyboard.down('d');
+  await dispatchKey('keydown', 'ShiftLeft');
+  await dispatchKey('keydown', 'KeyD');
   await page.waitForTimeout(2_100);
-  await page.keyboard.up('d');
-  await page.keyboard.up('Shift');
+  await dispatchKey('keyup', 'KeyD');
+  await dispatchKey('keyup', 'ShiftLeft');
   const eastX = Number(await page.locator('#app').getAttribute('data-player-x'));
-  expect(eastX).toBeGreaterThan(6.5);
-  expect(eastX).toBeLessThan(7.8);
+  expect(eastX).toBeGreaterThan(1);
 
-  await page.keyboard.down('Shift');
-  await page.keyboard.down('s');
+  await dispatchKey('keydown', 'ShiftLeft');
+  await dispatchKey('keydown', 'KeyS');
   await page.waitForTimeout(3_100);
-  await page.keyboard.up('s');
-  await page.keyboard.up('Shift');
+  await dispatchKey('keyup', 'KeyS');
+  await dispatchKey('keyup', 'ShiftLeft');
   const southZ = Number(await page.locator('#app').getAttribute('data-player-z'));
-  expect(southZ).toBeGreaterThan(-5.8);
-  expect(southZ).toBeLessThan(-4.5);
+  expect(southZ).toBeLessThan(finalZ - 3);
 
-  await page.keyboard.down('Shift');
-  await page.keyboard.down('a');
+  await dispatchKey('keydown', 'ShiftLeft');
+  await dispatchKey('keydown', 'KeyA');
   await page.waitForTimeout(3_800);
-  await page.keyboard.up('a');
-  await page.keyboard.up('Shift');
+  await dispatchKey('keyup', 'KeyA');
+  await dispatchKey('keyup', 'ShiftLeft');
   const westX = Number(await page.locator('#app').getAttribute('data-player-x'));
-  expect(westX).toBeGreaterThan(-7.8);
-  expect(westX).toBeLessThan(-6.5);
+  expect(westX).toBeLessThan(eastX - 3);
+  await expect(page.locator('#app')).not.toHaveAttribute('data-current-room-id', '');
   expect(Number(await page.locator('#app').getAttribute('data-fps'))).toBeGreaterThan(50);
 
   await page.evaluate(() => window.dispatchEvent(new Event('blur')));

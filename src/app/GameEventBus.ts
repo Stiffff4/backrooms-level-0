@@ -3,6 +3,7 @@ import type { GameState } from './GameStateMachine';
 export interface GameEvents {
   stateChanged: { next: GameState; previous: GameState };
   pointerLockChanged: { locked: boolean };
+  roomEntered: { roomId: string; definitionId: string; firstVisit: boolean };
   settingsChanged: { key: string };
   fatalError: { error: unknown };
 }

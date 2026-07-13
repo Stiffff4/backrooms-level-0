@@ -11,7 +11,7 @@ Implementación activa. La fuente de verdad es `MASTER_PLAN.md`.
 | 0 — Repositorio y fundación | Completada | `chore: initialize babylon game foundation` |
 | 1 — Movimiento | Completada | `feat: implement first person movement` |
 | 2 — Audio | Completada | `feat: add environmental audio system` |
-| 3 — Módulos | Pendiente | — |
+| 3 — Módulos | Completada | `feat: add procedural room generation` |
 | 4 — Streaming | Pendiente | — |
 | 5 — Visual pixelado | Pendiente | — |
 | 6 — Iluminación | Pendiente | — |
@@ -95,3 +95,35 @@ en 1,100 kB, después de medir el bundle y sin modificar los presupuestos de pro
 - Rendimiento observado con audio activo: 60 FPS sostenidos tras warm-up, 31 nodos de audio,
   28 draw calls y 1,008 triángulos en la sala vertical.
 - Bundle: 1,058.81 kB JS sin comprimir, 253.50 kB gzip; sin warnings y muy por debajo del budget.
+
+## Fase 3 — Sistema de módulos y generación base
+
+- Catálogo tipado con los 12 módulos base de `MASTER_PLAN.md`, footprints, recetas geométricas,
+  pesos, etiquetas y sockets cardinales con anchura y altura explícitas.
+- `SeedBank` con streams independientes `world`, `visual`, `audio` y `tension`; la topología no
+  cambia al consumir aleatoriedad cosmética o sonora.
+- Grafo lógico de `RoomInstance`, conexiones recíprocas y estados `open`, `connected` y `sealed`
+  como fuente de verdad separada del renderer.
+- Generación ponderada y determinista con rotaciones de cuarto de vuelta, alineación de sockets,
+  rechazo por AABB, límites de repetición y cierre explícito de sockets sin pareja.
+- Renderer modular original con materiales compartidos, geometría combinada por habitación,
+  columnas, retícula, fixtures, colliders, triggers de visita y anclas de iluminación.
+- Juntas sin superficies coplanares: suelo visible limitado al footprint, collider invisible con
+  solape mínimo y paredes, linteles y zócalos retraídos dentro de su módulo.
+- Mundo de checkpoint de 18 habitaciones integrado al ciclo real del juego, con spawn orientado,
+  transición física entre módulos, conteo único de visitas y reinicio reproducible con la misma seed.
+- Telemetría de seed, firma topológica, intentos/rechazos, habitación actual, visitas, meshes,
+  colliders y triángulos disponible para HUD y automatización.
+
+### Validación
+
+- `npm run validate`: correcto; TypeScript strict, ESLint, 13 archivos/52 tests y build de producción.
+- Property test sobre 320 seeds y grafos de 36–48 habitaciones: conectividad, reciprocidad,
+  alineación, determinismo, cobertura de los 12 módulos, ausencia de solapes y límites de repetición.
+- `npm run test:e2e`: 7/7 en Chromium; incluye misma seed/misma topología, seed distinta/layout
+  distinto, cruce físico de una junta, cambio de habitación, visitas y restart reproducible.
+- Smoke `NullEngine`: construcción/reconstrucción de 48 habitaciones estable en 338 meshes y
+  liberación completa de meshes, materiales y transform nodes al disponer el mundo.
+- Capturas inspeccionadas a ambos lados de una unión: 45–61 FPS en la captura headless, 5–38 draw
+  calls y 720–5,796 triángulos activos según la habitación visible.
+- Bundle: 1,079.27 kB JS sin comprimir, 260.34 kB gzip; build en 404 ms y dentro del budget.
