@@ -52,6 +52,251 @@ select {
   text-align: center;
 }
 
+.ui-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  overflow: auto;
+  padding: clamp(1rem, 4vw, 3rem);
+  color: #ede6bd;
+  background:
+    linear-gradient(90deg, rgb(7 7 4 / 96%), rgb(17 16 8 / 84%) 55%, rgb(7 7 4 / 96%)),
+    radial-gradient(circle at 55% 25%, rgb(150 137 55 / 18%), transparent 48%);
+  backdrop-filter: blur(4px);
+}
+
+.ui-overlay[hidden] {
+  display: none;
+}
+
+.title-screen {
+  display: grid;
+  grid-template-columns: minmax(18rem, 34rem) minmax(16rem, 28rem);
+  align-content: center;
+  justify-content: center;
+  column-gap: clamp(1.5rem, 5vw, 5rem);
+  row-gap: 0.85rem;
+}
+
+.title-screen__heading,
+.title-screen > :not(.title-screen__settings) {
+  grid-column: 1;
+}
+
+.title-screen__heading h1 {
+  margin: 0;
+  font-size: clamp(2.5rem, 8vw, 6.6rem);
+  font-weight: 400;
+  line-height: 0.92;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 1.8rem rgb(230 218 145 / 15%);
+}
+
+.title-screen__heading p:last-child {
+  max-width: 36ch;
+  color: #b8b087;
+  line-height: 1.55;
+}
+
+.title-screen__recommendation {
+  color: #d7cf9f;
+  letter-spacing: 0.08em;
+}
+
+.title-screen__controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 1rem;
+  margin: 0;
+  padding: 0;
+  color: #a8a176;
+  list-style: none;
+}
+
+.title-screen__warning {
+  max-width: 52ch;
+  border-left: 2px solid #8c844b;
+  padding-left: 0.8rem;
+  color: #aaa274;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.title-screen__settings {
+  grid-column: 2;
+  grid-row: 1 / span 8;
+  align-self: center;
+  border: 1px solid rgb(188 179 117 / 30%);
+  padding: 1rem;
+  background: rgb(31 29 14 / 72%);
+}
+
+.title-screen__settings summary {
+  cursor: pointer;
+  color: #d8d09e;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+}
+
+.title-screen__status {
+  min-height: 1.3em;
+  color: #a9a170;
+}
+
+.title-screen__actions,
+.pause-menu__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.ui-overlay button,
+.ui-overlay select {
+  border: 1px solid #8f885f;
+  padding: 0.68rem 1rem;
+  color: #eee6b9;
+  background: #292716;
+  cursor: pointer;
+}
+
+.ui-overlay button:hover,
+.ui-overlay select:hover {
+  border-color: #c3ba7b;
+  background: #36331b;
+}
+
+.ui-overlay button:focus-visible,
+.ui-overlay input:focus-visible,
+.ui-overlay select:focus-visible,
+.ui-overlay summary:focus-visible {
+  outline: 2px solid #eee6b9;
+  outline-offset: 3px;
+}
+
+.title-screen__enter,
+.pause-menu__primary-action {
+  min-width: 9rem;
+  border-color: #c5bc7f !important;
+  background: #45401d !important;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.title-screen progress {
+  width: min(100%, 22rem);
+  accent-color: #9b945a;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1rem;
+  border: 0;
+  padding: 0;
+}
+
+.settings-panel legend {
+  margin-bottom: 0.9rem;
+  color: #c7be89;
+}
+
+.settings-control {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.settings-control__label-row,
+.settings-control--select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.settings-control__value {
+  color: #8f895f;
+  font-size: 0.82rem;
+}
+
+.settings-control input[type='range'] {
+  width: 100%;
+  accent-color: #a69e62;
+}
+
+.settings-control--checkbox {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.settings-control--checkbox input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #a69e62;
+}
+
+.pause-menu {
+  display: grid;
+  place-content: center;
+  justify-items: stretch;
+}
+
+.credits-dialog {
+  z-index: 25;
+  display: grid;
+  place-content: center;
+}
+
+.credits-dialog__panel {
+  width: min(92vw, 38rem);
+  border: 1px solid rgb(188 179 117 / 36%);
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  background: rgb(25 24 12 / 94%);
+  box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 45%);
+}
+
+.credits-dialog h1 {
+  margin-top: 0;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+}
+
+.credits-dialog p {
+  color: #b7af80;
+  line-height: 1.6;
+}
+
+.pause-menu > * {
+  width: min(92vw, 42rem);
+}
+
+.pause-menu h1 {
+  margin-bottom: 0;
+  font-size: clamp(2rem, 6vw, 4rem);
+  font-weight: 400;
+  letter-spacing: 0.16em;
+}
+
+.pause-menu .settings-panel {
+  margin-top: 2rem;
+  border-top: 1px solid rgb(188 179 117 / 22%);
+  padding-top: 1rem;
+}
+
+.debug-hud {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 30;
+  margin: 0;
+  border: 1px solid rgb(211 205 151 / 35%);
+  padding: 0.6rem;
+  color: #e5dda8;
+  background: rgb(7 7 3 / 78%);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  pointer-events: none;
+}
+
 .boot-status h1,
 .fatal-error h1 {
   margin: 0;
@@ -84,4 +329,29 @@ select {
 .fatal-error button:focus-visible {
   outline: 2px solid #eee6b9;
   outline-offset: 3px;
+}
+
+@media (max-width: 760px) {
+  .title-screen {
+    display: block;
+  }
+
+  .title-screen__settings {
+    margin-top: 1.5rem;
+  }
+
+  .title-screen__controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

@@ -33,8 +33,39 @@ TypeScript 6.0.3, la versión estable más reciente dentro del rango soportado p
 
 **Estado:** aceptada — Fase 0.
 
-El entry inicial de Babylon mide aproximadamente 600 kB (141 kB gzip), muy por debajo del budget
+El entry del vertical slice con Babylon mide aproximadamente 1,009 kB (242 kB gzip), muy por
+debajo del budget
 de descarga. Un intento de dividir sus módulos internos con el agrupador avanzado de Rolldown
 produjo un error de orden de inicialización (`MatrixTrackPrecisionChange`) en Chromium, por lo que
-se descartó. El umbral informativo de Vite se fija en 700 kB y el bundle se seguirá midiendo con un
+se descartó. El umbral informativo de Vite se fija en 1,100 kB y el bundle se seguirá midiendo con un
 reporte propio en la Fase 9.
+
+## D-006 — Collider posicionado por los pies
+
+**Estado:** aceptada — Fase 1.
+
+`spawnPoint` representa la base del collider. La altura de ojos pertenece únicamente a la cámara
+hija. Esta convención evita intersecciones con techo y se mantendrá al conectar módulos.
+
+## D-007 — Control cinemático sin motor de físicas
+
+**Estado:** aceptada — Fase 1.
+
+El jugador usa un mesh invisible con elipsoide, velocidad horizontal suavizada, gravedad explícita
+y `moveWithCollisions`. No hay salto, stamina ni cuerpo visible. La telemetría de movimiento se
+publica por frame para audio, estadísticas y pruebas.
+
+## D-008 — Settings DOM versionados
+
+**Estado:** aceptada — Fase 1.
+
+Los ajustes viven en un store tipado e independiente del renderer. La persistencia incluye versión,
+clamping y fallback si storage está corrupto, lleno o denegado. Título y pausa reutilizan controles
+DOM nativos accesibles.
+
+## D-009 — Pausa explícita por foco
+
+**Estado:** aceptada — Fase 1.
+
+Además de reaccionar a `pointerlockchange`, la aplicación pausa directamente en `blur` y cuando el
+documento queda oculto. Esto evita depender de diferencias de pointer lock entre navegadores.

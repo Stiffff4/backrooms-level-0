@@ -1,0 +1,22 @@
+export const gameConfig = {
+  movement: {
+    walkSpeed: 2.65,
+    sprintSpeed: 4.55,
+    acceleration: 11,
+    braking: 15,
+    gravity: 18,
+    eyeHeight: 1.7,
+    colliderRadius: 0.36,
+    colliderHeight: 1.72,
+    headBobWalkFrequency: 8.2,
+    headBobSprintFrequency: 10.6,
+    headBobWalkAmplitude: 0.018,
+    headBobSprintAmplitude: 0.032,
+  },
+  camera: {
+    defaultFov: 80,
+    minFov: 65,
+    maxFov: 100,
+    defaultSensitivity: 0.5,
+  },
+} as const;
