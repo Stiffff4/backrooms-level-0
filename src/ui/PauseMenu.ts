@@ -126,6 +126,7 @@ export class SettingsControls {
   private readonly footstepsVolume: RangeControl;
   private readonly headBob: CheckboxControl;
   private readonly invertY: CheckboxControl;
+  private readonly dithering: CheckboxControl;
   private readonly reducedFlashing: CheckboxControl;
   private readonly quality: SelectControl;
   private readonly unsubscribe: () => void;
@@ -179,6 +180,7 @@ export class SettingsControls {
     this.quality = createQualityControl(`${idPrefix}-quality`);
     this.headBob = createCheckboxControl(`${idPrefix}-head-bob`, 'Movimiento de cámara al caminar');
     this.invertY = createCheckboxControl(`${idPrefix}-invert-y`, 'Invertir eje vertical');
+    this.dithering = createCheckboxControl(`${idPrefix}-dithering`, 'Dithering suave de imagen');
     this.reducedFlashing = createCheckboxControl(
       `${idPrefix}-reduced-flashing`,
       'Reducir parpadeos y destellos',
@@ -194,6 +196,7 @@ export class SettingsControls {
       this.quality.container,
       this.headBob.container,
       this.invertY.container,
+      this.dithering.container,
       this.reducedFlashing.container,
     );
 
@@ -222,6 +225,9 @@ export class SettingsControls {
     });
     this.invertY.input.addEventListener('change', () => {
       this.store.set('invertY', this.invertY.input.checked);
+    });
+    this.dithering.input.addEventListener('change', () => {
+      this.store.set('dithering', this.dithering.input.checked);
     });
     this.reducedFlashing.input.addEventListener('change', () => {
       this.store.set('reducedFlashing', this.reducedFlashing.input.checked);
@@ -254,6 +260,7 @@ export class SettingsControls {
     this.quality.select.value = settings.quality;
     this.headBob.input.checked = settings.headBob;
     this.invertY.input.checked = settings.invertY;
+    this.dithering.input.checked = settings.dithering;
     this.reducedFlashing.input.checked = settings.reducedFlashing;
   }
 }

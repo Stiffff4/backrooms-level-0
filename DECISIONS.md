@@ -184,3 +184,47 @@ mantiene 240 m. El reset devuelve el delta inverso y pone métricas/offset a cer
 La escena usa fog lineal del mismo tono que `clearColor`, de 16 a 44 m. Su final es también el límite
 de protección por frustum/entradas, por lo que renderer, visibilidad y streaming comparten una frontera
 mensurable que podrá ser afinada por el pipeline visual sin cambiar el contrato lógico.
+
+## D-023 — Buffer interno real y UI fuera del pixelado
+
+**Estado:** aceptada — Fase 5.
+
+Cada preset fija la altura del framebuffer Babylon en 240, 360 o 480 píxeles y calcula el ancho por
+aspecto. El canvas ocupa el viewport mediante CSS con escalado nearest-neighbor, mientras título,
+pausa, ajustes y HUD siguen siendo DOM nativo. Un único owner coalesce resize y cambio de preset para
+evitar buffers transitorios o listeners duplicados.
+
+## D-024 — Arte procedural determinista, versionado y CC0
+
+**Estado:** aceptada — Fase 5.
+
+Las texturas raster se generan con una herramienta local determinista y se versionan junto con un
+manifiesto de hashes. Se prefieren activos originales pequeños y coherentes a descargas externas; el
+catálogo y la licencia CC0-1.0 se documentan en `ASSET_LICENSES.md`. `assets:check` forma parte de la
+validación para detectar cualquier asset ausente o desactualizado.
+
+## D-025 — Materiales compartidos con UV en unidades físicas
+
+**Estado:** aceptada — Fase 5.
+
+Las once variantes visuales comparten texturas y materiales por escena. Los builders producen UVs a
+escala física, aplican offsets derivados del stream visual de la habitación y los conservan al
+combinar geometría. Mipmaps, filtrado trilineal y anisotropía limitada reducen shimmer sin suavizar el
+pixel art; los normal maps se deshabilitan en `low`.
+
+## D-026 — Un postproceso espacial estable
+
+**Estado:** aceptada — Fase 5.
+
+Color grade, cuantización, dithering Bayer y grano espacial viven en un solo postproceso. Sus patrones
+dependen de la coordenada del píxel interno, no del tiempo, por lo que una cámara inmóvil produce la
+misma imagen. `reducedFlashing` elimina grano y `dithering` puede desactivarse sin reconstruir recursos.
+
+## D-027 — Presets como política única de coste visual
+
+**Estado:** aceptada — Fase 5.
+
+`QualityManager` aplica en una transacción resolución, fog, normales, anisotropía y el presupuesto de
+luces de la fase siguiente. Los sistemas ya existentes consumen la política inmediatamente; el campo
+de luces queda tipado y probado para que `LightPool` lo haga efectivo en Fase 6 sin duplicar tablas de
+calidad ni cambiar la persistencia de ajustes.

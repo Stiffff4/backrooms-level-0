@@ -49,7 +49,7 @@ export interface StreamingVisibilityVerification {
 
 interface ResolvedConfig {
   readonly safetyDistance: number;
-  readonly fogEnd: number;
+  fogEnd: number;
   readonly entranceVisibilityPadding: number;
 }
 
@@ -112,7 +112,7 @@ export class StreamingVisibilityGuard {
     assertFiniteNonNegative(resolved.safetyDistance, 'safetyDistance');
     assertFinitePositive(resolved.fogEnd, 'fogEnd');
     assertFiniteNonNegative(resolved.entranceVisibilityPadding, 'entranceVisibilityPadding');
-    this.config = Object.freeze(resolved);
+    this.config = resolved;
 
     graph.rooms.forEach((room, index) => {
       if (this.graphRoomIds.has(room.id)) {
@@ -130,6 +130,15 @@ export class StreamingVisibilityGuard {
 
   public get lastViolationRoomIds(): readonly RoomId[] {
     return this.lastViolations;
+  }
+
+  public get fogEnd(): number {
+    return this.config.fogEnd;
+  }
+
+  public setFogEnd(fogEnd: number): void {
+    assertFinitePositive(fogEnd, 'fogEnd');
+    this.config.fogEnd = fogEnd;
   }
 
   public evaluate(input: StreamingVisibilityGuardInput): StreamingVisibilityResult {

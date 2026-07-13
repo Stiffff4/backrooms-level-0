@@ -15,12 +15,14 @@ import { PlayerController } from '../player/PlayerController';
 import { assertValidRoomGraph, generateRoomGraph } from '../procedural/RoomGraphGenerator';
 import { hashSeed } from '../procedural/SeedBank';
 import type { RoomGraph, RoomInstance } from '../procedural/procedural.types';
+import { PixelRenderPipeline } from '../rendering/PixelRenderPipeline';
+import { QualityManager } from '../rendering/QualityManager';
 import { ModularWorld } from '../rooms/ModularWorld';
 import type { BuiltModularRoom } from '../rooms/rendering/rendering.types';
 import { renderErrorScreen } from '../ui/ErrorScreen';
 import { CreditsDialog } from '../ui/CreditsDialog';
 import { PauseMenu } from '../ui/PauseMenu';
-import { SettingsStore } from '../ui/SettingsStore';
+import { SettingsStore, type GameSettings } from '../ui/SettingsStore';
 import { TitleScreen } from '../ui/TitleScreen';
 import { ChunkStreamer } from '../world/ChunkStreamer';
 import { FloatingOrigin } from '../world/FloatingOrigin';
@@ -39,6 +41,9 @@ export class App {
   private readonly clock = new GameClock();
   private readonly stats = new SessionStats();
   private readonly debugOptions = parseDebugOptions(window.location.search);
+  private readonly qualityManager = new QualityManager(
+    this.debugOptions.quality ?? this.settings.value.quality,
+  );
   private readonly unsubscribers: (() => void)[] = [];
   private readonly audioEngine: GameAudioEngine;
   private readonly audioLocalForward = Vector3.Forward();
@@ -48,6 +53,7 @@ export class App {
   });
 
   private engineBootstrap: EngineBootstrap | null = null;
+  private pixelPipeline: PixelRenderPipeline | null = null;
   private scene: Scene | null = null;
   private roomGraph: RoomGraph | null = null;
   private modularWorld: ModularWorld | null = null;
@@ -135,8 +141,18 @@ export class App {
     const bootStartedAt = performance.now();
     try {
       this.stateMachine.transition('loading');
-      this.engineBootstrap = EngineBootstrap.create(this.canvas);
+      this.engineBootstrap = EngineBootstrap.create(this.canvas, { resizeOwnership: 'external' });
+      this.pixelPipeline = PixelRenderPipeline.create({
+        canvas: this.canvas,
+        engine: this.engineBootstrap.engine,
+        quality: this.qualityManager.current,
+      });
+      this.pixelPipeline.setUserEffects({
+        dithering: this.settings.value.dithering,
+        reducedFlashing: this.settings.value.reducedFlashing,
+      });
       this.scene = createGameplayScene(this.engineBootstrap.engine);
+      this.scene.fogEnd = this.qualityManager.current.fogEnd;
       this.roomGraph = generateRoomGraph({
         seed: this.debugOptions.seed,
         targetRooms: gameConfig.world.logicalRoomCount,
@@ -160,14 +176,28 @@ export class App {
         maxLoadedRooms: gameConfig.world.maxMaterializedRooms,
         pooledRoomLimit: gameConfig.world.pooledRoomViews,
       });
+      this.modularWorld.materialLibrary.applyQuality({
+        normalMaps: this.qualityManager.current.normalMaps,
+        anisotropy: this.qualityManager.current.anisotropy,
+      });
+      this.syncRenderingSnapshot();
       this.modularWorld.setGraph(this.roomGraph);
       this.visibilityGuard = new StreamingVisibilityGuard(
         this.roomGraph,
         this.modularWorld,
         this.scene,
-        { fogEnd: gameConfig.world.fogEnd },
+        { fogEnd: this.qualityManager.current.fogEnd },
       );
       this.chunkStreamer = this.createChunkStreamer();
+      const textureReadiness = await this.modularWorld.materialLibrary.whenAllTexturesSettled();
+      this.syncRenderingSnapshot();
+      if (!textureReadiness.criticalReady) {
+        const failures = textureReadiness.failures
+          .filter((failure) => failure.critical)
+          .map((failure) => `${failure.id}: ${failure.message}`)
+          .join('; ');
+        throw new Error(`No se pudieron cargar las texturas críticas de Level 0. ${failures}`);
+      }
       this.streamAround(this.roomGraph.startRoomId);
       this.player = new PlayerController(
         this.scene,
@@ -177,6 +207,8 @@ export class App {
       );
       this.player.setLookRotation(this.modularWorld.spawnYaw);
       this.player.setEnabled(false);
+      this.pixelPipeline.attach(this.player.camera);
+      this.syncRenderingSnapshot();
       const initialTransition = this.modularWorld.updatePlayerPosition(this.player.position);
       this.recordRoomEntry(initialTransition.roomId);
       this.syncWorldDebugSnapshot();
@@ -237,6 +269,8 @@ export class App {
     this.ambientDirector = null;
     this.audioBank?.dispose();
     this.audioBank = null;
+    this.pixelPipeline?.dispose();
+    this.pixelPipeline = null;
     this.player?.dispose();
     this.player = null;
     this.chunkStreamer?.dispose();
@@ -288,6 +322,7 @@ export class App {
           lights: current.ambienceVolume,
           footsteps: current.footstepsVolume,
         });
+        this.applyRenderingSettings(current, changedKeys.includes('quality'));
         for (const key of changedKeys) {
           this.events.emit('settingsChanged', { key });
         }
@@ -307,12 +342,14 @@ export class App {
     }
     this.updateDebugSnapshot();
     const audioSnapshot = this.audioEngine.snapshot;
+    const renderMetrics = this.pixelPipeline?.metrics;
     this.debugHud?.update(performance.now(), [
       `AUDIO ${audioSnapshot.state} / ${this.getAudioNodeCount()} NODES`,
       `STEPS ${this.footstepCount}`,
       `ROOM ${this.modularWorld?.activeRoomId ?? 'none'} / ${this.stats.snapshot(this.clock.elapsedSeconds).roomsVisited} VISITED`,
       `STREAM ${this.chunkStreamer?.metrics.activeRoomCount ?? 0} ACTIVE / ${this.chunkStreamer?.metrics.preloadRoomCount ?? 0} PRELOAD / ${this.modularWorld?.pooledRoomCount ?? 0} POOLED`,
       `ORIGIN ${this.floatingOrigin.metrics.rebaseCount} REBASES`,
+      `RENDER ${this.qualityManager.presetName.toUpperCase()} ${renderMetrics?.bufferWidth ?? 0}x${renderMetrics?.bufferHeight ?? 0}`,
       `SEED ${this.debugOptions.seed}`,
     ]);
     this.scene.render();
@@ -638,6 +675,60 @@ export class App {
     this.root.dataset.sceneMeshes = String(this.scene?.meshes.length ?? 0);
     this.root.dataset.sceneMaterials = String(this.scene?.materials.length ?? 0);
     this.root.dataset.sceneTransformNodes = String(this.scene?.transformNodes.length ?? 0);
+    this.syncRenderingSnapshot();
+  }
+
+  private applyRenderingSettings(settings: Readonly<GameSettings>, updatePreset: boolean): void {
+    if (updatePreset) {
+      this.qualityManager.setPreset(settings.quality);
+    }
+    const quality = this.qualityManager.current;
+    if (this.pixelPipeline?.quality.name !== quality.name) {
+      this.pixelPipeline?.setQuality(quality);
+    }
+    this.pixelPipeline?.setUserEffects({
+      dithering: settings.dithering,
+      reducedFlashing: settings.reducedFlashing,
+    });
+    this.modularWorld?.materialLibrary.applyQuality({
+      normalMaps: quality.normalMaps,
+      anisotropy: quality.anisotropy,
+    });
+    if (this.scene) {
+      this.scene.fogEnd = quality.fogEnd;
+    }
+    this.visibilityGuard?.setFogEnd(quality.fogEnd);
+    this.syncRenderingSnapshot();
+    window.requestAnimationFrame(() => {
+      if (!this.disposed) {
+        this.syncRenderingSnapshot();
+      }
+    });
+  }
+
+  private syncRenderingSnapshot(): void {
+    const quality = this.qualityManager.current;
+    const effects = this.pixelPipeline?.effects;
+    const metrics = this.pixelPipeline?.metrics;
+    const textures = this.modularWorld?.materialLibrary.readiness;
+    this.root.dataset.qualityPreset = quality.name;
+    this.root.dataset.renderInternalHeight = String(quality.internalHeight);
+    this.root.dataset.renderBufferWidth = String(metrics?.bufferWidth ?? 0);
+    this.root.dataset.renderBufferHeight = String(metrics?.bufferHeight ?? 0);
+    this.root.dataset.renderDithering = String(effects?.dithering ?? quality.dithering);
+    this.root.dataset.renderGrainStrength = String(effects?.grainStrength ?? quality.grainStrength);
+    this.root.dataset.renderNormalMaps = String(quality.normalMaps);
+    this.root.dataset.renderAnisotropy = String(quality.anisotropy);
+    this.root.dataset.renderLightBudget = String(quality.futureLightBudget);
+    this.root.dataset.fogStart = String(this.scene?.fogStart ?? 0);
+    this.root.dataset.fogEnd = String(this.scene?.fogEnd ?? quality.fogEnd);
+    this.root.dataset.texturesCriticalReady = String(textures?.criticalReady ?? false);
+    this.root.dataset.texturesSettled = String(textures?.allSettled ?? false);
+    this.root.dataset.texturesReady = String(
+      (textures?.allSettled ?? false) && (textures?.criticalReady ?? false),
+    );
+    this.root.dataset.textureReadyCount = String(textures?.readyCount ?? 0);
+    this.root.dataset.textureFailedCount = String(textures?.failedCount ?? 0);
   }
 
   private syncAudioDebugSnapshot(): void {

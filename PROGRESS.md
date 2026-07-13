@@ -174,3 +174,37 @@ en 1,100 kB, después de medir el bundle y sin modificar los presupuestos de pro
   detectado al avanzar 180 salas en una sola tarea se eliminó troceando el helper debug; el recorrido
   normal ya materializaba entre frames.
 - Bundle: 1,107.59 kB JS sin comprimir, 267.58 kB gzip; build en 398 ms y dentro del budget.
+
+## Fase 5 — Arte y render pixelado
+
+- Pipeline de render interno real con presets `low` (240p), `default` (360p) y `high` (480p),
+  escalado nearest-neighbor nítido y UI DOM conservada a resolución nativa.
+- Resolución interna recalculada por aspecto y resize mediante un único `ResizeObserver`; los cambios
+  de preset son en vivo, coalescidos por frame y no recrean la escena ni el postproceso.
+- Postproceso único con paleta amarilla enfermiza, negros levantados, contraste moderado, Bayer 4×4
+  espacial y grano estable. No usa ruido temporal, bloom, VHS ni desenfoque que oculten el pixel grid.
+- Doce texturas PNG originales y deterministas para papel, manchas, normales, alfombra seca/mojada,
+  techo, zócalos, columnas y luminarias, generadas localmente y verificadas contra un manifiesto.
+- Biblioteca compartida de once materiales con mipmaps, wrapping, filtrado trilineal, anisotropía por
+  preset, normales opcionales, variantes mojadas/manchadas/apagadas y readiness observable.
+- UVs físicas y offsets deterministas por habitación preservados al combinar geometría, de forma que
+  la escala del patrón se mantiene coherente y las repeticiones contiguas no parecen una sola copia.
+- Ajustes persistentes de calidad y dithering integrados en título y pausa, junto con respeto efectivo
+  de `reducedFlashing`; fog, normales, anisotropía y buffer cambian como una unidad.
+- Licencia y procedencia de cada activo registradas en `ASSET_LICENSES.md`; todos los assets creados
+  para el proyecto se publican como CC0-1.0 y no se incorporó material de origen desconocido.
+
+### Validación
+
+- `npm run validate`: correcto; generación reproducible de assets, TypeScript strict, ESLint,
+  23 archivos/92 tests y build de producción.
+- `npm run test:e2e`: 11/11 en Chromium; cubre presets y buffers reales, texturas listas, cambio de
+  calidad/dithering en vivo, gameplay existente, streaming, audio y regresión visual.
+- Regresión versionada a 1280×720 y dos capturas inmóviles separadas 150 ms idénticas byte a byte;
+  sin blur, artefactos estáticos ni errores de consola durante la captura.
+- Soak de 48 ciclos `low → default → high`, 144 resizes y alternancia de dithering/reduced flashing:
+  materiales 11, texturas 12, postprocesos 1 y observers 1 permanecieron constantes; `dispose()`
+  idempotente devolvió todos los recursos y callbacks a cero.
+- Build bajo subruta `VITE_BASE_PATH=/threshold` servido correctamente: HTML, JS y 12/12 texturas
+  respondieron 200. Los PNG y su manifiesto ocupan 108,254 bytes.
+- Bundle: 1,073.68 kB JS sin comprimir, 261.04 kB gzip; build en 403 ms y dentro del budget.

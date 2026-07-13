@@ -9,6 +9,7 @@ export interface GameSettings {
   ambienceVolume: number;
   footstepsVolume: number;
   quality: QualityPreset;
+  dithering: boolean;
   reducedFlashing: boolean;
 }
 
@@ -44,6 +45,7 @@ export const DEFAULT_SETTINGS: Readonly<GameSettings> = Object.freeze({
   ambienceVolume: 0.75,
   footstepsVolume: 0.8,
   quality: 'default',
+  dithering: true,
   reducedFlashing: false,
 });
 
@@ -58,6 +60,7 @@ const SETTINGS_KEYS = [
   'ambienceVolume',
   'footstepsVolume',
   'quality',
+  'dithering',
   'reducedFlashing',
 ] as const satisfies readonly SettingsKey[];
 
@@ -120,6 +123,7 @@ function sanitizeSettings(value: unknown, fallback: Readonly<GameSettings>): Gam
       SETTINGS_LIMITS.volume.max,
     ),
     quality: readQuality(source.quality, fallback.quality),
+    dithering: readBoolean(source.dithering, fallback.dithering),
     reducedFlashing: readBoolean(source.reducedFlashing, fallback.reducedFlashing),
   };
 }

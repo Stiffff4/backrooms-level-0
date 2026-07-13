@@ -1,14 +1,27 @@
 import { Engine } from '@babylonjs/core/Engines/engine';
 
+export type EngineResizeOwnership = 'bootstrap' | 'external';
+
+export interface EngineBootstrapOptions {
+  readonly resizeOwnership?: EngineResizeOwnership;
+}
+
 export class EngineBootstrap {
   private readonly handleResize = (): void => this.engine.resize();
+  private resizeOwnershipValue: EngineResizeOwnership;
 
   private constructor(
     public readonly engine: Engine,
     private readonly canvas: HTMLCanvasElement,
-  ) {}
+    resizeOwnership: EngineResizeOwnership,
+  ) {
+    this.resizeOwnershipValue = resizeOwnership;
+  }
 
-  public static create(canvas: HTMLCanvasElement): EngineBootstrap {
+  public static create(
+    canvas: HTMLCanvasElement,
+    options: EngineBootstrapOptions = {},
+  ): EngineBootstrap {
     const webGl2 = canvas.getContext('webgl2', {
       antialias: false,
       alpha: false,
@@ -30,10 +43,29 @@ export class EngineBootstrap {
     });
     engine.setHardwareScalingLevel(1);
 
-    const bootstrap = new EngineBootstrap(engine, canvas);
-    window.addEventListener('resize', bootstrap.handleResize, { passive: true });
-    bootstrap.handleResize();
+    const resizeOwnership = options.resizeOwnership ?? 'bootstrap';
+    const bootstrap = new EngineBootstrap(engine, canvas, resizeOwnership);
+    if (resizeOwnership === 'bootstrap') {
+      window.addEventListener('resize', bootstrap.handleResize, { passive: true });
+      bootstrap.handleResize();
+    }
     return bootstrap;
+  }
+
+  public get resizeOwnership(): EngineResizeOwnership {
+    return this.resizeOwnershipValue;
+  }
+
+  /**
+   * Stops the viewport-sized resize listener before a fixed-resolution pipeline
+   * takes control of the canvas buffer. Safe to call more than once.
+   */
+  public releaseResizeOwnership(): void {
+    if (this.resizeOwnershipValue === 'external') {
+      return;
+    }
+    window.removeEventListener('resize', this.handleResize);
+    this.resizeOwnershipValue = 'external';
   }
 
   public start(render: () => void): void {
@@ -41,7 +73,7 @@ export class EngineBootstrap {
   }
 
   public dispose(): void {
-    window.removeEventListener('resize', this.handleResize);
+    this.releaseResizeOwnership();
     this.engine.stopRenderLoop();
     this.engine.dispose();
     this.canvas.width = 0;

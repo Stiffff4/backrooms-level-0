@@ -38,6 +38,7 @@ describe('SettingsStore', () => {
       ambienceVolume: 0.4,
       footstepsVolume: 0.9,
       quality: 'high',
+      dithering: false,
       reducedFlashing: true,
     };
 
@@ -94,6 +95,7 @@ describe('SettingsStore', () => {
       ambienceVolume: 0,
       footstepsVolume: 0.35,
       quality: DEFAULT_SETTINGS.quality,
+      dithering: DEFAULT_SETTINGS.dithering,
       reducedFlashing: true,
     });
   });

@@ -1,9 +1,10 @@
 import type { Material } from '@babylonjs/core/Materials/material';
-import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { Vector3, Vector4 } from '@babylonjs/core/Maths/math.vector';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
+import { VertexBuffer } from '@babylonjs/core/Buffers/buffer';
 import type { Scene } from '@babylonjs/core/scene';
 import type {
   QuarterTurn,
@@ -24,6 +25,13 @@ interface BoxRecipe {
   readonly height: number;
   readonly depth: number;
   readonly position: Vector3;
+  readonly uvOffset?: UvOffset;
+  readonly uvMetersPerTile?: number;
+}
+
+interface UvOffset {
+  readonly u: number;
+  readonly v: number;
 }
 
 interface Opening {
@@ -55,6 +63,12 @@ const CEILING_GRID_STEP = 2;
 const FIXTURE_LENGTH = 1.45;
 const FIXTURE_WIDTH = 0.29;
 const PLAYER_BASE_HEIGHT = 0.04;
+const WALL_UV_METERS_PER_TILE = 1.8;
+const CARPET_UV_METERS_PER_TILE = 2.4;
+const CEILING_UV_METERS_PER_TILE = 2;
+const TRIM_UV_METERS_PER_TILE = 1;
+const FIXTURE_UV_METERS_PER_TILE = 0.5;
+const COLUMN_UV_METERS_PER_TILE = 1.2;
 
 /**
  * Builds one visual representation of a logical room. The room graph remains
@@ -84,7 +98,7 @@ export class ModularRoomBuilder {
     let disposed = false;
     try {
       const architecture = this.createArchitecture(instance, definition, root);
-      const ceilingDetails = this.createCeilingGrid(definition, root);
+      const ceilingDetails = this.createCeilingGrid(instance, definition, root);
       const columns = this.createColumns(instance, definition, root);
       const fixtureBuild = this.createFixtures(instance, definition, root);
 
@@ -140,6 +154,7 @@ export class ModularRoomBuilder {
         height: FLOOR_THICKNESS,
         depth,
         position: new Vector3(0, -FLOOR_THICKNESS / 2, 0),
+        uvOffset: this.createUvOffset(instance.seed, 11),
       },
       this.isWet(instance.seed) ? this.materials.carpetWet : this.materials.carpet,
     );
@@ -170,6 +185,7 @@ export class ModularRoomBuilder {
         height: 0.12,
         depth,
         position: new Vector3(0, height + 0.06, 0),
+        uvOffset: this.createUvOffset(instance.seed, 17),
       },
       this.materials.ceiling,
     );
@@ -180,7 +196,7 @@ export class ModularRoomBuilder {
     const trimBoxes: Mesh[] = [];
     for (const side of this.getWallSides(definition)) {
       const openings = this.getConnectedOpenings(instance, side);
-      this.appendWallSide(instance.id, height, side, openings, wallBoxes, trimBoxes);
+      this.appendWallSide(instance.id, instance.seed, height, side, openings, wallBoxes, trimBoxes);
     }
 
     const wallMaterial = this.useStainedWalls(instance.seed)
@@ -277,6 +293,7 @@ export class ModularRoomBuilder {
 
   private appendWallSide(
     roomId: string,
+    roomSeed: number,
     roomHeight: number,
     side: WallSide,
     openings: readonly Opening[],
@@ -285,6 +302,7 @@ export class ModularRoomBuilder {
   ): void {
     let cursor = -side.length / 2;
     let segmentIndex = 0;
+    const uvOffset = this.createUvOffset(roomSeed, this.getWallUvSalt(side));
     for (const opening of openings) {
       if (opening.start > cursor) {
         this.appendFullHeightWall(
@@ -296,6 +314,7 @@ export class ModularRoomBuilder {
           segmentIndex,
           wallBoxes,
           trimBoxes,
+          uvOffset,
         );
         segmentIndex += 1;
       }
@@ -311,6 +330,8 @@ export class ModularRoomBuilder {
             lintelHeight,
             roomHeight - lintelHeight / 2,
             WALL_THICKNESS,
+            uvOffset,
+            WALL_UV_METERS_PER_TILE,
           ),
         );
       }
@@ -328,6 +349,7 @@ export class ModularRoomBuilder {
         segmentIndex,
         wallBoxes,
         trimBoxes,
+        uvOffset,
       );
     }
   }
@@ -341,6 +363,7 @@ export class ModularRoomBuilder {
     index: number,
     wallBoxes: Mesh[],
     trimBoxes: Mesh[],
+    uvOffset: UvOffset,
   ): void {
     if (end - start <= 0.01) {
       return;
@@ -355,6 +378,8 @@ export class ModularRoomBuilder {
         roomHeight,
         roomHeight / 2,
         WALL_THICKNESS,
+        uvOffset,
+        WALL_UV_METERS_PER_TILE,
       ),
     );
     trimBoxes.push(
@@ -366,6 +391,8 @@ export class ModularRoomBuilder {
         TRIM_HEIGHT,
         TRIM_HEIGHT / 2,
         WALL_THICKNESS + TRIM_DEPTH,
+        uvOffset,
+        TRIM_UV_METERS_PER_TILE,
       ),
     );
   }
@@ -378,14 +405,15 @@ export class ModularRoomBuilder {
     height: number,
     centerY: number,
     thickness: number,
+    uvOffset: UvOffset,
+    uvMetersPerTile: number,
   ): Mesh {
     const length = end - start;
     const center = (start + end) / 2;
     // `side.coordinate` is the room boundary. Pull every wall, lintel and trim
     // fully into its owning footprint. Adjacent rooms therefore meet at a
     // shared face instead of drawing overlapping coplanar boxes.
-    const insetCoordinate =
-      side.coordinate - Math.sign(side.coordinate) * (thickness / 2);
+    const insetCoordinate = side.coordinate - Math.sign(side.coordinate) * (thickness / 2);
     return this.createBox(
       {
         name,
@@ -397,17 +425,22 @@ export class ModularRoomBuilder {
           centerY,
           side.horizontal ? insetCoordinate : center,
         ),
+        uvOffset,
+        uvMetersPerTile,
       },
       null,
     );
   }
 
   private createCeilingGrid(
+    instance: RoomInstance,
     definition: RoomDefinition,
     root: TransformNode,
   ): readonly AbstractMesh[] {
     const { width, depth, height } = definition.footprint;
     const boxes: Mesh[] = [];
+    const uvOffset = this.createUvOffset(instance.seed, 71);
+    let gridIndex = 0;
     for (let x = -width / 2 + CEILING_GRID_STEP; x < width / 2; x += CEILING_GRID_STEP) {
       boxes.push(
         this.createBox(
@@ -417,10 +450,15 @@ export class ModularRoomBuilder {
             height: 0.025,
             depth,
             position: new Vector3(x, height - 0.025, 0),
+            uvOffset: {
+              u: uvOffset.u + gridIndex,
+              v: uvOffset.v,
+            },
           },
           this.materials.ceilingGrid,
         ),
       );
+      gridIndex += 1;
     }
     for (let z = -depth / 2 + CEILING_GRID_STEP; z < depth / 2; z += CEILING_GRID_STEP) {
       boxes.push(
@@ -431,10 +469,15 @@ export class ModularRoomBuilder {
             height: 0.025,
             depth: 0.025,
             position: new Vector3(0, height - 0.025, z),
+            uvOffset: {
+              u: uvOffset.u + gridIndex,
+              v: uvOffset.v,
+            },
           },
           this.materials.ceilingGrid,
         ),
       );
+      gridIndex += 1;
     }
 
     if (boxes.length === 0) {
@@ -472,6 +515,7 @@ export class ModularRoomBuilder {
           height,
           depth: 0.5,
           position,
+          uvOffset: this.createUvOffset(instance.seed, 101 + index),
         },
         this.materials.column,
       ),
@@ -493,7 +537,8 @@ export class ModularRoomBuilder {
     const housingBoxes: Mesh[] = [];
     const onBoxes: Mesh[] = [];
     const offBoxes: Mesh[] = [];
-    for (const fixture of fixtures) {
+    for (const [fixtureIndex, fixture] of fixtures.entries()) {
+      const uvOffset = this.createUvOffset(instance.seed, 211 + fixtureIndex);
       housingBoxes.push(
         this.createBox(
           {
@@ -502,6 +547,7 @@ export class ModularRoomBuilder {
             height: 0.075,
             depth: FIXTURE_LENGTH + 0.12,
             position: fixture.position.add(new Vector3(0, 0.035, 0)),
+            uvOffset,
           },
           this.materials.fixtureHousing,
         ),
@@ -513,6 +559,7 @@ export class ModularRoomBuilder {
           height: 0.028,
           depth: FIXTURE_LENGTH,
           position: fixture.position.add(new Vector3(0, -0.012, 0)),
+          uvOffset,
         },
         fixture.enabled ? this.materials.fixtureEmitter : this.materials.fixtureEmitterOff,
       );
@@ -617,9 +664,16 @@ export class ModularRoomBuilder {
   }
 
   private createBox(recipe: BoxRecipe, material: Material | null): Mesh {
+    const uvMetersPerTile =
+      recipe.uvMetersPerTile ?? (material === null ? undefined : this.getUvMetersPerTile(material));
+    const faceUV =
+      uvMetersPerTile === undefined
+        ? undefined
+        : this.createPhysicalBoxUvs(recipe, uvMetersPerTile);
+    const dimensions = { width: recipe.width, height: recipe.height, depth: recipe.depth };
     const mesh = MeshBuilder.CreateBox(
       recipe.name,
-      { width: recipe.width, height: recipe.height, depth: recipe.depth },
+      faceUV === undefined ? dimensions : { ...dimensions, faceUV },
       this.scene,
     );
     mesh.position.copyFrom(recipe.position);
@@ -629,6 +683,9 @@ export class ModularRoomBuilder {
   }
 
   private mergeMeshes(name: string, sources: Mesh[], root: TransformNode): Mesh {
+    const shouldPreserveUvs = sources.every((source) =>
+      source.isVerticesDataPresent(VertexBuffer.UVKind),
+    );
     const merged = Mesh.MergeMeshes(sources, true, true, undefined, false, false);
     if (merged === null) {
       for (const source of sources) {
@@ -636,11 +693,81 @@ export class ModularRoomBuilder {
       }
       throw new Error(`Could not merge geometry for ${name}.`);
     }
+    if (shouldPreserveUvs && !merged.isVerticesDataPresent(VertexBuffer.UVKind)) {
+      merged.dispose(false, false);
+      throw new Error(`Merged geometry lost physical UVs for ${name}.`);
+    }
     merged.name = name;
     merged.id = name;
     merged.isPickable = false;
     merged.parent = root;
     return merged;
+  }
+
+  private createPhysicalBoxUvs(recipe: BoxRecipe, metersPerTile: number): Vector4[] {
+    const offset = recipe.uvOffset ?? { u: 0, v: 0 };
+    const xStart = recipe.position.x - recipe.width / 2;
+    const yStart = recipe.position.y - recipe.height / 2;
+    const zStart = recipe.position.z - recipe.depth / 2;
+    const rect = (uStart: number, vStart: number, uLength: number, vLength: number): Vector4 =>
+      new Vector4(
+        offset.u + uStart / metersPerTile,
+        offset.v + vStart / metersPerTile,
+        offset.u + (uStart + uLength) / metersPerTile,
+        offset.v + (vStart + vLength) / metersPerTile,
+      );
+
+    return [
+      rect(xStart, yStart, recipe.width, recipe.height),
+      rect(xStart, yStart, recipe.width, recipe.height),
+      rect(zStart, yStart, recipe.depth, recipe.height),
+      rect(zStart, yStart, recipe.depth, recipe.height),
+      rect(xStart, zStart, recipe.width, recipe.depth),
+      rect(xStart, zStart, recipe.width, recipe.depth),
+    ];
+  }
+
+  private getUvMetersPerTile(material: Material): number {
+    if (material === this.materials.carpet || material === this.materials.carpetWet) {
+      return CARPET_UV_METERS_PER_TILE;
+    }
+    if (material === this.materials.ceiling) {
+      return CEILING_UV_METERS_PER_TILE;
+    }
+    if (material === this.materials.trim || material === this.materials.ceilingGrid) {
+      return TRIM_UV_METERS_PER_TILE;
+    }
+    if (
+      material === this.materials.fixtureHousing ||
+      material === this.materials.fixtureEmitter ||
+      material === this.materials.fixtureEmitterOff
+    ) {
+      return FIXTURE_UV_METERS_PER_TILE;
+    }
+    if (material === this.materials.column) {
+      return COLUMN_UV_METERS_PER_TILE;
+    }
+    return WALL_UV_METERS_PER_TILE;
+  }
+
+  private createUvOffset(seed: number, salt: number): UvOffset {
+    return Object.freeze({
+      u: (this.hash(seed, salt) % 1024) / 256,
+      v: (this.hash(seed, salt + 8191) % 1024) / 256,
+    });
+  }
+
+  private getWallUvSalt(side: WallSide): number {
+    switch (side.id) {
+      case 'north':
+        return 31;
+      case 'east':
+        return 37;
+      case 'south':
+        return 41;
+      case 'west':
+        return 43;
+    }
   }
 
   private quarterTurnRadians(rotation: QuarterTurn): number {

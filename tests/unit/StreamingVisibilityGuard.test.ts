@@ -80,6 +80,19 @@ afterEach(() => {
 });
 
 describe('StreamingVisibilityGuard', () => {
+  it('sincroniza de forma validada el límite de niebla cuando cambia el preset', () => {
+    const graph = generateRoomGraph({ seed: 'visibility-quality', targetRooms: 24 });
+    const harness = createHarness('visibility-quality', [graph.startRoomId]);
+    const guard = new StreamingVisibilityGuard(harness.graph, harness.world, harness.scene, {
+      fogEnd: 36,
+    });
+
+    expect(guard.fogEnd).toBe(36);
+    guard.setFogEnd(48);
+    expect(guard.fogEnd).toBe(48);
+    expect(() => guard.setFogEnd(0)).toThrow(/fogEnd must be a finite positive number/);
+  });
+
   it('protege por distancia sin considerar meshes deshabilitados como activos', () => {
     const graph = generateRoomGraph({ seed: 'visibility-safety', targetRooms: 24 });
     const farRoom = [...graph.rooms].sort((left, right) => right.depth - left.depth)[0];

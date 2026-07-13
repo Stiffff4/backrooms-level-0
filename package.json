@@ -7,6 +7,8 @@
     "node": ">=24.0.0"
   },
   "scripts": {
+    "assets:generate": "node --experimental-strip-types tools/generate-assets/generate.ts --write",
+    "assets:check": "node --experimental-strip-types tools/generate-assets/generate.ts --check",
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && vite build",
@@ -17,7 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "validate": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "validate": "npm run assets:check && npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "dependencies": {
     "@babylonjs/core": "9.16.1"
