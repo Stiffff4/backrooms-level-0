@@ -1,4 +1,9 @@
 import type { Scene } from '@babylonjs/core/scene';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { AmbientDirector } from '../audio/AmbientDirector';
+import { FootstepSystem } from '../audio/FootstepSystem';
+import { GameAudioEngine } from '../audio/GameAudioEngine';
+import { ProceduralAudioBank, hashAudioSeed } from '../audio/ProceduralAudioBank';
 import { GameClock } from '../game/GameClock';
 import { SessionStats } from '../game/SessionStats';
 import { DebugHud } from '../debug/DebugHud';
@@ -24,6 +29,9 @@ export class App {
   private readonly stats = new SessionStats();
   private readonly debugOptions = parseDebugOptions(window.location.search);
   private readonly unsubscribers: (() => void)[] = [];
+  private readonly audioEngine: GameAudioEngine;
+  private readonly audioLocalForward = Vector3.Forward();
+  private readonly audioForward = Vector3.Zero();
 
   private engineBootstrap: EngineBootstrap | null = null;
   private scene: Scene | null = null;
@@ -33,10 +41,19 @@ export class App {
   private pauseMenu: PauseMenu | null = null;
   private creditsDialog: CreditsDialog | null = null;
   private debugHud: DebugHud | null = null;
+  private audioBank: ProceduralAudioBank | null = null;
+  private ambientDirector: AmbientDirector | null = null;
+  private footsteps: FootstepSystem | null = null;
+  private footstepCount = 0;
   private disposed = false;
 
-  private readonly handleWindowBlur = (): void => this.pauseForFocusLoss();
+  private readonly handleWindowBlur = (): void => {
+    this.audioEngine.setFocused(false);
+    this.pauseForFocusLoss();
+  };
+  private readonly handleWindowFocus = (): void => this.audioEngine.setFocused(true);
   private readonly handleVisibilityChange = (): void => {
+    this.audioEngine.setFocused(document.visibilityState === 'visible' && document.hasFocus());
     if (document.visibilityState === 'hidden') {
       this.pauseForFocusLoss();
     }
@@ -46,10 +63,28 @@ export class App {
     private readonly root: HTMLElement,
     private readonly canvas: HTMLCanvasElement,
   ) {
+    const settings = this.settings.value;
+    this.audioEngine = new GameAudioEngine({
+      enabled: !this.debugOptions.noAudio,
+      initialVolumes: {
+        master: settings.masterVolume,
+        ambience: settings.ambienceVolume,
+        lights: settings.ambienceVolume,
+        footsteps: settings.footstepsVolume,
+      },
+    });
+    this.audioEngine.setPaused(true);
+    this.syncAudioDebugSnapshot();
+
     this.unsubscribers.push(
       this.stateMachine.subscribe((next, previous) => {
         this.events.emit('stateChanged', { next, previous });
         this.root.dataset.gameState = next;
+        const paused = next !== 'playing' && next !== 'entering';
+        this.audioEngine.setPaused(paused);
+        this.ambientDirector?.setPaused(paused);
+        this.footsteps?.setPaused(paused);
+        this.syncAudioDebugSnapshot();
       }),
     );
   }
@@ -70,6 +105,7 @@ export class App {
       this.installUi();
       this.installSubscriptions();
       window.addEventListener('blur', this.handleWindowBlur);
+      window.addEventListener('focus', this.handleWindowFocus);
       document.addEventListener('visibilitychange', this.handleVisibilityChange);
 
       if (this.debugOptions.debug) {
@@ -97,6 +133,7 @@ export class App {
     }
     this.events.clear();
     window.removeEventListener('blur', this.handleWindowBlur);
+    window.removeEventListener('focus', this.handleWindowFocus);
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     this.debugHud?.dispose();
     this.debugHud = null;
@@ -106,6 +143,12 @@ export class App {
     this.creditsDialog = null;
     this.titleScreen?.dispose();
     this.titleScreen = null;
+    this.footsteps?.dispose();
+    this.footsteps = null;
+    this.ambientDirector?.dispose();
+    this.ambientDirector = null;
+    this.audioBank?.dispose();
+    this.audioBank = null;
     this.player?.dispose();
     this.player = null;
     this.room?.dispose();
@@ -114,6 +157,7 @@ export class App {
     this.scene = null;
     this.engineBootstrap?.dispose();
     this.engineBootstrap = null;
+    void this.audioEngine.dispose();
   }
 
   private installUi(): void {
@@ -138,9 +182,16 @@ export class App {
       this.player.subscribePointerLock((locked) => this.handlePointerLock(locked)),
       this.player.subscribeMovement((frame) => {
         this.stats.recordMovement(frame.distance, frame.sprinting);
+        this.footstepCount += this.footsteps?.update(frame) ?? 0;
       }),
       this.settings.subscribe(({ current, changedKeys }) => {
         this.player?.updateSettings(current);
+        this.audioEngine.setVolumes({
+          master: current.masterVolume,
+          ambience: current.ambienceVolume,
+          lights: current.ambienceVolume,
+          footsteps: current.footstepsVolume,
+        });
         for (const key of changedKeys) {
           this.events.emit('settingsChanged', { key });
         }
@@ -155,10 +206,32 @@ export class App {
 
     if (this.stateMachine.state === 'playing') {
       this.player?.update(this.engineBootstrap.engine.getDeltaTime() / 1000);
+      this.updateAudioFrame();
     }
     this.updateDebugSnapshot();
-    this.debugHud?.update(performance.now());
+    const audioSnapshot = this.audioEngine.snapshot;
+    this.debugHud?.update(performance.now(), [
+      `AUDIO ${audioSnapshot.state} / ${this.getAudioNodeCount()} NODES`,
+      `STEPS ${this.footstepCount}`,
+    ]);
     this.scene.render();
+  }
+
+  private updateAudioFrame(): void {
+    const player = this.player;
+    if (!player) {
+      return;
+    }
+
+    this.ambientDirector?.update();
+    if (!this.audioEngine.context) {
+      return;
+    }
+
+    player.camera.computeWorldMatrix();
+    const position = player.camera.globalPosition;
+    player.camera.getDirectionToRef(this.audioLocalForward, this.audioForward);
+    this.audioEngine.updateListener({ position, forward: this.audioForward });
   }
 
   private updateDebugSnapshot(): void {
@@ -173,8 +246,27 @@ export class App {
     this.root.dataset.playerZ = position.z.toFixed(4);
     this.root.dataset.playerMoving = String(movement.moving);
     this.root.dataset.playerSprinting = String(movement.sprinting);
+    this.root.dataset.playerGrounded = String(movement.grounded);
     this.root.dataset.elapsedSeconds = this.clock.elapsedSeconds.toFixed(2);
     this.root.dataset.fps = (this.engineBootstrap?.engine.getFps() ?? 0).toFixed(1);
+    this.syncAudioDebugSnapshot();
+  }
+
+  private syncAudioDebugSnapshot(): void {
+    const snapshot = this.audioEngine.snapshot;
+    this.root.dataset.audioState = snapshot.state === 'idle' ? 'uninitialized' : snapshot.state;
+    this.root.dataset.audioNodeCount = String(this.getAudioNodeCount());
+    this.root.dataset.audioMixState = snapshot.paused || !snapshot.focused ? 'paused' : 'active';
+    this.root.dataset.footstepCount = String(this.footstepCount);
+    this.root.dataset.footstepPendingDistance = (this.footsteps?.pendingDistance ?? 0).toFixed(3);
+  }
+
+  private getAudioNodeCount(): number {
+    return (
+      this.audioEngine.nodeCount +
+      (this.ambientDirector?.nodeCount ?? 0) +
+      (this.footsteps?.activeVoiceCount ?? 0) * 3
+    );
   }
 
   private async enterGame(): Promise<void> {
@@ -185,12 +277,60 @@ export class App {
     this.stateMachine.transition('entering');
     this.titleScreen?.setEntering();
     this.player.setEnabled(true);
-    const locked = await this.player.requestPointerLock();
+    const audioActivation = this.activateAudioFromUserGesture();
+    const pointerLockRequest = this.player.requestPointerLock();
+    const [, locked] = await Promise.all([audioActivation, pointerLockRequest]);
     if (!locked && this.readState() === 'entering') {
       this.player.setEnabled(false);
       this.stateMachine.transition('title');
       this.titleScreen?.setReady('Haz clic de nuevo para activar el mouse.');
     }
+  }
+
+  private async activateAudioFromUserGesture(): Promise<void> {
+    const activated = await this.audioEngine.activateFromUserGesture();
+    if (activated) {
+      this.initializeAudioSystems();
+    }
+    this.syncAudioDebugSnapshot();
+  }
+
+  private initializeAudioSystems(): void {
+    if (this.audioBank || this.ambientDirector || this.footsteps) {
+      return;
+    }
+
+    const context = this.audioEngine.context;
+    const ambienceBus = this.audioEngine.ambienceBus;
+    const lightsBus = this.audioEngine.lightsBus;
+    const footstepsBus = this.audioEngine.footstepsBus;
+    const eventsBus = this.audioEngine.eventsBus;
+    if (!context || !ambienceBus || !lightsBus || !footstepsBus || !eventsBus) {
+      return;
+    }
+
+    const bank = new ProceduralAudioBank(context, { seed: this.debugOptions.seed });
+    const ambientDirector = new AmbientDirector(
+      {
+        context,
+        ambienceBus: ambienceBus.input,
+        lightsBus: lightsBus.input,
+        eventsBus: eventsBus.input,
+      },
+      bank,
+    );
+    const footsteps = new FootstepSystem(context, footstepsBus.input, {
+      seed: hashAudioSeed(this.debugOptions.seed),
+      initialCondition: 'damp',
+    });
+
+    this.audioBank = bank;
+    this.ambientDirector = ambientDirector;
+    this.footsteps = footsteps;
+    const paused = this.stateMachine.state !== 'playing' && this.stateMachine.state !== 'entering';
+    ambientDirector.start();
+    ambientDirector.setPaused(paused);
+    footsteps.setPaused(paused);
   }
 
   private async resumeGame(): Promise<void> {
@@ -199,7 +339,9 @@ export class App {
     }
 
     this.player.setEnabled(true);
-    const locked = await this.player.requestPointerLock();
+    const audioActivation = this.activateAudioFromUserGesture();
+    const pointerLockRequest = this.player.requestPointerLock();
+    const [, locked] = await Promise.all([audioActivation, pointerLockRequest]);
     if (!locked) {
       this.player.setEnabled(false);
       this.pauseMenu?.show();
@@ -246,6 +388,8 @@ export class App {
 
     this.stats.reset();
     this.clock.reset();
+    this.footstepCount = 0;
+    this.footsteps?.resetAfterRebase();
     this.player.setPosition(this.room.spawnPoint);
     this.player.setLookRotation(0);
     await this.resumeGame();
@@ -262,6 +406,8 @@ export class App {
     this.player.setLookRotation(0);
     this.stats.reset();
     this.clock.reset();
+    this.footstepCount = 0;
+    this.footsteps?.resetAfterRebase();
     this.pauseMenu?.hide();
     this.titleScreen?.show();
     this.titleScreen?.setReady();

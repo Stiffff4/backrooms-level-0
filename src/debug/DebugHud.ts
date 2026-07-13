@@ -18,7 +18,7 @@ export class DebugHud {
     this.instrumentation.captureFrameTime = true;
   }
 
-  public update(nowMs: number): void {
+  public update(nowMs: number, extraLines: readonly string[] = []): void {
     if (nowMs - this.lastUpdate < 250) {
       return;
     }
@@ -33,6 +33,7 @@ export class DebugHud {
       `MESHES ${meshes}`,
       `TRIANGLES ${triangles}`,
       `DRAW CALLS ${this.instrumentation.drawCallsCounter.current}`,
+      ...extraLines,
     ].join('\n');
   }
 

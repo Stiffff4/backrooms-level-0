@@ -12,7 +12,9 @@
 
 ## Pendientes de QA manual acumulativos
 
-- La calidad sensorial con audífonos se evaluará cuando el sistema de audio exista.
+- El sistema de audio está validado funcionalmente y por análisis de señal, pero la fatiga del
+  buzzing, la localización subjetiva con audífonos y la ausencia perceptual de clicks/clipping
+  requieren una escucha humana acumulativa antes del cierre de Fase 9.
 - La matriz ampliada de navegadores se ejecutará en la Fase 9.
 - La superficie de navegador integrada del entorno de automatización no estaba disponible; el
   smoke de navegador se ejecutó con el Chromium administrado por Playwright del propio proyecto.

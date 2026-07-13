@@ -69,3 +69,28 @@ DOM nativos accesibles.
 
 Además de reaccionar a `pointerlockchange`, la aplicación pausa directamente en `blur` y cuando el
 documento queda oculto. Esto evita depender de diferencias de pointer lock entre navegadores.
+
+## D-010 — Web Audio completamente lazy y desacoplado de Babylon
+
+**Estado:** aceptada — Fase 2.
+
+Construir `GameAudioEngine` no crea un `AudioContext`; el grafo y todos los sonidos se materializan
+solo dentro del gesto de entrada/reanudación. Los generadores reciben contexto y destinos por
+inyección, por lo que no dependen del renderer ni de globals y pueden validarse con runtimes falsos.
+
+## D-011 — Assets de audio originales por síntesis determinista
+
+**Estado:** aceptada — Fase 2.
+
+El lanzamiento no depende de descargas ni licencias de terceros para audio. Hum, buzz, ballast,
+pop y cuatro variantes de alfombra se sintetizan localmente a partir de streams sembrados. Los
+loops son periódicos, centrados en cero y con límites de amplitud; la misma seed reproduce la misma
+variación sin acoplar audio y generación espacial.
+
+## D-012 — Cadencia de pasos por distancia y voces acotadas
+
+**Estado:** aceptada — Fase 2.
+
+Los pasos consumen la distancia horizontal posterior a colisiones, no timers ni velocidad
+solicitada. Esto conserva sincronía al chocar, pausar o rebasar el origen. Un límite por frame y un
+límite global de ocho voces evitan ráfagas y crecimiento transitorio aun ante deltas anómalos.

@@ -10,7 +10,7 @@ Implementación activa. La fuente de verdad es `MASTER_PLAN.md`.
 | --- | --- | --- |
 | 0 — Repositorio y fundación | Completada | `chore: initialize babylon game foundation` |
 | 1 — Movimiento | Completada | `feat: implement first person movement` |
-| 2 — Audio | Pendiente | — |
+| 2 — Audio | Completada | `feat: add environmental audio system` |
 | 3 — Módulos | Pendiente | — |
 | 4 — Streaming | Pendiente | — |
 | 5 — Visual pixelado | Pendiente | — |
@@ -66,3 +66,32 @@ en 1,100 kB, después de medir el bundle y sin modificar los presupuestos de pro
 - Rendimiento observado en headless: 57–60 FPS, 28 draw calls, 1,008 triángulos y 28 meshes.
 - Bundle: 1,024.77 kB JS sin comprimir, 243.62 kB gzip; sin warnings y muy por debajo del budget.
 - Capturas inspeccionadas: composición inicial completa y sala visible con métricas correctas.
+
+## Fase 2 — Audio vertical
+
+- `GameAudioEngine` lazy: ningún `AudioContext` se crea antes del gesto de entrada.
+- Mezclador Web Audio con buses master, ambience, lights, footsteps, events y UI, más limitador
+  suave, rampas de volumen y cierre idempotente.
+- Volúmenes master/ambiente/pasos conectados a los ajustes persistidos.
+- Banco procedural original y determinista: tres loops periódicos sin DC ni costuras audibles y
+  un pop fluorescente con envolvente propia.
+- Ambiente por capas con fundamental de 60 Hz, armónicos, buzz, ballast, modulación lenta,
+  perfiles de tensión, silencios y pops deterministas.
+- Pasos estéreo alternados sobre `wet_carpet`, sintetizados en cuatro condiciones y disparados por
+  distancia real distinta al caminar/correr.
+- Fades de pausa y pérdida de foco, reanudación desde gesto, listener 3D y ruta `noAudio` sin crear
+  objetos Web Audio.
+- HUD y atributos debug con estado, mezcla, nodos activos, pasos y distancia pendiente.
+- Límites duros de pops, pasos por frame y voces simultáneas; recuperación limpia si la creación
+  inicial del grafo falla parcialmente.
+
+### Validación
+
+- `npm run validate`: correcto; TypeScript strict, ESLint, 43 unit tests y build de producción.
+- `npm run test:e2e`: 5/5 en Chromium; incluye autoplay, `noAudio`, pasos durante movimiento y
+  fade al pausar, además de toda la regresión de fases anteriores.
+- Audio unitario: determinismo, amplitud normalizada, DC/costuras, cadencia, buses, limiter,
+  rampas, listener, límites de voces y cleanup/reintento sin leaks.
+- Rendimiento observado con audio activo: 60 FPS sostenidos tras warm-up, 31 nodos de audio,
+  28 draw calls y 1,008 triángulos en la sala vertical.
+- Bundle: 1,058.81 kB JS sin comprimir, 253.50 kB gzip; sin warnings y muy por debajo del budget.
