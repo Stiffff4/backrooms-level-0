@@ -96,6 +96,14 @@ const DEFAULT_QUALITY: Readonly<RoomMaterialQuality> = Object.freeze({
   anisotropy: 4,
 });
 
+/**
+ * Fixed fragment-shader light-loop size for every lit room material. This is
+ * deliberately independent from the light pool's active budget (which can go
+ * up to 12 for spatial coverage at hd720/hd1080) — see the maxSimultaneousLights
+ * assignment below for why a higher shader-side ceiling breaks real hardware.
+ */
+const MATERIAL_LIGHT_SHADER_CEILING = 8;
+
 const TEXTURE_DEFINITIONS: readonly TextureDefinition[] = Object.freeze([
   { id: 'wallPaper', filename: 'wall-paper.png', critical: true },
   { id: 'wallStained', filename: 'wall-stained.png', critical: false },
@@ -272,9 +280,14 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
       this.fixtureHousing,
       this.column,
     ]) {
-      // The pool owns the live 4/6/8/10/12 budget. Keeping the shader ceiling
-      // fixed prevents material recompiles when the quality preset changes.
-      illuminated.maxSimultaneousLights = 12;
+      // The pool owns the live 4/6/8/10/12 budget, but the material's shader
+      // light loop is intentionally capped lower: compiling a fixed-size loop
+      // for 10-12 lights combined with bump mapping/specular blew past the
+      // fragment shader uniform budget on real hardware (verified working at
+      // 8 loop iterations, which is what 'high' already used), causing the
+      // wall/floor/ceiling/column shaders to fail to compile and those
+      // meshes to render nothing while the unlit fixture materials survived.
+      illuminated.maxSimultaneousLights = MATERIAL_LIGHT_SHADER_CEILING;
     }
     this.owned = Object.freeze([
       this.wall,
