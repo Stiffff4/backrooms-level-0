@@ -17,6 +17,8 @@ export interface GameEvents {
     intensity: number;
     activeEventType: TensionEventType | null;
   };
+  exitSpawned: { roomId: string; surfaceId: string; forced: boolean };
+  exitEntered: { roomId: string; surfaceId: string; elapsedSeconds: number };
   fatalError: { error: unknown };
 }
 

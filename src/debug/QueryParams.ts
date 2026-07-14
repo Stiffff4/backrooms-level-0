@@ -30,7 +30,7 @@ export function parseDebugOptions(
     seed: normalizeSeed(params.get('seed')),
     debug,
     quality,
-    exitNow: environment === 'development' && debug && params.get('exitNow') === '1',
+    exitNow: (environment === 'development' || debug) && params.get('exitNow') === '1',
     noAudio: params.get('noAudio') === '1',
   };
 }

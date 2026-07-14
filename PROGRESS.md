@@ -16,7 +16,7 @@ Implementación activa. La fuente de verdad es `MASTER_PLAN.md`.
 | 5 — Visual pixelado         | Completada | `feat: implement pixel rendering pipeline`  |
 | 6 — Iluminación             | Completada | `feat: add fluorescent lighting system`     |
 | 7 — Tensión                 | Completada | `feat: implement tension and anomalies`     |
-| 8 — Salida y final          | Pendiente  | —                                           |
+| 8 — Salida y final          | Completada | `feat: add controlled exit sequence`        |
 | 9 — Optimización y QA       | Pendiente  | —                                           |
 
 ## Fase 0 — Repositorio y fundación
@@ -288,3 +288,43 @@ en 1,100 kB, después de medir el bundle y sin modificar los presupuestos de pro
   de cronometrar movimiento; el test mantiene más de 50 FPS sin falsos context-loss.
 - Bundle principal: 1,144.82 kB JS sin comprimir, 278.95 kB gzip y build en 423 ms; continúa muy por
   debajo del budget de producto y queda para inspección/división segura en Fase 9.
+
+## Fase 8 — Salida controlada y final
+
+- `ExitDirector` lógico y determinista: exige simultáneamente seis minutos y treinta habitaciones,
+  evalúa una sola vez cada candidato apto y aplica la curva 2% + tiempo + exploración con tope 16%.
+- Garantías por dieciocho minutos, 120 habitaciones o cinco rechazos tardíos fuerzan el siguiente
+  candidato seguro hacia delante; `exitNow` usa el mismo camino en desarrollo/QA y no crea una salida
+  especial fuera del sistema.
+- Validación explícita de superficie, dimensiones, profundidad, visibilidad, aproximación, tags,
+  navegación, alcance, agotamiento visual y posición frente al jugador. La salida reservada queda
+  protegida contra descarga y layout shifts hasta terminar la experiencia.
+- Pared integrada con el mismo papel pintado, respuesta lumínica irregular y cinco discontinuidades
+  pixeladas deterministas; no usa neón, material de portal, collider nuevo ni luz dinámica adicional.
+- Beacon Web Audio original de trece nodos con `PannerNode` HRTF, capas eléctricas sintetizadas,
+  cancelación de fase por proximidad, corte rápido y cola grave al cruzar. Se registra en el budget y
+  acompaña correctamente los rebases del origen flotante.
+- Cruce por avance físico, sin tecla de uso: el trigger acumula 120 ms de intención válida incluso si
+  la pared detiene el desplazamiento real. La transición de 820 ms reduce input, distorsiona textura,
+  corta el buzz y funde a oscuro sin flash blanco.
+- Pantalla final DOM accesible con título, agradecimiento, tiempo, habitaciones únicas, seed,
+  copia de seed, nueva partida, repetición exacta, regreso al título y créditos. Todos los caminos
+  reinician streaming, salida, tensión, audio, iluminación y origen sin recargar salvo nueva seed.
+- Eventos `exitSpawned`/`exitEntered`, HUD y datasets cubren elegibilidad, probabilidad, garantía,
+  reserva, protección, distancia, activación, transición, audio y finalización para QA reproducible.
+
+### Validación
+
+- `npm run validate`: correcto; doce assets reproducibles, TypeScript strict, ESLint, 36 archivos/
+  150 tests y build de producción (550 módulos).
+- Property sweep de salida: 1,000 simulaciones deterministas verifican que no aparezca prematuramente,
+  que nunca elija candidatos inválidos y que reserve como máximo el primer candidato seguro tras la
+  garantía; existen tanto finales probabilísticos como forzados.
+- Tests focales: 27/27 para curva, garantías, reset, pared, trigger, audio direccional, transición,
+  `reducedFlashing`, floating origin, cleanup, duración y parámetros QA.
+- `npm run test:e2e`: 19/19 en Chromium serial; cubre spawn/protección, aproximación física, cruce,
+  audio activo, fundido, pantalla final, repetición de la misma seed y toda la regresión acumulada.
+- Regresiones visuales nuevas a 1280×720 para pared y pantalla final, inspeccionadas manualmente: la
+  salida se percibe como papel incorrecto dentro del espacio y el final permanece legible sin flash.
+- Bundle principal: 1,192.11 kB JS sin comprimir, 289.88 kB gzip; sigue muy por debajo de 30 MB y su
+  partición segura queda como objetivo medido de la optimización final.

@@ -8,9 +8,9 @@
 
 ## Activos
 
-- Ningún defecto bloqueante conocido tras la Fase 7.
-- **No bloqueante:** el chunk principal alcanzó 1,144.82 kB sin comprimir y activa el aviso informativo
-  configurado en 1,100 kB. Su tamaño gzip es 278.95 kB y está muy por debajo del budget de 30 MB; la
+- Ningún defecto bloqueante conocido tras la Fase 8.
+- **No bloqueante:** el chunk principal alcanzó 1,192.11 kB sin comprimir y activa el aviso informativo
+  configurado en 1,100 kB. Su tamaño gzip es 289.88 kB y está muy por debajo del budget de 30 MB; la
   inspección y posible división segura quedan registradas para la Fase 9.
 
 ## Pendientes de QA manual acumulativos
@@ -39,3 +39,6 @@
 - La estabilidad equivalente a 30 minutos se cubre con simulación lógica acelerada y un recorrido
   WebGL de 180 entradas. El soak de navegador a tiempo real y la percepción humana de pop-in/rebase
   permanecen en la pasada acumulativa de rendimiento de Fase 9.
+- La salida, su localización HRTF, el corte del buzzing y el fundido final están cubiertos de forma
+  funcional y visual; la claridad subjetiva de la pista a distancia y el impacto del final después de
+  una partida natural de 10–20 minutos requieren la pasada humana acumulativa de Fase 9.

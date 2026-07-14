@@ -1,7 +1,7 @@
 :root {
   color: #eee6b9;
   background: #0e0d07;
-  font-family: "Courier New", Courier, monospace;
+  font-family: 'Courier New', Courier, monospace;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -145,7 +145,8 @@ select {
 }
 
 .title-screen__actions,
-.pause-menu__actions {
+.pause-menu__actions,
+.end-screen__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
@@ -175,7 +176,8 @@ select {
 }
 
 .title-screen__enter,
-.pause-menu__primary-action {
+.pause-menu__primary-action,
+.end-screen__primary-action {
   min-width: 9rem;
   border-color: #c5bc7f !important;
   background: #45401d !important;
@@ -239,6 +241,87 @@ select {
   display: grid;
   place-content: center;
   justify-items: stretch;
+}
+
+.end-screen {
+  z-index: 20;
+  display: grid;
+  align-content: center;
+  justify-content: center;
+  grid-template-columns: minmax(18rem, 42rem);
+  background:
+    linear-gradient(90deg, rgb(5 5 3 / 98%), rgb(24 22 11 / 91%) 52%, rgb(5 5 3 / 98%)),
+    radial-gradient(circle at 50% 20%, rgb(194 180 91 / 17%), transparent 48%);
+}
+
+.end-screen__header h1 {
+  margin: 0;
+  font-size: clamp(2.8rem, 9vw, 6.8rem);
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: 0.12em;
+}
+
+.end-screen__thanks {
+  margin: 1.6rem 0 0.35rem;
+  color: #e7deb0;
+  font-size: clamp(1.1rem, 2.5vw, 1.45rem);
+}
+
+.end-screen__hint,
+.end-screen__copy-status {
+  min-height: 1.4em;
+  color: #9f986d;
+}
+
+.end-screen > h2 {
+  margin: 2.2rem 0 0.8rem;
+  color: #c6bd87;
+  font-size: 0.92rem;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.end-screen__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0 0 1.5rem;
+}
+
+.end-screen__stat {
+  min-width: 0;
+  border-top: 1px solid rgb(188 179 117 / 28%);
+  padding-top: 0.7rem;
+}
+
+.end-screen__stat dt {
+  color: #89835e;
+  font-size: 0.75rem;
+  letter-spacing: 0.07em;
+}
+
+.end-screen__stat dd {
+  overflow: hidden;
+  margin: 0.35rem 0 0;
+  color: #ded6a5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exit-transition-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: block;
+  background: #080804;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.exit-transition-overlay[hidden] {
+  display: none;
 }
 
 .credits-dialog {
@@ -342,6 +425,10 @@ select {
   }
 
   .title-screen__controls {
+    grid-template-columns: 1fr;
+  }
+
+  .end-screen__stats {
     grid-template-columns: 1fr;
   }
 }

@@ -316,3 +316,31 @@ Chromium headless reciente dejó de activar automáticamente SwiftShader. Playwr
 `--enable-unsafe-swiftshader` para el origen local confiable y deja terminar el único handoff inicial
 antes de medir input/FPS. Esto elimina pérdidas de contexto propias del runner sin cambiar flags,
 calidad ni ruta WebGL2 de la build que recibe el jugador.
+
+## D-038 — La salida se decide por candidatos revelados, no por posición fija
+
+**Estado:** aceptada — Fase 8.
+
+`ExitDirector` no conoce Babylon ni escanea el grafo por frame. Cada nueva habitación presenta como
+máximo un candidato compatible con un snapshot de progreso; solo candidatos nuevos, elegibles y
+válidos consumen RNG. Las garantías permanecen armadas hasta que aparece una superficie segura y la
+reserva conserva seed, roll, momento y razón, haciendo auditable cada final sin romper el azar normal.
+
+## D-039 — Reserva lógica protegida y presentación en coordenadas renderizadas
+
+**Estado:** aceptada — Fase 8.
+
+La habitación de salida se añade al set obligatorio del streamer y se excluye de shifts. Su superficie
+local se transforma con la matriz de la vista ya materializada, por lo que LRU y floating origin no
+introducen deriva. La pared visual y su beacon reciben el mismo delta de rebase; el grafo, sockets y
+colliders permanecen inmutables y la salida no puede crear un atajo topológico.
+
+## D-040 — Trigger por intención y transición breve gobernada por configuración
+
+**Estado:** aceptada — Fase 8.
+
+La pared sigue siendo físicamente sólida, así que el trigger usa velocidad horizontal solicitada,
+orientación, banda y tiempo de aproximación en vez de exigir cruzar el plano del collider. Al activarse,
+una secuencia configurada de 820 ms mantiene vivo solo el bus de evento, apaga ambiente/pasos, combina
+la distorsión con el postproceso existente y funde a negro. No hay tecla contextual, portal luminoso,
+flash, física general ni temporizadores dispersos en UI.

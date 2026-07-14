@@ -7,6 +7,7 @@ import { LightingAudioBridge } from '../audio/LightingAudioBridge';
 import { ProceduralAudioBank, hashAudioSeed } from '../audio/ProceduralAudioBank';
 import { getRoomAudioProfile, toAmbientProfile } from '../audio/RoomAudioProfiles';
 import { gameConfig } from '../config/game.config';
+import { lightingConfig } from '../config/lighting.config';
 import { tensionConfig } from '../config/tension.config';
 import { GameClock } from '../game/GameClock';
 import { SessionStats } from '../game/SessionStats';
@@ -22,13 +23,23 @@ import {
   getRoomDefinitions,
 } from '../procedural/RoomCatalog';
 import { hashSeed } from '../procedural/SeedBank';
-import type { RoomGraph, RoomInstance } from '../procedural/procedural.types';
+import type {
+  ExitSurfaceDefinition,
+  RoomGraph,
+  RoomInstance,
+} from '../procedural/procedural.types';
 import { PixelRenderPipeline } from '../rendering/PixelRenderPipeline';
 import { QualityManager } from '../rendering/QualityManager';
 import { LightingDirector, type LightingFrameSnapshot } from '../lighting/LightingDirector';
 import { FIXTURE_FLICKER_PROFILES, type FixtureFlickerProfile } from '../lighting/lighting.types';
 import { ModularWorld } from '../rooms/ModularWorld';
 import type { BuiltModularRoom } from '../rooms/rendering/rendering.types';
+import { ExitDirector } from '../exit/ExitDirector';
+import type { ExitCandidate, ExitReservation, ExitSnapshot } from '../exit/exit.types';
+import type { ExitWallPlacement } from '../exit/exit.presentation.types';
+import { exitPresentationConfig } from '../exit/exit.presentation.config';
+import { ExitAudioBeacon } from '../exit/ExitAudioBeacon';
+import { ExitWallPresentation } from '../exit/ExitWallPresentation';
 import { TensionDirector } from '../tension/TensionDirector';
 import {
   TENSION_EVENT_TYPES,
@@ -43,7 +54,8 @@ import { CreditsDialog } from '../ui/CreditsDialog';
 import { PauseMenu } from '../ui/PauseMenu';
 import { SettingsStore, type GameSettings } from '../ui/SettingsStore';
 import { TitleScreen } from '../ui/TitleScreen';
-import { ChunkStreamer } from '../world/ChunkStreamer';
+import { EndScreen } from '../ui/EndScreen';
+import { calculateGraphDistances, ChunkStreamer } from '../world/ChunkStreamer';
 import { FloatingOrigin } from '../world/FloatingOrigin';
 import {
   StreamingVisibilityGuard,
@@ -67,6 +79,7 @@ export class App {
   private readonly audioEngine: GameAudioEngine;
   private readonly audioLocalForward = Vector3.Forward();
   private readonly audioForward = Vector3.Zero();
+  private readonly exitCameraForward = Vector3.Zero();
   private readonly floatingOrigin = new FloatingOrigin({
     rebaseThreshold: this.debugOptions.debug ? 40 : gameConfig.world.floatingOriginThreshold,
   });
@@ -82,6 +95,12 @@ export class App {
   private lightingSnapshot: LightingFrameSnapshot | null = null;
   private tensionDirector: TensionDirector | null = null;
   private tensionSnapshot: TensionSnapshot | null = null;
+  private exitDirector: ExitDirector | null = null;
+  private exitSnapshot: ExitSnapshot | null = null;
+  private exitReservation: ExitReservation | null = null;
+  private exitPresentation: ExitWallPresentation | null = null;
+  private exitAudioBeacon: ExitAudioBeacon | null = null;
+  private exitFixtureId: string | null = null;
   private lastVisibility: StreamingVisibilityResult | null = null;
   private roomsById = new Map<string, RoomInstance>();
   private readonly visitedDefinitionIds = new Set<string>();
@@ -92,6 +111,8 @@ export class App {
   private titleScreen: TitleScreen | null = null;
   private pauseMenu: PauseMenu | null = null;
   private creditsDialog: CreditsDialog | null = null;
+  private endScreen: EndScreen | null = null;
+  private exitTransitionOverlay: HTMLElement | null = null;
   private debugHud: DebugHud | null = null;
   private audioBank: ProceduralAudioBank | null = null;
   private ambientDirector: AmbientDirector | null = null;
@@ -107,8 +128,13 @@ export class App {
   private lastAppliedTensionRevision = -1;
   private lastAppliedTensionIntensity = -1;
   private lastPixelEffectKey = '';
+  private exitPixelEffectStrength = 0;
+  private exitPixelEffectPhase = 0;
   private readonly tensionLightingRoomIds = new Set<string>();
   private readonly tensionFixtureIds = new Set<string>();
+  private previousExitPlayerPosition = Vector3.Zero();
+  private exitTransitionElapsedSeconds = 0;
+  private exitTransitionStats: ReturnType<SessionStats['snapshot']> | null = null;
   private disposed = false;
 
   private readonly handleDebugAdvanceStreaming = (event: Event): void => {
@@ -172,6 +198,36 @@ export class App {
     this.updateAudioFrame();
   };
 
+  private readonly handleDebugApproachExit = (): void => {
+    if (
+      !this.debugOptions.debug ||
+      this.stateMachine.state !== 'playing' ||
+      !this.exitPresentation ||
+      !this.player ||
+      !this.modularWorld
+    ) {
+      return;
+    }
+    const { center, inwardNormal } = this.exitPresentation.placement;
+    const currentY = this.player.position.y;
+    const approachPosition = new Vector3(
+      center.x + inwardNormal.x * 0.52,
+      currentY,
+      center.z + inwardNormal.z * 0.52,
+    );
+    const outward = new Vector3(-inwardNormal.x, 0, -inwardNormal.z);
+    this.player.setPosition(approachPosition);
+    this.player.setLookRotation(Math.atan2(outward.x, outward.z));
+    this.previousExitPlayerPosition.copyFrom(approachPosition);
+    const roomTransition = this.modularWorld.updatePlayerPosition(approachPosition);
+    this.recordRoomEntry(roomTransition.roomId);
+    if (roomTransition.roomId) {
+      this.streamAround(roomTransition.roomId);
+    }
+    this.root.dataset.debugExitApproach = 'ready';
+    this.syncWorldDebugSnapshot();
+  };
+
   private readonly handleWindowBlur = (): void => {
     this.audioEngine.setFocused(false);
     this.pauseForFocusLoss();
@@ -205,10 +261,11 @@ export class App {
       this.stateMachine.subscribe((next, previous) => {
         this.events.emit('stateChanged', { next, previous });
         this.root.dataset.gameState = next;
-        const paused = next !== 'playing' && next !== 'entering';
-        this.audioEngine.setPaused(paused);
-        this.ambientDirector?.setPaused(paused);
-        this.footsteps?.setPaused(paused);
+        const masterPaused = next !== 'playing' && next !== 'entering' && next !== 'exitTransition';
+        const worldPaused = next !== 'playing' && next !== 'entering';
+        this.audioEngine.setPaused(masterPaused);
+        this.ambientDirector?.setPaused(worldPaused);
+        this.footsteps?.setPaused(worldPaused);
         this.syncAudioDebugSnapshot();
       }),
     );
@@ -235,6 +292,10 @@ export class App {
         reducedFlashing: this.settings.value.reducedFlashing,
       });
       this.tensionDirector = new TensionDirector(this.debugOptions.seed);
+      this.exitDirector = new ExitDirector(this.debugOptions.seed);
+      if (this.debugOptions.exitNow) {
+        this.exitDirector.forceNextCandidate('debug');
+      }
       this.roomGraph = generateRoomGraph({
         seed: this.debugOptions.seed,
         targetRooms: gameConfig.world.logicalRoomCount,
@@ -297,6 +358,7 @@ export class App {
       this.syncRenderingSnapshot();
       const initialTransition = this.modularWorld.updatePlayerPosition(this.player.position);
       this.recordRoomEntry(initialTransition.roomId);
+      this.updateExitFrame();
       this.updateTensionFrame();
       this.updateLightingFrame();
       this.syncWorldDebugSnapshot();
@@ -317,6 +379,7 @@ export class App {
           this.handleDebugLightingOverride,
         );
         this.root.addEventListener('backrooms:debug-tension-event', this.handleDebugTensionEvent);
+        this.root.addEventListener('backrooms:debug-approach-exit', this.handleDebugApproachExit);
       }
 
       this.engineBootstrap.start(() => this.renderFrame());
@@ -353,16 +416,23 @@ export class App {
       this.handleDebugLightingOverride,
     );
     this.root.removeEventListener('backrooms:debug-tension-event', this.handleDebugTensionEvent);
+    this.root.removeEventListener('backrooms:debug-approach-exit', this.handleDebugApproachExit);
     this.debugHud?.dispose();
     this.debugHud = null;
     this.pauseMenu?.dispose();
     this.pauseMenu = null;
+    this.endScreen?.dispose();
+    this.endScreen = null;
+    this.exitTransitionOverlay?.remove();
+    this.exitTransitionOverlay = null;
     this.creditsDialog?.dispose();
     this.creditsDialog = null;
     this.titleScreen?.dispose();
     this.titleScreen = null;
     this.footsteps?.dispose();
     this.footsteps = null;
+    this.exitAudioBeacon?.dispose();
+    this.exitAudioBeacon = null;
     this.lightingAudioBridge?.dispose();
     this.lightingAudioBridge = null;
     this.ambientDirector?.dispose();
@@ -371,6 +441,12 @@ export class App {
     this.audioBank = null;
     this.pixelPipeline?.dispose();
     this.pixelPipeline = null;
+    this.exitPresentation?.dispose();
+    this.exitPresentation = null;
+    this.exitDirector?.dispose();
+    this.exitDirector = null;
+    this.exitSnapshot = null;
+    this.exitReservation = null;
     this.tensionDirector?.dispose();
     this.tensionDirector = null;
     this.tensionSnapshot = null;
@@ -407,6 +483,17 @@ export class App {
       onResume: () => void this.resumeGame(),
       onRestartSeed: () => void this.restartSession(),
       onExitToMenu: () => this.returnToTitle(),
+    });
+    this.exitTransitionOverlay = document.createElement('div');
+    this.exitTransitionOverlay.className = 'exit-transition-overlay';
+    this.exitTransitionOverlay.hidden = true;
+    this.exitTransitionOverlay.setAttribute('aria-hidden', 'true');
+    this.root.append(this.exitTransitionOverlay);
+    this.endScreen = new EndScreen(this.root, {
+      onRestartNewSeed: () => this.restartWithNewSeed(),
+      onRestartSameSeed: () => void this.restartFromEnd(),
+      onReturnToTitle: () => this.returnToTitleFromEnd(),
+      onCredits: () => this.creditsDialog?.show(),
     });
   }
 
@@ -445,11 +532,19 @@ export class App {
       return;
     }
 
+    const deltaSeconds = this.engineBootstrap.engine.getDeltaTime() / 1000;
     if (this.stateMachine.state === 'playing') {
-      this.player?.update(this.engineBootstrap.engine.getDeltaTime() / 1000);
+      if (this.player) {
+        this.previousExitPlayerPosition.copyFrom(this.player.position);
+      }
+      this.player?.update(deltaSeconds);
       this.updateWorldFrame();
       this.updateLightingFrame();
       this.updateTensionFrame();
+      this.updateExitFrame(deltaSeconds);
+      this.updateAudioFrame();
+    } else if (this.stateMachine.state === 'exitTransition') {
+      this.updateExitTransition(deltaSeconds);
       this.updateAudioFrame();
     }
     this.updateDebugSnapshot();
@@ -464,6 +559,7 @@ export class App {
       `RENDER ${this.qualityManager.presetName.toUpperCase()} ${renderMetrics?.bufferWidth ?? 0}x${renderMetrics?.bufferHeight ?? 0}`,
       `LIGHTS ${this.lightingSnapshot?.metrics.pool.activeLightCount ?? 0}/${this.lightingSnapshot?.metrics.pool.activeBudget ?? 0} / ${this.lightingSnapshot?.metrics.animatedFixtureCount ?? 0} FLICKER`,
       `TENSION ${this.tensionSnapshot?.phase.toUpperCase() ?? 'OFF'} ${(this.tensionSnapshot?.intensity ?? 0).toFixed(2)} / ${this.tensionSnapshot?.activeEventType ?? 'QUIET'}`,
+      `EXIT ${this.exitSnapshot?.exitSpawned ? this.exitReservation?.roomId : this.exitSnapshot?.eligible ? `${(this.exitSnapshot.probability * 100).toFixed(1)}%` : 'LOCKED'}`,
       `SEED ${this.debugOptions.seed}`,
     ]);
     this.scene.render();
@@ -505,6 +601,9 @@ export class App {
     const routeIndex = this.streamingRoute.indexOf(roomId);
     if (routeIndex >= 0) {
       this.streamingRouteIndex = routeIndex;
+    }
+    if (firstVisit) {
+      this.considerExitCandidate(instance, false);
     }
     this.events.emit('roomEntered', { roomId, definitionId: instance.definitionId, firstVisit });
     this.syncWorldDebugSnapshot();
@@ -590,7 +689,7 @@ export class App {
       currentRoomId: roomId,
       visibleRoomIds: visibility?.visibleRoomIds ?? [],
       visibleEntranceRoomIds: visibility?.visibleEntranceRoomIds ?? [],
-      exitRoomId: null,
+      exitRoomId: this.exitReservation?.roomId ?? null,
       recentlyLeftRoomIds: [...this.recentlyLeftRooms.keys()],
     });
     if (visibility && this.visibilityGuard) {
@@ -619,6 +718,8 @@ export class App {
 
     const delta = new Vector3(rebase.worldDelta.x, rebase.worldDelta.y, rebase.worldDelta.z);
     this.modularWorld.translate(delta);
+    this.exitPresentation?.translate(delta);
+    this.exitAudioBeacon?.translate(delta);
     this.player.setPosition(
       new Vector3(rebase.playerLocalAfter.x, rebase.playerLocalAfter.y, rebase.playerLocalAfter.z),
       false,
@@ -648,6 +749,7 @@ export class App {
           .filter(
             (roomId) =>
               roomId !== world?.activeRoomId &&
+              roomId !== this.exitReservation?.roomId &&
               !visible.has(roomId) &&
               !this.recentlyLeftRooms.has(roomId) &&
               !shifted.has(roomId),
@@ -664,7 +766,7 @@ export class App {
       secondsSinceMovement: Math.max(0, elapsedSeconds - this.lastMovementAtSeconds),
       quality: this.qualityManager.presetName,
       reducedFlashing: this.settings.value.reducedFlashing,
-      exitDistance: null,
+      exitDistance: this.player ? this.getExitDistance(this.player.position) : null,
       layoutShiftCandidates,
     };
   }
@@ -723,6 +825,7 @@ export class App {
     ]);
     if (
       event.targetRoomId === world.activeRoomId ||
+      event.targetRoomId === this.exitReservation?.roomId ||
       visible.has(event.targetRoomId) ||
       !world.isRoomLoaded(event.targetRoomId)
     ) {
@@ -799,15 +902,23 @@ export class App {
   }
 
   private applyTensionPixelEffect(snapshot: TensionSnapshot): void {
-    const phase =
-      snapshot.visualEffectStrength > 0 ? Math.floor(snapshot.visualEffectPhase * 12) / 12 : 0;
-    const key = `${snapshot.visualEffectStrength.toFixed(5)}:${phase.toFixed(3)}`;
+    this.syncPixelContextEffects(snapshot);
+  }
+
+  private syncPixelContextEffects(snapshot = this.tensionSnapshot): void {
+    const tensionStrength = snapshot?.visualEffectStrength ?? 0;
+    const tensionPhase =
+      tensionStrength > 0 ? Math.floor((snapshot?.visualEffectPhase ?? 0) * 12) / 12 : 0;
+    const useExitEffect = this.exitPixelEffectStrength >= tensionStrength;
+    const strength = Math.max(tensionStrength, this.exitPixelEffectStrength);
+    const phase = useExitEffect ? this.exitPixelEffectPhase : tensionPhase;
+    const key = `${strength.toFixed(5)}:${phase.toFixed(3)}`;
     if (key === this.lastPixelEffectKey) {
       return;
     }
     this.lastPixelEffectKey = key;
     this.pixelPipeline?.setContextEffects({
-      anomalyStrength: snapshot.visualEffectStrength,
+      anomalyStrength: strength,
       anomalyPhase: phase,
     });
   }
@@ -829,6 +940,431 @@ export class App {
     this.root.dataset.worldSpatialAnomalies = String(this.modularWorld?.spatialAnomalyCount ?? 0);
     this.root.dataset.worldSpatialAnomalyRooms =
       this.modularWorld?.spatialAnomalyRoomIds.join(',') ?? '';
+  }
+
+  private createExitProgress(): { readonly elapsedSeconds: number; readonly uniqueRooms: number } {
+    const stats = this.stats.snapshot(this.clock.elapsedSeconds);
+    return { elapsedSeconds: stats.elapsedSeconds, uniqueRooms: stats.roomsVisited };
+  }
+
+  private considerExitCandidate(instance: RoomInstance, assumeAhead: boolean): void {
+    const director = this.exitDirector;
+    if (!director || director.current.exitSpawned) {
+      return;
+    }
+    const definition = getRoomDefinition(instance.definitionId);
+    if (definition.exitCompatibleSurfaces.length === 0) {
+      return;
+    }
+
+    const selected = this.selectExitSurface(instance, assumeAhead);
+    const surface = selected.surface;
+    const normalUsesWidth = Math.abs(surface.localForward.x) > Math.abs(surface.localForward.z);
+    const candidate: ExitCandidate = {
+      roomId: instance.id,
+      definitionId: instance.definitionId,
+      surfaceId: surface.id,
+      roomDepth: instance.depth,
+      roomTags: definition.tags,
+      surfaceWidthMeters: surface.width,
+      surfaceHeightMeters: surface.height,
+      revealDistanceMeters: Math.hypot(surface.localPosition.x, surface.localPosition.z),
+      approachDepthMeters:
+        (normalUsesWidth ? definition.footprint.width : definition.footprint.depth) / 2,
+      visibleFromApproach: true,
+      approachPathClear: true,
+      reachable: true,
+      visuallyExhausted: false,
+      navigable: true,
+      behindPlayer: selected.behindPlayer,
+    };
+    const decision = director.considerCandidate(this.createExitProgress(), candidate);
+    this.exitSnapshot = decision.snapshot;
+    this.root.dataset.exitLastCandidateStatus = decision.status;
+    this.root.dataset.exitLastCandidateId = decision.candidateId;
+    this.root.dataset.exitLastRejectionReasons = decision.rejectionReasons.join(',');
+    if (decision.reservation) {
+      this.applyExitReservation(decision.reservation);
+    }
+  }
+
+  private selectExitSurface(
+    instance: RoomInstance,
+    assumeAhead: boolean,
+  ): { readonly surface: ExitSurfaceDefinition; readonly behindPlayer: boolean } {
+    const definition = getRoomDefinition(instance.definitionId);
+    const surfaces = [...definition.exitCompatibleSurfaces].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    );
+    const first = surfaces[0];
+    if (!first) {
+      throw new Error(`Room ${instance.id} has no exit-compatible surface.`);
+    }
+    const view = this.modularWorld?.getLoadedRoom(instance.id);
+    if (assumeAhead || !view || !this.player) {
+      return { surface: first, behindPlayer: false };
+    }
+
+    view.root.computeWorldMatrix(true);
+    this.player.camera.getDirectionToRef(this.audioLocalForward, this.exitCameraForward);
+    this.exitCameraForward.y = 0;
+    this.exitCameraForward.normalize();
+    const playerPosition = this.player.position;
+    let bestSurface = first;
+    let bestAlignment = Number.NEGATIVE_INFINITY;
+    for (const surface of surfaces) {
+      const center = Vector3.TransformCoordinates(
+        new Vector3(surface.localPosition.x, surface.localPosition.y, surface.localPosition.z),
+        view.root.getWorldMatrix(),
+      );
+      center.y = playerPosition.y;
+      const direction = center.subtract(playerPosition);
+      const alignment =
+        direction.lengthSquared() > Number.EPSILON
+          ? Vector3.Dot(direction.normalize(), this.exitCameraForward)
+          : 1;
+      if (alignment > bestAlignment) {
+        bestAlignment = alignment;
+        bestSurface = surface;
+      }
+    }
+    return { surface: bestSurface, behindPlayer: bestAlignment < -0.05 };
+  }
+
+  private updateExitFrame(deltaSeconds = 0): void {
+    const director = this.exitDirector;
+    if (!director) {
+      return;
+    }
+    this.exitSnapshot = director.update(this.createExitProgress());
+    if (this.exitSnapshot.forcedPending && !this.exitReservation) {
+      this.reserveNextForwardExitCandidate();
+    }
+
+    const presentation = this.exitPresentation;
+    const player = this.player;
+    if (presentation && player) {
+      const distance = this.getExitDistance(player.position) ?? Number.POSITIVE_INFINITY;
+      const sample = presentation.update(this.clock.elapsedSeconds, distance);
+      this.exitPixelEffectStrength = Math.min(
+        0.3,
+        sample.proximity * sample.glitchStrength * 1.8 + sample.transitionProgress * 0.3,
+      );
+      this.exitPixelEffectPhase = Math.floor(this.clock.elapsedSeconds * 12) / 12;
+      this.syncPixelContextEffects();
+
+      if (
+        deltaSeconds > 0 &&
+        this.stateMachine.state === 'playing' &&
+        this.modularWorld?.activeRoomId === this.exitReservation?.roomId
+      ) {
+        player.camera.getDirectionToRef(this.audioLocalForward, this.exitCameraForward);
+        const movement = player.movementFrame;
+        const trigger = presentation.trigger.update({
+          previousPosition: this.previousExitPlayerPosition,
+          position: player.position,
+          forward: this.exitCameraForward,
+          velocity: { x: movement.velocity.x, y: 0, z: movement.velocity.z },
+          deltaSeconds,
+        });
+        this.root.dataset.exitActivationProgress = trigger.activationProgress.toFixed(4);
+        this.root.dataset.exitApproachValid = String(
+          trigger.insideSurface && trigger.insideActivationBand && trigger.approachSpeed > 0,
+        );
+        if (trigger.entered) {
+          this.beginExitTransition();
+        }
+      }
+    }
+    this.syncExitDebugSnapshot();
+  }
+
+  private reserveNextForwardExitCandidate(): void {
+    const graph = this.roomGraph;
+    const currentId = this.modularWorld?.activeRoomId;
+    if (!graph || !currentId || this.exitReservation) {
+      return;
+    }
+    const current = this.roomsById.get(currentId);
+    if (!current) {
+      return;
+    }
+
+    const adjacency = new Map<string, string[]>(graph.rooms.map((room) => [room.id, []]));
+    for (const connection of graph.connections) {
+      adjacency.get(connection.roomAId)?.push(connection.roomBId);
+      adjacency.get(connection.roomBId)?.push(connection.roomAId);
+    }
+    const forwardIds = new Set<string>();
+    const queue = [current.id];
+    for (const roomId of queue) {
+      const room = this.roomsById.get(roomId);
+      if (!room) continue;
+      for (const neighborId of adjacency.get(room.id) ?? []) {
+        const neighbor = this.roomsById.get(neighborId);
+        if (!neighbor || neighbor.depth <= room.depth || forwardIds.has(neighbor.id)) continue;
+        forwardIds.add(neighbor.id);
+        queue.push(neighbor.id);
+      }
+    }
+    const distances = calculateGraphDistances(graph, current.id);
+    const candidates = [...forwardIds]
+      .map((roomId) => this.roomsById.get(roomId))
+      .filter((room): room is RoomInstance => room !== undefined && room.visitState !== 'visited')
+      .filter((room) => {
+        const definition = getRoomDefinition(room.definitionId);
+        return definition.exitCompatibleSurfaces.length > 0;
+      })
+      .sort(
+        (left, right) =>
+          (distances.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+            (distances.get(right.id) ?? Number.MAX_SAFE_INTEGER) || left.id.localeCompare(right.id),
+      );
+
+    for (const candidate of candidates) {
+      this.considerExitCandidate(candidate, true);
+      if (this.exitReservation) {
+        return;
+      }
+    }
+  }
+
+  private applyExitReservation(reservation: ExitReservation): void {
+    if (this.exitReservation?.id === reservation.id && this.exitPresentation) {
+      return;
+    }
+    const world = this.modularWorld;
+    const scene = this.scene;
+    if (!world || !scene) {
+      throw new Error('Cannot present the exit before the rendered world exists.');
+    }
+    this.exitReservation = reservation;
+    if (world.spatialAnomalyRoomIds.includes(reservation.roomId)) {
+      world.setRoomSpatialAnomaly(reservation.roomId, false);
+    }
+    const activeRoomId = world.activeRoomId ?? this.roomGraph?.startRoomId;
+    if (!activeRoomId) {
+      throw new Error('Cannot protect the exit without an active room.');
+    }
+    this.streamAround(activeRoomId);
+    const view = world.getLoadedRoom(reservation.roomId);
+    if (!view) {
+      throw new Error(`Reserved exit room ${reservation.roomId} was not materialized.`);
+    }
+    const surface = view.definition.exitCompatibleSurfaces.find(
+      (candidate) => candidate.id === reservation.surfaceId,
+    );
+    if (!surface) {
+      throw new Error(`Reserved exit surface ${reservation.surfaceId} no longer exists.`);
+    }
+
+    view.root.computeWorldMatrix(true);
+    const matrix = view.root.getWorldMatrix();
+    const center = Vector3.TransformCoordinates(
+      new Vector3(surface.localPosition.x, surface.localPosition.y, surface.localPosition.z),
+      matrix,
+    );
+    const outward = Vector3.TransformNormal(
+      new Vector3(surface.localForward.x, surface.localForward.y, surface.localForward.z),
+      matrix,
+    ).normalize();
+    const placement: ExitWallPlacement = {
+      roomId: reservation.roomId,
+      surfaceId: reservation.surfaceId,
+      center,
+      inwardNormal: outward.scale(-1),
+      width: surface.width,
+      height: surface.height,
+      seed: reservation.seed,
+    };
+    this.exitPresentation?.dispose();
+    this.exitPresentation = new ExitWallPresentation(scene, placement, world.materialLibrary.wall, {
+      reducedFlashing: this.settings.value.reducedFlashing,
+    });
+    this.initializeExitAudioBeacon();
+    this.previousExitPlayerPosition.copyFrom(this.player?.position ?? center);
+
+    // Streaming the protected exit can add fixtures after the previous
+    // lighting frame. Register those anchors before applying the local beacon
+    // override so the controller never receives an unknown fixture id.
+    this.updateLightingFrame();
+    const anchor = world.lightAnchors
+      .filter((candidate) => candidate.roomId === reservation.roomId && candidate.enabled)
+      .sort(
+        (left, right) =>
+          Vector3.DistanceSquared(left.node.getAbsolutePosition(), center) -
+          Vector3.DistanceSquared(right.node.getAbsolutePosition(), center),
+      )[0];
+    if (anchor) {
+      this.exitFixtureId = anchor.id;
+      this.lightingDirector?.setFixtureOverride(anchor.id, lightingConfig.exitOverride);
+      this.updateLightingFrame();
+    }
+    this.events.emit('exitSpawned', {
+      roomId: reservation.roomId,
+      surfaceId: reservation.surfaceId,
+      forced: reservation.forced,
+    });
+    this.syncExitDebugSnapshot();
+  }
+
+  private initializeExitAudioBeacon(): void {
+    const context = this.audioEngine.context;
+    const eventsBus = this.audioEngine.eventsBus;
+    const placement = this.exitPresentation?.placement;
+    if (!context || !eventsBus || !placement) {
+      return;
+    }
+    this.exitAudioBeacon?.dispose();
+    this.exitAudioBeacon = new ExitAudioBeacon(
+      {
+        context,
+        destination: eventsBus.input,
+        registerNode: (node) => this.audioEngine.registerNode(node),
+      },
+      placement,
+      this.settings.value.reducedFlashing,
+    );
+    this.exitAudioBeacon.setActive(true);
+  }
+
+  private getExitDistance(position: Vector3): number | null {
+    const placement = this.exitPresentation?.placement;
+    if (!placement) {
+      return null;
+    }
+    return Math.hypot(
+      position.x - placement.center.x,
+      position.y - placement.center.y,
+      position.z - placement.center.z,
+    );
+  }
+
+  private syncExitDebugSnapshot(): void {
+    const snapshot = this.exitSnapshot;
+    const reservation = this.exitReservation;
+    this.root.dataset.exitEligible = String(snapshot?.eligible ?? false);
+    this.root.dataset.exitProbability = (snapshot?.probability ?? 0).toFixed(5);
+    this.root.dataset.exitForcedPending = String(snapshot?.forcedPending ?? false);
+    this.root.dataset.exitSpawned = String(snapshot?.exitSpawned ?? false);
+    this.root.dataset.exitRoomId = reservation?.roomId ?? '';
+    this.root.dataset.exitSurfaceId = reservation?.surfaceId ?? '';
+    this.root.dataset.exitForced = String(reservation?.forced ?? false);
+    this.root.dataset.exitForceReason = reservation?.forceReason ?? snapshot?.forceReason ?? 'none';
+    this.root.dataset.exitConsideredRooms = String(snapshot?.consideredRoomCount ?? 0);
+    this.root.dataset.exitValidCandidates = String(snapshot?.validCandidateCount ?? 0);
+    this.root.dataset.exitRejectedCandidates = String(snapshot?.probabilisticRejectionCount ?? 0);
+    this.root.dataset.exitProtected = String(
+      reservation !== null &&
+        (this.chunkStreamer?.metrics.protectedRoomCount ?? 0) > 0 &&
+        this.modularWorld?.isRoomLoaded(reservation.roomId),
+    );
+    this.root.dataset.exitVisualMeshes = String(this.exitPresentation?.meshes.length ?? 0);
+    this.root.dataset.exitAudioNodes = String(this.exitAudioBeacon?.nodeCount ?? 0);
+    this.root.dataset.exitAudioActive = String(this.exitAudioBeacon?.snapshot.active ?? false);
+    this.root.dataset.exitAudioTransitionPlayed = String(
+      this.exitAudioBeacon?.snapshot.transitionPlayed ?? false,
+    );
+    this.root.dataset.exitDistance =
+      (this.player ? this.getExitDistance(this.player.position) : null)?.toFixed(4) ?? 'none';
+  }
+
+  private beginExitTransition(): void {
+    const reservation = this.exitReservation;
+    const player = this.player;
+    if (!reservation || !player || this.stateMachine.state !== 'playing') {
+      return;
+    }
+
+    this.clock.pause();
+    this.exitTransitionStats = this.stats.snapshot(this.clock.elapsedSeconds);
+    this.exitTransitionElapsedSeconds = 0;
+    this.stateMachine.transition('exitTransition');
+    player.setEnabled(false);
+    player.releasePointerLock();
+    this.exitPresentation?.setTransitionProgress(0);
+    this.exitAudioBeacon?.beginTransition();
+    if (this.exitTransitionOverlay) {
+      this.exitTransitionOverlay.hidden = false;
+      this.exitTransitionOverlay.style.opacity = '0';
+      this.exitTransitionOverlay.setAttribute('aria-hidden', 'true');
+    }
+    this.root.dataset.exitTransitionProgress = '0.0000';
+    this.root.dataset.exitInputScale = '1.0000';
+    this.root.dataset.exitFadeOpacity = '0.0000';
+    this.events.emit('exitEntered', {
+      roomId: reservation.roomId,
+      surfaceId: reservation.surfaceId,
+      elapsedSeconds: this.exitTransitionStats.elapsedSeconds,
+    });
+    this.syncExitDebugSnapshot();
+  }
+
+  private updateExitTransition(deltaSeconds: number): void {
+    const config = exitPresentationConfig.transition;
+    const safeDelta = Math.min(0.1, Math.max(0, deltaSeconds));
+    this.exitTransitionElapsedSeconds = Math.min(
+      config.totalSeconds,
+      this.exitTransitionElapsedSeconds + safeDelta,
+    );
+    const elapsed = this.exitTransitionElapsedSeconds;
+    const progress = Math.min(1, elapsed / config.totalSeconds);
+    const inputScale = Math.max(0, 1 - elapsed / config.inputReductionSeconds);
+    const distortionRise = Math.min(1, elapsed / config.distortionPeakSeconds);
+    const distortionFall = Math.max(
+      0,
+      1 -
+        Math.max(0, elapsed - config.distortionPeakSeconds) /
+          (config.fadeEndSeconds - config.distortionPeakSeconds),
+    );
+    const distortion = Math.min(distortionRise, distortionFall);
+    const rawFade = Math.min(
+      1,
+      Math.max(
+        0,
+        (elapsed - config.fadeStartSeconds) / (config.fadeEndSeconds - config.fadeStartSeconds),
+      ),
+    );
+    const fade = rawFade * rawFade * (3 - 2 * rawFade);
+
+    this.exitPresentation?.setTransitionProgress(progress);
+    if (this.exitPresentation && this.player) {
+      const distance = this.getExitDistance(this.player.position) ?? 0;
+      this.exitPresentation.update(this.clock.elapsedSeconds + elapsed, distance);
+    }
+    this.exitPixelEffectStrength = distortion * 0.3;
+    this.exitPixelEffectPhase = Math.floor((this.clock.elapsedSeconds + elapsed) * 18) / 18;
+    this.syncPixelContextEffects();
+    if (this.exitTransitionOverlay) {
+      this.exitTransitionOverlay.style.opacity = fade.toFixed(4);
+    }
+    this.root.dataset.exitTransitionProgress = progress.toFixed(4);
+    this.root.dataset.exitInputScale = inputScale.toFixed(4);
+    this.root.dataset.exitFadeOpacity = fade.toFixed(4);
+
+    if (elapsed >= config.totalSeconds) {
+      this.finishExitTransition();
+    }
+  }
+
+  private finishExitTransition(): void {
+    if (this.stateMachine.state !== 'exitTransition') {
+      return;
+    }
+    const finalStats = this.exitTransitionStats ?? this.stats.snapshot(this.clock.elapsedSeconds);
+    if (this.exitTransitionOverlay) {
+      this.exitTransitionOverlay.style.opacity = '1';
+    }
+    this.exitPixelEffectStrength = 0;
+    this.syncPixelContextEffects();
+    this.stateMachine.transition('ended');
+    this.root.dataset.gameCompleted = 'true';
+    this.endScreen?.show({
+      elapsedSeconds: finalStats.elapsedSeconds,
+      roomsVisited: finalStats.roomsVisited,
+      seed: this.debugOptions.seed,
+    });
+    this.syncExitDebugSnapshot();
   }
 
   private updateLightingFrame(): void {
@@ -974,6 +1510,11 @@ export class App {
     const position = player.camera.globalPosition;
     player.camera.getDirectionToRef(this.audioLocalForward, this.audioForward);
     this.audioEngine.updateListener({ position, forward: this.audioForward });
+    if (this.exitAudioBeacon) {
+      const distance =
+        this.getExitDistance(player.position) ?? exitPresentationConfig.audio.maxDistance;
+      this.exitAudioBeacon.update(this.clock.elapsedSeconds, distance);
+    }
     this.syncAudioDebugSnapshot();
   }
 
@@ -1055,6 +1596,7 @@ export class App {
     this.root.dataset.sceneMeshes = String(this.scene?.meshes.length ?? 0);
     this.root.dataset.sceneMaterials = String(this.scene?.materials.length ?? 0);
     this.root.dataset.sceneTransformNodes = String(this.scene?.transformNodes.length ?? 0);
+    this.syncExitDebugSnapshot();
     this.syncRenderingSnapshot();
   }
 
@@ -1076,6 +1618,8 @@ export class App {
     });
     this.lightingDirector?.setLightBudget(quality.lightBudget);
     this.lightingDirector?.setReducedFlashing(settings.reducedFlashing);
+    this.exitPresentation?.setReducedFlashing(settings.reducedFlashing);
+    this.exitAudioBeacon?.setReducedFlashing(settings.reducedFlashing);
     this.lightingAudioBridge?.setVoiceBudget(this.getLightingAudioVoiceBudget());
     if (this.scene) {
       this.scene.fogEnd = quality.fogEnd;
@@ -1244,6 +1788,9 @@ export class App {
     if (this.currentRoomDefinitionId) {
       this.applyRoomAudioProfile(this.currentRoomDefinitionId);
     }
+    if (this.exitPresentation && !this.exitAudioBeacon) {
+      this.initializeExitAudioBeacon();
+    }
   }
 
   private async resumeGame(): Promise<void> {
@@ -1294,6 +1841,44 @@ export class App {
     this.pauseMenu?.show();
   }
 
+  private restartWithNewSeed(): void {
+    if (this.stateMachine.state !== 'ended') {
+      return;
+    }
+    const random = new Uint32Array(2);
+    crypto.getRandomValues(random);
+    const seed = `threshold-${Date.now().toString(36)}-${[...random]
+      .map((value) => value.toString(36))
+      .join('-')}`;
+    const url = new URL(window.location.href);
+    url.searchParams.set('seed', seed);
+    url.searchParams.delete('exitNow');
+    window.location.assign(url.toString());
+  }
+
+  private async restartFromEnd(): Promise<void> {
+    if (!this.modularWorld || !this.player || this.stateMachine.state !== 'ended') {
+      return;
+    }
+    this.stateMachine.transition('loading');
+    this.resetStreamingSessionState();
+    this.titleScreen?.show(false);
+    this.titleScreen?.setReady();
+    this.stateMachine.transition('title');
+    await this.enterGame();
+  }
+
+  private returnToTitleFromEnd(): void {
+    if (!this.modularWorld || !this.player || this.stateMachine.state !== 'ended') {
+      return;
+    }
+    this.stateMachine.transition('loading');
+    this.resetStreamingSessionState();
+    this.titleScreen?.show();
+    this.titleScreen?.setReady();
+    this.stateMachine.transition('title');
+  }
+
   private async restartSession(): Promise<void> {
     if (!this.modularWorld || !this.player) {
       return;
@@ -1325,6 +1910,32 @@ export class App {
     this.debugStreamingAdvanceToken += 1;
     this.root.dataset.debugStreamingPending = 'false';
 
+    this.exitAudioBeacon?.dispose();
+    this.exitAudioBeacon = null;
+    this.exitPresentation?.dispose();
+    this.exitPresentation = null;
+    if (this.exitFixtureId) {
+      this.lightingDirector?.setFixtureOverride(this.exitFixtureId, null);
+    }
+    this.exitFixtureId = null;
+    this.exitReservation = null;
+    this.exitDirector?.reset();
+    if (this.debugOptions.exitNow) {
+      this.exitDirector?.forceNextCandidate('debug');
+    }
+    this.exitSnapshot = this.exitDirector?.current ?? null;
+    this.exitTransitionElapsedSeconds = 0;
+    this.exitTransitionStats = null;
+    this.exitPixelEffectStrength = 0;
+    this.exitPixelEffectPhase = 0;
+    this.endScreen?.hide();
+    if (this.exitTransitionOverlay) {
+      this.exitTransitionOverlay.hidden = true;
+      this.exitTransitionOverlay.style.opacity = '0';
+    }
+    this.root.dataset.gameCompleted = 'false';
+    this.root.dataset.debugExitApproach = '';
+
     const reset = this.floatingOrigin.reset();
     this.modularWorld.translate(
       new Vector3(reset.worldDelta.x, reset.worldDelta.y, reset.worldDelta.z),
@@ -1349,7 +1960,7 @@ export class App {
     this.tensionLightingRoomIds.clear();
     this.tensionFixtureIds.clear();
     this.modularWorld.clearSpatialAnomalies();
-    this.pixelPipeline?.setContextEffects({ anomalyStrength: 0, anomalyPhase: 0 });
+    this.syncPixelContextEffects(null);
     this.ambientDirector?.setTension(0, 0.5);
     this.lightingDirector?.reset();
     this.lightingSnapshot = null;
@@ -1361,6 +1972,8 @@ export class App {
     this.player.setLookRotation(this.modularWorld.spawnYaw);
     const transition = this.modularWorld.updatePlayerPosition(this.player.position);
     this.recordRoomEntry(transition.roomId);
+    this.previousExitPlayerPosition.copyFrom(this.player.position);
+    this.updateExitFrame();
     this.updateTensionFrame();
     this.updateLightingFrame();
     this.syncWorldDebugSnapshot();

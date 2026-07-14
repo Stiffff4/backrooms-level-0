@@ -9,10 +9,11 @@ describe('parseDebugOptions', () => {
     expect(result.seed.length).toBeLessThanOrEqual(64);
   });
 
-  it('solo habilita exitNow en desarrollo junto a debug', () => {
+  it('solo habilita exitNow en desarrollo o junto a debug en la build estática de QA', () => {
     const query = '?debug=1&exitNow=1';
 
-    expect(parseDebugOptions(query, 'production').exitNow).toBe(false);
+    expect(parseDebugOptions('?exitNow=1', 'development').exitNow).toBe(true);
+    expect(parseDebugOptions(query, 'production').exitNow).toBe(true);
     expect(parseDebugOptions(query, 'development').exitNow).toBe(true);
   });
 });
