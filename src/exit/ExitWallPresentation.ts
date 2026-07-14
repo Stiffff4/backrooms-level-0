@@ -48,7 +48,7 @@ function cloneExitMaterial(source: StandardMaterial, name: string): StandardMate
   const material = source.clone(name);
   material.name = name;
   material.id = name;
-  material.backFaceCulling = true;
+  material.backFaceCulling = false;
   material.disableLighting = false;
   return material;
 }
@@ -114,13 +114,14 @@ export class ExitWallPresentation {
     this.wallMesh = MeshBuilder.CreateBox(
       `${this.root.name}.wall`,
       {
-        width: this.placementValue.width,
-        height: this.placementValue.height,
+        width: this.placementValue.width + 0.12,
+        height: this.placementValue.height + 0.12,
         depth: exitPresentationConfig.visual.thickness,
       },
       scene,
     );
-    this.wallMesh.position.z = exitPresentationConfig.visual.surfaceOffset;
+    this.wallMesh.position.z =
+      exitPresentationConfig.visual.surfaceOffset + exitPresentationConfig.visual.thickness / 2;
     this.wallMesh.material = this.wallMaterial;
     this.wallMesh.parent = this.root;
     this.wallMesh.isPickable = false;
@@ -238,7 +239,7 @@ export class ExitWallPresentation {
 
   private createGlitchStrip(scene: Scene, rng: SeededRandom, index: number): ExitGlitchStrip {
     const width = this.placementValue.width * (0.3 + rng.next() * 0.5);
-    const height = 0.018 + rng.next() * 0.034;
+    const height = 0.032 + rng.next() * 0.05;
     const availableX = Math.max(0, (this.placementValue.width - width) / 2);
     const baseX = (rng.next() * 2 - 1) * availableX;
     const availableY = Math.max(0, (this.placementValue.height - height) / 2 - 0.08);
@@ -253,7 +254,7 @@ export class ExitWallPresentation {
       baseY,
       exitPresentationConfig.visual.surfaceOffset +
         exitPresentationConfig.visual.thickness / 2 +
-        0.008,
+        0.018,
     );
     mesh.material = this.glitchMaterial;
     mesh.parent = this.root;
@@ -268,18 +269,18 @@ export class ExitWallPresentation {
   }
 
   private applySample(sample: ExitWallVisualSample): void {
-    const diffuseScale = 0.28 + sample.lightResponse * 0.16;
+    const diffuseScale = 0.18 + sample.lightResponse * 0.04;
     this.wallMaterial.diffuseColor.copyFrom(this.baseDiffuse).scaleInPlace(diffuseScale);
     this.wallMaterial.emissiveColor.copyFrom(this.baseEmissive);
-    this.wallMaterial.emissiveColor.r += sample.emissiveStrength * 0.82;
-    this.wallMaterial.emissiveColor.g += sample.emissiveStrength * 0.88;
-    this.wallMaterial.emissiveColor.b += sample.emissiveStrength * 0.52;
+    this.wallMaterial.emissiveColor.r += sample.emissiveStrength * 0.18;
+    this.wallMaterial.emissiveColor.g += sample.emissiveStrength * 0.18;
+    this.wallMaterial.emissiveColor.b += sample.emissiveStrength * 0.08;
 
-    this.glitchMaterial.diffuseColor.copyFrom(this.baseDiffuse).scaleInPlace(diffuseScale * 0.62);
+    this.glitchMaterial.diffuseColor.copyFrom(this.baseDiffuse).scaleInPlace(diffuseScale * 0.45);
     this.glitchMaterial.emissiveColor.copyFrom(this.baseEmissive);
-    this.glitchMaterial.emissiveColor.r += sample.emissiveStrength * 1.1;
-    this.glitchMaterial.emissiveColor.g += sample.emissiveStrength * 1.16;
-    this.glitchMaterial.emissiveColor.b += sample.emissiveStrength * 0.7;
+    this.glitchMaterial.emissiveColor.r += sample.emissiveStrength * 0.28;
+    this.glitchMaterial.emissiveColor.g += sample.emissiveStrength * 0.28;
+    this.glitchMaterial.emissiveColor.b += sample.emissiveStrength * 0.12;
 
     const transitionWave = Math.sin(sample.elapsedSeconds * 18.1 + this.seedPhaseB);
     this.root.scaling.x =

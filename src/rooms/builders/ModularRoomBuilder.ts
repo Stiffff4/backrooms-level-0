@@ -206,6 +206,7 @@ export class ModularRoomBuilder {
 
     const wallBoxes: Mesh[] = [];
     const rotatedWallBoxes: Mesh[] = [];
+    const lintelBoxes: Mesh[] = [];
     const trimBoxes: Mesh[] = [];
     for (const side of this.getWallSides(definition)) {
       const openings = this.getConnectedOpenings(instance, side);
@@ -216,6 +217,7 @@ export class ModularRoomBuilder {
         side,
         openings,
         this.sideUsesRotatedWallpaper(side) ? rotatedWallBoxes : wallBoxes,
+        lintelBoxes,
         trimBoxes,
       );
     }
@@ -232,6 +234,9 @@ export class ModularRoomBuilder {
     for (const wall of rotatedWallBoxes) {
       wall.material = rotatedWallMaterial;
     }
+    for (const lintel of lintelBoxes) {
+      lintel.material = wallMaterial;
+    }
     for (const trim of trimBoxes) {
       trim.material = this.materials.trim;
     }
@@ -246,6 +251,11 @@ export class ModularRoomBuilder {
       const rotatedWalls = this.mergeMeshes(`${instance.id}.walls.rotated`, rotatedWallBoxes, root);
       rotatedWalls.checkCollisions = true;
       wallMeshes.push(rotatedWalls);
+    }
+    if (lintelBoxes.length > 0) {
+      const lintels = this.mergeMeshes(`${instance.id}.lintels`, lintelBoxes, root);
+      lintels.checkCollisions = true;
+      wallMeshes.push(lintels);
     }
     const trim = this.mergeMeshes(`${instance.id}.trim`, trimBoxes, root);
 
@@ -334,6 +344,7 @@ export class ModularRoomBuilder {
     side: WallSide,
     openings: readonly Opening[],
     wallBoxes: Mesh[],
+    lintelBoxes: Mesh[],
     trimBoxes: Mesh[],
   ): void {
     let cursor = -side.length / 2;
@@ -357,7 +368,7 @@ export class ModularRoomBuilder {
 
       const lintelHeight = roomHeight - Math.min(opening.height, roomHeight);
       if (lintelHeight > 0.01) {
-        wallBoxes.push(
+        lintelBoxes.push(
           this.createSideBox(
             `${roomId}.${side.id}.lintel.${segmentIndex}`,
             side,
@@ -943,8 +954,8 @@ export class ModularRoomBuilder {
   }
 
 
-  private sideUsesRotatedWallpaper(side: WallSide): boolean {
-    return side.horizontal === false;
+  private sideUsesRotatedWallpaper(_side: WallSide): boolean {
+    return false;
   }
 
   private quarterTurnRadians(rotation: QuarterTurn): number {
@@ -973,8 +984,8 @@ export class ModularRoomBuilder {
     return (value ^ (value >>> 16)) >>> 0;
   }
 
-  private useStainedWalls(seed: number): boolean {
-    return this.hash(seed, 51) % 5 === 0;
+  private useStainedWalls(_seed: number): boolean {
+    return false;
   }
 
   private isWet(seed: number): boolean {
