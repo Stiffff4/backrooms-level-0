@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-test('la build de fundación inicializa Babylon y muestra un canvas dimensionado', async ({ page }) => {
+test('la build de fundación inicializa Babylon y muestra un canvas dimensionado', async ({
+  page,
+}) => {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   page.on('console', (message) => {

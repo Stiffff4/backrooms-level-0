@@ -344,3 +344,59 @@ orientación, banda y tiempo de aproximación en vez de exigir cruzar el plano d
 una secuencia configurada de 820 ms mantiene vivo solo el bus de evento, apaga ambiente/pasos, combina
 la distorsión con el postproceso existente y funde a negro. No hay tecla contextual, portal luminoso,
 flash, física general ni temporizadores dispersos en UI.
+
+## D-041 — Compatibilidad antes del motor y recuperación después de una pérdida
+
+**Estado:** aceptada — Fase 9.
+
+Las capacidades bloqueantes se prueban antes de crear Babylon, sin iniciar audio ni pedir permisos.
+Una vez creada la sesión, `WebGlContextRecovery` conserva preventivamente la extensión de restauración,
+posee el ciclo de eventos del canvas y usa `engine.onContextRestoredObservable` como barrera. La
+recuperación nunca devuelve directamente a `playing`: mantiene `paused` para que Pointer Lock y audio
+vuelvan a activarse mediante un gesto explícito y no exista movimiento a ciegas.
+
+## D-042 — Budgets medibles, monitor acotado y optimización guiada por evidencia
+
+**Estado:** aceptada — Fase 9.
+
+Los budgets viven en JSON versionado y alimentan tanto tests como un ring buffer runtime de tamaño
+fijo. El analyzer distingue tamaño raw, gzip, grafo inicial, memoria decodificada y source maps. El
+soak mantiene heap y recursos acotados; por ello se descarta una división manual tardía de Babylon que
+añadiría riesgo de carga sin resolver un presupuesto excedido. El margen menor de 15 % del entry queda
+como warning visible, no como fallo oculto.
+
+## D-043 — El smoke de subruta no modifica el artefacto candidato
+
+**Estado:** aceptada — Fase 9.
+
+`dist/` representa la build raíz publicable y `dist-static/` existe solo durante el smoke con base
+`/threshold/`. El servidor de QA aplica el baseline de headers, cache, MIME y gzip, pero se documenta
+expresamente que no es un servidor público. Producción omite source maps; CI y el gate local prueban el
+artefacto desde HTTP estático y conservan el candidato raíz para inspección y hashing posteriores.
+
+## D-044 — Accesibilidad ambiental sin una ruta de juego paralela
+
+**Estado:** aceptada — Fase 9.
+
+La preferencia del sistema por movimiento reducido se convierte en el default de `reducedFlashing`
+solo cuando el usuario no guardó una elección. Foco modal, labels, estados ARIA y contraste se corrigen
+en las mismas pantallas y sistemas visuales; no se mantiene una versión alternativa. Los controles
+esenciales siguen requiriendo teclado/mouse de escritorio por definición de producto.
+
+## D-045 — Licencias separadas para claridad, no como conclusión jurídica
+
+**Estado:** aceptada — Fase 9.
+
+El código original declara MIT, los assets y síntesis originales CC0-1.0 y la adaptación/capturas CC
+BY-SA 3.0. `CREDITS.md` conserva fuente, autores y licencia de “Level 0 — Threshold”, y la build incluye
+los avisos exactos de Babylon.js. Esta organización documenta procedencia y condiciones, pero advierte
+que no determina por sí sola hasta dónde alcanza Share-Alike y exige revisión antes de monetizar.
+
+## D-046 — Matriz realista y reproducible, sin prometer compatibilidad universal
+
+**Estado:** aceptada — Fase 9.
+
+La suite principal permanece serial en Chromium por el presupuesto GPU compartido. Una configuración
+separada prueba el flujo normal y el fallback sin WebGL en Chromium, Firefox y Edge actuales; Safari y
+móviles permanecen fuera del alcance. Los números de rendimiento automatizado registran explícitamente
+SwiftShader para no presentarlos como benchmark de una GPU física.

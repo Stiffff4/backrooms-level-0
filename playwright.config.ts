@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  testIgnore: 'static-hosting.spec.ts',
   fullyParallel: false,
   // Babylon/WebGL scenarios share a finite GPU budget; serial browser workers
   // keep movement timing, screenshots and long streaming checks deterministic.

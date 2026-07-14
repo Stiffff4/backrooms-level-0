@@ -1,6 +1,6 @@
 {
   "name": "backrooms-level-0-threshold",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -12,14 +12,20 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && vite build",
+    "analyze:build": "node --experimental-strip-types tools/analyze-build/analyze.ts --dir dist",
+    "build:analyze": "npm run build && npm run analyze:build",
     "preview": "vite preview",
+    "serve:dist": "node tools/serve-dist.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "validate": "npm run assets:check && npm run typecheck && npm run lint && npm run test && npm run build"
+    "test:compat": "playwright test --config=playwright.compat.config.ts",
+    "test:static": "playwright test --config=playwright.static.config.ts",
+    "validate": "npm run assets:check && npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build && npm run analyze:build",
+    "validate:release": "npm run validate && npm run test:e2e && npm run test:compat && npm run test:static"
   },
   "dependencies": {
     "@babylonjs/core": "9.16.1"

@@ -328,3 +328,54 @@ en 1,100 kB, después de medir el bundle y sin modificar los presupuestos de pro
   salida se percibe como papel incorrecto dentro del espacio y el final permanece legible sin flash.
 - Bundle principal: 1,192.11 kB JS sin comprimir, 289.88 kB gzip; sigue muy por debajo de 30 MB y su
   partición segura queda como objetivo medido de la optimización final.
+
+## Fase 9 — Optimización, compatibilidad y release QA
+
+- Gate de capacidades previo a Babylon para WebGL2, Pointer Lock, Web Audio, almacenamiento y
+  preferencia de movimiento reducido. Un navegador incompatible recibe un `alertdialog` explicativo
+  con reintento/recarga; una limitación no esencial queda registrada sin impedir la partida.
+- Recuperación real de `webglcontextlost`: pausa render, simulación, input y audio; conserva la sesión;
+  espera la reconstrucción interna de Babylon; reaplica pipeline, materiales, luces, tensión y salida;
+  y vuelve a una pausa segura que requiere un gesto nuevo para capturar el mouse.
+- Monitor de profiling con ring buffers tipados y sin allocations en la ruta de registro, budgets
+  versionados para frame time, draw calls, triángulos, meshes, habitaciones, luces, audio y heap, y
+  datasets diagnósticos periódicos solo en modo debug.
+- Analizador de build que recorre el grafo inicial, calcula raw/gzip, memoria decodificada y source
+  maps, diferencia warning de fallo y hace que los presupuestos duros formen parte de `validate`.
+- Producción sin source maps públicos, assets hasheados con cache inmutable, assets de nombre estable
+  con revalidación corta, CSP/COOP/CORP/anti-framing/Permissions-Policy, MIME y compresión gzip en el
+  servidor local equivalente usado para QA.
+- Build bajo base path aislada en `dist-static/`, sin sustituir el candidato raíz de `dist/`; el smoke
+  verifica subruta, favicon, avisos legales, ausencia de archivos fuente/requests externos y final
+  jugable desde HTTP estático.
+- Accesibilidad reforzada: `prefers-reduced-motion` activa por defecto la reducción de parpadeo cuando
+  no existe una preferencia guardada, Créditos atrapa/restaura foco y expone atribución navegable, y
+  los fallbacks gráficos mantienen nombre, estado ARIA y controles por teclado.
+- Release `1.0.0` documentada con README, runbook de build/hosting/rollback, checklist de QA manual,
+  créditos dentro/fuera del juego, catálogo de assets, MIT para código original, CC0 para assets
+  originales y CC BY-SA 3.0 para el contenido adaptado, sin afirmar una frontera jurídica absoluta.
+- CI instala Chromium, ejecuta lockfile, assets, TypeScript, lint, formato, unit/procedural, build,
+  budgets y smoke E2E. La matriz local adicional cubre Chromium, Firefox y Edge actuales.
+
+### Validación
+
+- `npm run validate`: correcto; 12/12 assets reproducibles, TypeScript strict, ESLint, Prettier,
+  42 archivos/180 tests, build de producción de 557 módulos y análisis de bundle.
+- `npm run test:e2e`: 25/25 en Chromium serial, sin errores de consola; cubre título, ajustes, audio,
+  pointer lock, movimiento, procedural, streaming, iluminación, tensión, recuperación WebGL real,
+  accesibilidad, rendimiento, salida, final y reinicio de la misma seed.
+- `npm run test:compat`: 6/6; flujo completo y fallback WebGL en Chromium 149.0.7827.55, Firefox
+  151.0 y Edge 150.0.4078.65.
+- `npm run test:static`: 1/1; build autosuficiente bajo `/threshold/`, headers/cache/MIME correctos,
+  cero requests externos y partida terminada desde el artefacto estático.
+- Soak de profiling: 1,064 transiciones acumuladas con reinicio; heap post-GC 19,107,808 →
+  21,980,808 bytes (+2.74 MiB), 58–60 FPS finales, máximo 97 draw calls, 7,668 triángulos, 265
+  meshes de escena, 33 habitaciones materializadas registradas y cero descargas visibles inválidas.
+- Bundle final: transferencia inicial 365.11 KiB y total 572.10 KiB; JavaScript 1.81 MiB raw /
+  454.71 KiB gzip, entrada 1.16 MiB raw / 288.39 KiB gzip, assets decodificados estimados
+  833.13 KiB y 0 bytes de source maps públicos. Todos los budgets duros pasan.
+- `npm audit --omit=dev` y `npm audit`: 0 vulnerabilidades; copias distribuidas de licencia/NOTICE de
+  Babylon.js verificadas exactamente contra el paquete fijado.
+
+**Estado final:** Fases 0–9 y Definition of Done completadas. La publicación pública permanece fuera
+del alcance autorizado; el mismo artefacto fue validado mediante URL HTTP local de raíz y subruta.

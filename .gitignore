@@ -1,8 +1,11 @@
 node_modules/
 dist/
+dist-static/
 .vite/
 coverage/
 playwright-report/
+playwright-compat-report/
+playwright-static-report/
 test-results/
 *.log
 .DS_Store

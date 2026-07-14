@@ -1,0 +1,30 @@
+{
+  "runtime": {
+    "targetFramesPerSecond": 60,
+    "targetFrameTimeMs": 16.6667,
+    "maximumP95FrameTimeMs": 20,
+    "idealDrawCalls": 150,
+    "maximumDrawCalls": 250,
+    "maximumVisibleTriangles": 250000,
+    "maximumActiveMeshes": 400,
+    "maximumActiveRooms": 60,
+    "maximumDynamicLights": 8,
+    "maximumAudioNodes": 80,
+    "heapGrowthWarningBytes": 20971520,
+    "heapGrowthWarningRatio": 0.2,
+    "minimumHeapWindowMs": 60000
+  },
+  "build": {
+    "maximumInitialTransferBytes": 31457280,
+    "maximumTotalTransferBytes": 83886080,
+    "maximumDecodedAssetBytes": 262144000,
+    "maximumEntryJavaScriptBytes": 1310720,
+    "maximumEntryJavaScriptGzipBytes": 327680,
+    "maximumTotalJavaScriptBytes": 2621440,
+    "warningRatio": 0.85
+  },
+  "monitor": {
+    "sampleCapacity": 300,
+    "minimumEvaluationSamples": 120
+  }
+}

@@ -18,6 +18,22 @@ export class DebugHud {
     this.instrumentation.captureFrameTime = true;
   }
 
+  public get frameTimeMs(): number {
+    return this.instrumentation.frameTimeCounter.current;
+  }
+
+  public get drawCalls(): number {
+    return this.instrumentation.drawCallsCounter.current;
+  }
+
+  public get visibleTriangles(): number {
+    return Math.floor(this.scene.getActiveIndices() / 3);
+  }
+
+  public get activeMeshes(): number {
+    return this.scene.getActiveMeshes().length;
+  }
+
   public update(nowMs: number, extraLines: readonly string[] = []): void {
     if (nowMs - this.lastUpdate < 250) {
       return;
@@ -25,14 +41,12 @@ export class DebugHud {
     this.lastUpdate = nowMs;
 
     const fps = this.scene.getEngine().getFps();
-    const meshes = this.scene.getActiveMeshes().length;
-    const triangles = Math.floor(this.scene.getActiveIndices() / 3);
     this.element.textContent = [
       `FPS ${fps.toFixed(0)}`,
-      `FRAME ${this.instrumentation.frameTimeCounter.current.toFixed(1)} ms`,
-      `MESHES ${meshes}`,
-      `TRIANGLES ${triangles}`,
-      `DRAW CALLS ${this.instrumentation.drawCallsCounter.current}`,
+      `FRAME ${this.frameTimeMs.toFixed(1)} ms`,
+      `MESHES ${this.activeMeshes}`,
+      `TRIANGLES ${this.visibleTriangles}`,
+      `DRAW CALLS ${this.drawCalls}`,
       ...extraLines,
     ].join('\n');
   }

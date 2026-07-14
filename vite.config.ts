@@ -15,8 +15,8 @@ export default defineConfig(({ mode }) => {
     base: normalizeBasePath(env.VITE_BASE_PATH),
     build: {
       target: 'es2022',
-      sourcemap: true,
-      chunkSizeWarningLimit: 1_100,
+      sourcemap: mode !== 'production',
+      chunkSizeWarningLimit: 1_250,
     },
   };
 });

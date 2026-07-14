@@ -15,7 +15,9 @@ import { DebugHud } from '../debug/DebugHud';
 import { parseDebugOptions } from '../debug/QueryParams';
 import { EngineBootstrap } from '../engine/EngineBootstrap';
 import { createGameplayScene } from '../engine/SceneFactory';
+import { WebGlContextRecovery, type WebGlRecoverySnapshot } from '../engine/WebGlContextRecovery';
 import { PlayerController } from '../player/PlayerController';
+import { RuntimePerformanceMonitor } from '../performance/RuntimePerformanceMonitor';
 import { assertValidRoomGraph, generateRoomGraph } from '../procedural/RoomGraphGenerator';
 import {
   ADVANCED_ROOM_DEFINITION_IDS,
@@ -51,6 +53,7 @@ import {
 } from '../tension/tension.types';
 import { renderErrorScreen } from '../ui/ErrorScreen';
 import { CreditsDialog } from '../ui/CreditsDialog';
+import { ContextRecoveryScreen } from '../ui/ContextRecoveryScreen';
 import { PauseMenu } from '../ui/PauseMenu';
 import { SettingsStore, type GameSettings } from '../ui/SettingsStore';
 import { TitleScreen } from '../ui/TitleScreen';
@@ -71,6 +74,7 @@ export class App {
   private readonly settings = new SettingsStore();
   private readonly clock = new GameClock();
   private readonly stats = new SessionStats();
+  private readonly performanceMonitor = new RuntimePerformanceMonitor();
   private readonly debugOptions = parseDebugOptions(window.location.search);
   private readonly qualityManager = new QualityManager(
     this.debugOptions.quality ?? this.settings.value.quality,
@@ -85,6 +89,8 @@ export class App {
   });
 
   private engineBootstrap: EngineBootstrap | null = null;
+  private contextRecovery: WebGlContextRecovery | null = null;
+  private contextRecoveryScreen: ContextRecoveryScreen | null = null;
   private pixelPipeline: PixelRenderPipeline | null = null;
   private scene: Scene | null = null;
   private roomGraph: RoomGraph | null = null;
@@ -135,7 +141,12 @@ export class App {
   private previousExitPlayerPosition = Vector3.Zero();
   private exitTransitionElapsedSeconds = 0;
   private exitTransitionStats: ReturnType<SessionStats['snapshot']> | null = null;
+  private contextLossPreviousState: GameState | null = null;
+  private contextLossWasRendering = false;
+  private renderLoopRunning = false;
   private disposed = false;
+
+  private readonly renderLoop = (): void => this.renderFrame();
 
   private readonly handleDebugAdvanceStreaming = (event: Event): void => {
     if (!this.debugOptions.debug) {
@@ -226,6 +237,27 @@ export class App {
     }
     this.root.dataset.debugExitApproach = 'ready';
     this.syncWorldDebugSnapshot();
+  };
+
+  private readonly handleDebugContextLoss = (): void => {
+    if (!this.debugOptions.debug || !this.contextRecovery) {
+      return;
+    }
+
+    try {
+      const context = this.canvas.getContext('webgl2');
+      const extension = context?.getExtension('WEBGL_lose_context') as {
+        loseContext?: () => void;
+      } | null;
+      if (typeof extension?.loseContext !== 'function') {
+        this.root.dataset.debugContextLoss = 'unavailable';
+        return;
+      }
+      this.root.dataset.debugContextLoss = 'requested';
+      extension.loseContext();
+    } catch {
+      this.root.dataset.debugContextLoss = 'failed';
+    }
   };
 
   private readonly handleWindowBlur = (): void => {
@@ -364,6 +396,7 @@ export class App {
       this.syncWorldDebugSnapshot();
       this.installUi();
       this.installSubscriptions();
+      this.installContextRecovery();
       window.addEventListener('blur', this.handleWindowBlur);
       window.addEventListener('focus', this.handleWindowFocus);
       document.addEventListener('visibilitychange', this.handleVisibilityChange);
@@ -380,9 +413,10 @@ export class App {
         );
         this.root.addEventListener('backrooms:debug-tension-event', this.handleDebugTensionEvent);
         this.root.addEventListener('backrooms:debug-approach-exit', this.handleDebugApproachExit);
+        this.root.addEventListener('backrooms:debug-context-loss', this.handleDebugContextLoss);
       }
 
-      this.engineBootstrap.start(() => this.renderFrame());
+      this.startRenderLoop();
       this.root.querySelector('#boot-status')?.remove();
       this.root.dataset.bootDurationMs = (performance.now() - bootStartedAt).toFixed(2);
       this.stateMachine.transition('title');
@@ -417,6 +451,12 @@ export class App {
     );
     this.root.removeEventListener('backrooms:debug-tension-event', this.handleDebugTensionEvent);
     this.root.removeEventListener('backrooms:debug-approach-exit', this.handleDebugApproachExit);
+    this.root.removeEventListener('backrooms:debug-context-loss', this.handleDebugContextLoss);
+    this.stopRenderLoop();
+    this.contextRecovery?.dispose();
+    this.contextRecovery = null;
+    this.contextRecoveryScreen?.dispose();
+    this.contextRecoveryScreen = null;
     this.debugHud?.dispose();
     this.debugHud = null;
     this.pauseMenu?.dispose();
@@ -497,6 +537,137 @@ export class App {
     });
   }
 
+  private installContextRecovery(): void {
+    this.contextRecoveryScreen = new ContextRecoveryScreen(this.root, {
+      onRetry: () => this.contextRecovery?.retry() ?? false,
+      onReload: () => window.location.reload(),
+    });
+    this.contextRecovery = new WebGlContextRecovery(this.canvas, {
+      onPause: () => this.pauseForContextLoss(),
+      waitForRenderer: () => this.waitForBabylonContextRestore(),
+      restoreResources: () => this.restoreAfterContextLoss(),
+      onResume: () => this.resumeAfterContextLoss(),
+      onStateChange: (snapshot) => this.syncContextRecoverySnapshot(snapshot),
+    });
+    this.contextRecovery.start();
+  }
+
+  private pauseForContextLoss(): void {
+    if (this.contextLossPreviousState === null) {
+      this.contextLossPreviousState = this.stateMachine.state;
+      this.contextLossWasRendering = this.renderLoopRunning;
+    }
+    this.stopRenderLoop();
+
+    const state = this.stateMachine.state;
+    if (state === 'playing') {
+      this.player?.setEnabled(false);
+      this.clock.pause();
+      this.stateMachine.transition('paused');
+      this.player?.releasePointerLock();
+      this.pauseMenu?.hide();
+    } else if (state === 'entering') {
+      this.player?.setEnabled(false);
+      this.clock.pause();
+      this.stateMachine.transition('title');
+      this.player?.releasePointerLock();
+    } else {
+      this.player?.setEnabled(false);
+      this.player?.releasePointerLock();
+    }
+
+    this.audioEngine.setPaused(true);
+    this.ambientDirector?.setPaused(true);
+    this.footsteps?.setPaused(true);
+    this.syncAudioDebugSnapshot();
+  }
+
+  private waitForBabylonContextRestore(): Promise<void> {
+    const engine = this.engineBootstrap?.engine;
+    if (!engine) {
+      return Promise.reject(new Error('El renderer ya no está disponible.'));
+    }
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timeout = window.setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        engine.onContextRestoredObservable.remove(observer);
+        reject(new Error('El renderer no confirmó la recuperación a tiempo.'));
+      }, 8_000);
+      const observer = engine.onContextRestoredObservable.addOnce(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        window.clearTimeout(timeout);
+        resolve();
+      });
+    });
+  }
+
+  private restoreAfterContextLoss(): void {
+    this.pixelPipeline?.refresh();
+    this.applyRenderingSettings(this.settings.value, false);
+    this.updateTensionFrame();
+    this.updateLightingFrame();
+    this.updateExitFrame();
+    this.syncWorldDebugSnapshot();
+  }
+
+  private resumeAfterContextLoss(): void {
+    if (this.contextLossWasRendering) {
+      this.startRenderLoop();
+    }
+
+    if (this.contextLossPreviousState === 'exitTransition') {
+      this.audioEngine.setPaused(false);
+    }
+    this.syncAudioDebugSnapshot();
+  }
+
+  private syncContextRecoverySnapshot(snapshot: Readonly<WebGlRecoverySnapshot>): void {
+    this.contextRecoveryScreen?.update(snapshot);
+    this.root.dataset.webglRecoveryPhase = snapshot.phase;
+    this.root.dataset.webglContextLosses = String(snapshot.lossCount);
+    this.root.dataset.webglContextRecoveries = String(snapshot.recoveryCount);
+    this.root.dataset.webglRecoveryError = snapshot.lastError ?? '';
+
+    if (snapshot.phase !== 'ready' || this.contextLossPreviousState === null) {
+      return;
+    }
+
+    if (this.contextLossPreviousState === 'playing' && this.stateMachine.state === 'paused') {
+      this.pauseMenu?.show();
+    } else if (
+      this.contextLossPreviousState === 'entering' &&
+      this.stateMachine.state === 'title'
+    ) {
+      this.titleScreen?.setReady('Imagen recuperada. Haz clic para volver a entrar.');
+    }
+    this.contextLossPreviousState = null;
+    this.contextLossWasRendering = false;
+  }
+
+  private startRenderLoop(): void {
+    if (this.renderLoopRunning || !this.engineBootstrap) {
+      return;
+    }
+    this.engineBootstrap.start(this.renderLoop);
+    this.renderLoopRunning = true;
+  }
+
+  private stopRenderLoop(): void {
+    if (!this.renderLoopRunning || !this.engineBootstrap) {
+      return;
+    }
+    this.engineBootstrap.engine.stopRenderLoop(this.renderLoop);
+    this.renderLoopRunning = false;
+  }
+
   private installSubscriptions(): void {
     if (!this.player) {
       return;
@@ -550,6 +721,8 @@ export class App {
     this.updateDebugSnapshot();
     const audioSnapshot = this.audioEngine.snapshot;
     const renderMetrics = this.pixelPipeline?.metrics;
+    this.scene.render();
+    this.recordRuntimePerformance(deltaSeconds * 1_000);
     this.debugHud?.update(performance.now(), [
       `AUDIO ${audioSnapshot.state} / ${this.getAudioNodeCount()} NODES`,
       `STEPS ${this.footstepCount}`,
@@ -562,7 +735,35 @@ export class App {
       `EXIT ${this.exitSnapshot?.exitSpawned ? this.exitReservation?.roomId : this.exitSnapshot?.eligible ? `${(this.exitSnapshot.probability * 100).toFixed(1)}%` : 'LOCKED'}`,
       `SEED ${this.debugOptions.seed}`,
     ]);
-    this.scene.render();
+  }
+
+  private recordRuntimePerformance(frameTimeMs: number): void {
+    if (!this.debugHud || !this.debugOptions.debug) {
+      return;
+    }
+
+    this.performanceMonitor.recordFrame(
+      frameTimeMs,
+      this.debugHud.drawCalls,
+      this.debugHud.visibleTriangles,
+      this.debugHud.activeMeshes,
+      this.chunkStreamer?.metrics.activeRoomCount ?? 0,
+      this.lightingSnapshot?.metrics.pool.activeLightCount ?? 0,
+      this.getAudioNodeCount(),
+    );
+    if (this.performanceMonitor.sampleCount % 60 !== 0) {
+      return;
+    }
+
+    const snapshot = this.performanceMonitor.snapshot();
+    const evaluation = this.performanceMonitor.evaluate(snapshot);
+    this.root.dataset.performanceStatus = evaluation.status;
+    this.root.dataset.performanceP95Ms = snapshot.frameTime.p95.toFixed(2);
+    this.root.dataset.performancePeakDrawCalls = String(snapshot.drawCalls.maximum);
+    this.root.dataset.performancePeakTriangles = String(snapshot.visibleTriangles.maximum);
+    this.root.dataset.performanceFindings = evaluation.findings
+      .map((finding) => finding.metric)
+      .join(',');
   }
 
   private updateWorldFrame(): void {

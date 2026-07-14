@@ -3,6 +3,7 @@ import {
   DEFAULT_SETTINGS,
   SETTINGS_STORAGE_KEY,
   SettingsStore,
+  createEnvironmentDefaults,
   type GameSettings,
   type SettingsStorage,
 } from '../../src/ui/SettingsStore';
@@ -20,6 +21,16 @@ class MemoryStorage implements SettingsStorage {
 }
 
 describe('SettingsStore', () => {
+  it('activa reduced flashing por defecto cuando el sistema prefiere movimiento reducido', () => {
+    const defaults = createEnvironmentDefaults(true);
+    const store = new SettingsStore(null, defaults);
+
+    expect(defaults.reducedFlashing).toBe(true);
+    expect(store.value.reducedFlashing).toBe(true);
+    expect(store.reset().reducedFlashing).toBe(true);
+    expect(createEnvironmentDefaults(false)).toEqual(DEFAULT_SETTINGS);
+  });
+
   it('usa valores accesibles y jugables por defecto sin requerir localStorage', () => {
     const store = new SettingsStore(null);
 

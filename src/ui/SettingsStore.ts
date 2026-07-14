@@ -49,6 +49,13 @@ export const DEFAULT_SETTINGS: Readonly<GameSettings> = Object.freeze({
   reducedFlashing: false,
 });
 
+export function createEnvironmentDefaults(prefersReducedMotion: boolean): GameSettings {
+  return {
+    ...DEFAULT_SETTINGS,
+    reducedFlashing: prefersReducedMotion,
+  };
+}
+
 const SETTINGS_VERSION = 1;
 
 const SETTINGS_KEYS = [
@@ -128,21 +135,32 @@ function sanitizeSettings(value: unknown, fallback: Readonly<GameSettings>): Gam
   };
 }
 
-function settingsFromPersistedValue(value: unknown): GameSettings {
+function settingsFromPersistedValue(
+  value: unknown,
+  fallback: Readonly<GameSettings>,
+): GameSettings {
   if (!isRecord(value)) {
-    return { ...DEFAULT_SETTINGS };
+    return { ...fallback };
   }
 
   if ('version' in value || 'settings' in value) {
     if (value.version !== SETTINGS_VERSION || !isRecord(value.settings)) {
-      return { ...DEFAULT_SETTINGS };
+      return { ...fallback };
     }
 
-    return sanitizeSettings(value.settings, DEFAULT_SETTINGS);
+    return sanitizeSettings(value.settings, fallback);
   }
 
   // Accept the unversioned Phase 0 shape so early local builds migrate cleanly.
-  return sanitizeSettings(value, DEFAULT_SETTINGS);
+  return sanitizeSettings(value, fallback);
+}
+
+function environmentDefaults(): GameSettings {
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return createEnvironmentDefaults(prefersReducedMotion);
 }
 
 function browserStorage(): SettingsStorage | null {
@@ -168,8 +186,13 @@ function settingsAreEqual(left: Readonly<GameSettings>, right: Readonly<GameSett
 export class SettingsStore {
   private currentSettings: GameSettings;
   private readonly listeners = new Set<SettingsListener>();
+  private readonly defaults: Readonly<GameSettings>;
 
-  public constructor(private readonly storage: SettingsStorage | null = browserStorage()) {
+  public constructor(
+    private readonly storage: SettingsStorage | null = browserStorage(),
+    defaults: Readonly<GameSettings> = environmentDefaults(),
+  ) {
+    this.defaults = sanitizeSettings(defaults, DEFAULT_SETTINGS);
     this.currentSettings = this.readPersistedSettings();
   }
 
@@ -202,7 +225,7 @@ export class SettingsStore {
   }
 
   public reset(): Readonly<GameSettings> {
-    return this.replace(DEFAULT_SETTINGS);
+    return this.replace(this.defaults);
   }
 
   public reload(): Readonly<GameSettings> {
@@ -224,7 +247,7 @@ export class SettingsStore {
 
   private replace(settings: Readonly<GameSettings>, persist = true): Readonly<GameSettings> {
     const previous = copySettings(this.currentSettings);
-    const next = sanitizeSettings(settings, DEFAULT_SETTINGS);
+    const next = sanitizeSettings(settings, this.defaults);
 
     if (settingsAreEqual(previous, next)) {
       return copySettings(this.currentSettings);
@@ -243,18 +266,18 @@ export class SettingsStore {
 
   private readPersistedSettings(): GameSettings {
     if (!this.storage) {
-      return { ...DEFAULT_SETTINGS };
+      return { ...this.defaults };
     }
 
     try {
       const stored = this.storage.getItem(SETTINGS_STORAGE_KEY);
       if (stored === null) {
-        return { ...DEFAULT_SETTINGS };
+        return { ...this.defaults };
       }
 
-      return settingsFromPersistedValue(JSON.parse(stored) as unknown);
+      return settingsFromPersistedValue(JSON.parse(stored) as unknown, this.defaults);
     } catch {
-      return { ...DEFAULT_SETTINGS };
+      return { ...this.defaults };
     }
   }
 

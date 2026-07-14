@@ -168,11 +168,21 @@ select {
 }
 
 .ui-overlay button:focus-visible,
+.ui-overlay a:focus-visible,
 .ui-overlay input:focus-visible,
 .ui-overlay select:focus-visible,
 .ui-overlay summary:focus-visible {
   outline: 2px solid #eee6b9;
   outline-offset: 3px;
+}
+
+.ui-overlay a {
+  color: #d9cf90;
+  text-underline-offset: 0.2em;
+}
+
+.ui-overlay a:hover {
+  color: #fff5bd;
 }
 
 .title-screen__enter,
@@ -413,6 +423,29 @@ select {
 .fatal-error button:focus-visible {
   outline: 2px solid #eee6b9;
   outline-offset: 3px;
+}
+
+.incompatibility-screen,
+.context-recovery-screen {
+  z-index: 50;
+}
+
+.incompatibility-screen > *,
+.context-recovery-screen > * {
+  max-width: min(52rem, 100%);
+}
+
+.incompatibility-screen__issues {
+  text-align: left;
+  line-height: 1.55;
+}
+
+.incompatibility-screen__actions,
+.context-recovery-screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
 }
 
 @media (max-width: 760px) {

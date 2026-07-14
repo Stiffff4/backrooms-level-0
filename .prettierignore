@@ -1,6 +1,9 @@
 dist
+dist-static
 node_modules
 playwright-report
 test-results
 public/assets/generated
 package-lock.json
+AGENTS.md
+MASTER_PLAN.md

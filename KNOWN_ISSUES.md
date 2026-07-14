@@ -6,39 +6,34 @@
 - **No bloqueante:** limitación comprobada que no invalida el producto.
 - **Pendiente de QA manual:** requiere percepción humana o hardware no automatizable.
 
-## Activos
+## Estado de release 1.0.0
 
-- Ningún defecto bloqueante conocido tras la Fase 8.
-- **No bloqueante:** el chunk principal alcanzó 1,192.11 kB sin comprimir y activa el aviso informativo
-  configurado en 1,100 kB. Su tamaño gzip es 289.88 kB y está muy por debajo del budget de 30 MB; la
-  inspección y posible división segura quedan registradas para la Fase 9.
+- Ningún defecto bloqueante conocido tras la Fase 9.
+- No hay tests ignorados, fallos de consola conocidos, assets de procedencia desconocida ni
+  vulnerabilidades npm detectadas en el lockfile actual.
 
-## Pendientes de QA manual acumulativos
+## Limitaciones no bloqueantes
 
-- El sistema de audio está validado funcionalmente y por análisis de señal, pero la fatiga del
-  buzzing, la localización subjetiva con audífonos y la ausencia perceptual de clicks/clipping
-  requieren una escucha humana acumulativa antes del cierre de Fase 9.
-- La matriz ampliada de navegadores se ejecutará en la Fase 9.
-- La superficie de navegador integrada del entorno de automatización no estaba disponible; el
-  smoke de navegador se ejecutó con el Chromium administrado por Playwright del propio proyecto.
-- Headless Chromium no siempre enruta Escape, una tecla reservada por el navegador, hacia pointer
-  lock. El E2E intenta Escape y, si el navegador no lo libera, dispara `exitPointerLock()` para
-  verificar la misma transición. El flujo real sigue el API estándar y requiere matriz manual final.
-- La regresión visual automatizada confirma píxeles inmóviles estables, presets y ausencia de blur;
-  la percepción subjetiva de shimmer durante giros lentos, legibilidad en monitores con gamma distinta
-  y comodidad de la paleta durante una sesión larga quedan para la pasada manual acumulativa de Fase 9.
-- Curvas, sincronización visual/sonora, budgets y `reducedFlashing` están cubiertos automáticamente;
-  la comodidad subjetiva del microflicker y la localización de cuatro voces con audífonos permanece en
-  la escucha humana acumulativa de Fase 9.
-- La curva de tensión se simuló durante 20 minutos y se recorrieron 180 módulos en navegador; el ritmo
-  subjetivo de silencios, repetición, blackout y desorientación durante una sesión real de 10–20
-  minutos, especialmente en monitores con gamma distinta, queda para la pasada humana de Fase 9.
-- Aunque las capturas E2E verifican ambos lados de una conexión, la percepción subjetiva de bumps,
-  seams o z-fighting en todas las combinaciones de módulos queda en la pasada manual acumulativa de
-  Fase 9.
-- La estabilidad equivalente a 30 minutos se cubre con simulación lógica acelerada y un recorrido
-  WebGL de 180 entradas. El soak de navegador a tiempo real y la percepción humana de pop-in/rebase
-  permanecen en la pasada acumulativa de rendimiento de Fase 9.
-- La salida, su localización HRTF, el corte del buzzing y el fundido final están cubiertos de forma
-  funcional y visual; la claridad subjetiva de la pista a distancia y el impacto del final después de
-  una partida natural de 10–20 minutos requieren la pasada humana acumulativa de Fase 9.
+- El entry JavaScript mide 1.16 MiB raw / 288.39 KiB gzip y queda a menos de 15 % de sus ceilings de
+  1.25 MiB / 320 KiB. Es un warning explícito del analyzer, no un budget excedido; descarga inicial
+  completa (365.11 KiB) y total (572.10 KiB) permanecen muy por debajo de 30/80 MiB.
+- Los benchmarks automatizados se ejecutaron en Chromium headless con ANGLE/SwiftShader. Demuestran
+  límites, estabilidad y ausencia de crecimiento evidente, pero no sustituyen un perfil de frame
+  pacing en la GPU física mínima que el distribuidor elija como soporte.
+- La percepción de fatiga del buzzing, localización HRTF con distintos audífonos, shimmer/gamma,
+  comodidad del flicker y ritmo subjetivo de una partida natural de 10–20 minutos requiere QA humano.
+  Señal, curvas, sincronización, regresiones visuales y recorrido completo sí están automatizados.
+- Escape está reservado por algunos runners headless. El E2E intenta la tecla real y usa
+  `document.exitPointerLock()` como abstracción segura si el runner no la entrega; Chromium, Firefox y
+  Edge verificaron la transición estándar de Pointer Lock.
+- Safari, navegadores móviles, gamepad y pantallas táctiles están fuera del alcance de la versión 1.0,
+  que exige navegador desktop, teclado y mouse.
+- La adaptación está atribuida y licenciada de forma conservadora, pero el alcance jurídico de
+  Share-Alike debe revisarse antes de monetizar o relicenciar el producto.
+
+## Publicación
+
+- No se realizó deploy público porque el alcance lo prohíbe. La misma build fue probada mediante HTTP
+  local desde raíz y `/threshold/`, con headers, cache, MIME, avisos legales y recorrido hasta el final.
+  HTTPS, CDN, dominio, invalidación y rollback del proveedor quedan como acciones del operador descritas
+  en `docs/RELEASE_RUNBOOK.md`, no como defectos del juego.

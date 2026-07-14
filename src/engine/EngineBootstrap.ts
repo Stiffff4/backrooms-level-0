@@ -25,7 +25,11 @@ export class EngineBootstrap {
     const webGl2 = canvas.getContext('webgl2', {
       antialias: false,
       alpha: false,
+      depth: true,
       powerPreference: 'high-performance',
+      premultipliedAlpha: false,
+      preserveDrawingBuffer: false,
+      stencil: true,
     });
 
     if (!webGl2) {

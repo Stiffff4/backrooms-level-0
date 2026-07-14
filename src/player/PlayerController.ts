@@ -305,11 +305,7 @@ export class PlayerController {
     const sensitivity = this.settings.sensitivity * MOUSE_RADIANS_PER_PIXEL;
     this.yaw = normalizeAngle(this.yaw + lookX * sensitivity);
     const verticalDirection = this.settings.invertY ? -1 : 1;
-    this.pitch = clamp(
-      this.pitch + lookY * sensitivity * verticalDirection,
-      -MAX_PITCH,
-      MAX_PITCH,
-    );
+    this.pitch = clamp(this.pitch + lookY * sensitivity * verticalDirection, -MAX_PITCH, MAX_PITCH);
     this.applyCameraRotation();
   }
 
@@ -340,11 +336,7 @@ export class PlayerController {
     const response = 1 - Math.exp(-HEAD_BOB_RESPONSE * deltaSeconds);
     this.headBobX += (targetX - this.headBobX) * response;
     this.headBobY += (targetY - this.headBobY) * response;
-    this.camera.position.set(
-      this.headBobX,
-      gameConfig.movement.eyeHeight + this.headBobY,
-      0,
-    );
+    this.camera.position.set(this.headBobX, gameConfig.movement.eyeHeight + this.headBobY, 0);
   }
 
   private resetHeadBob(): void {
