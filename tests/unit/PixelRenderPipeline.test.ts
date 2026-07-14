@@ -1,5 +1,6 @@
 import type { Camera } from '@babylonjs/core/Cameras/camera';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
+import { Constants } from '@babylonjs/core/Engines/constants';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Scene } from '@babylonjs/core/scene';
@@ -23,6 +24,7 @@ class FakeAdapter implements PixelRenderAdapter {
   public readonly settings: PixelPostProcessSettings[] = [];
   public readonly attached: Camera[] = [];
   public readonly detached: Camera[] = [];
+  public clearRequestCount = 0;
   public disposeCount = 0;
 
   public setBufferSize(metrics: NonNullable<PixelRenderPipeline['metrics']>): void {
@@ -31,6 +33,11 @@ class FakeAdapter implements PixelRenderAdapter {
 
   public setPostProcessSettings(settings: PixelPostProcessSettings): void {
     this.settings.push(settings);
+  }
+
+  public requestFrameClear(onCleared?: () => void): void {
+    this.clearRequestCount += 1;
+    onCleared?.();
   }
 
   public attach(camera: Camera): void {
@@ -277,6 +284,10 @@ describe('PixelRenderPipeline', () => {
     });
 
     pipeline.attach(firstCamera);
+    const onCleared = vi.fn();
+    pipeline.requestFrameClear(onCleared);
+    expect(adapter.clearRequestCount).toBe(1);
+    expect(onCleared).toHaveBeenCalledOnce();
     expect(adapter.attached).toHaveLength(1);
     pipeline.attach(secondCamera);
     expect(adapter.detached).toEqual([firstCamera]);
@@ -325,18 +336,28 @@ describe('BabylonPixelRenderAdapter', () => {
 
     try {
       expect(engine.postProcesses).toHaveLength(1);
+      const postProcess = engine.postProcesses[0];
+      expect(postProcess?.autoClear).toBe(true);
+      expect(postProcess?.alphaMode).toBe(Constants.ALPHA_DISABLE);
+      expect(postProcess?.forceAutoClearInAlphaMode).toBe(true);
       expect(PIXEL_GRADE_FRAGMENT_SHADER).toContain('bayer4');
       expect(PIXEL_GRADE_FRAGMENT_SHADER).toContain('spatialNoise');
       expect(PIXEL_GRADE_FRAGMENT_SHADER).toContain('anomalyStrength');
       expect(PIXEL_GRADE_FRAGMENT_SHADER).not.toMatch(/\btime\b/i);
       expect(PIXEL_GRADE_FRAGMENT_SHADER).not.toMatch(/vhs|bloom|scanline/i);
+      expect(PIXEL_GRADE_FRAGMENT_SHADER).toContain(
+        'gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0)',
+      );
 
       const attach = vi.spyOn(camera, 'attachPostProcess');
       const detach = vi.spyOn(camera, 'detachPostProcess');
       adapter.attach(camera);
       adapter.attach(camera);
       expect(attach).toHaveBeenCalledTimes(1);
+      const clear = vi.spyOn(engine, 'clear');
+      adapter.requestFrameClear();
       expect(() => scene.render()).not.toThrow();
+      expect(clear).toHaveBeenCalledWith(scene.clearColor, true, true, true);
       adapter.detach(camera);
       expect(detach).toHaveBeenCalledTimes(1);
     } finally {

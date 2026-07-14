@@ -1,0 +1,131 @@
+import { t as Color3, u as Vector3, y as ToLinearSpace } from "./math.color.pure-DA4Mm_Z5.js";
+import { t as Clamp } from "./math.scalar.functions-BmHIPW7l.js";
+import { n as SphericalPolynomial, t as SphericalHarmonics } from "./sphericalPolynomial.pure-E3iX8D_l.js";
+var FileFaceOrientation = class {
+  constructor(name, worldAxisForNormal, worldAxisForFileX, worldAxisForFileY) {
+    this.name = name, this.worldAxisForNormal = worldAxisForNormal, this.worldAxisForFileX = worldAxisForFileX, this.worldAxisForFileY = worldAxisForFileY;
+  }
+}, CubeMapToSphericalPolynomialTools = class {
+  static _NearestPow2Floor(value) {
+    return value <= 1 ? 1 : 1 << Math.floor(Math.log2(value));
+  }
+  static ConvertCubeMapTextureToSphericalPolynomial(texture) {
+    if (!texture.isCube) return null;
+    texture.getScene()?.getEngine().flushFramebuffer();
+    const size = texture.getSize().width, rawTargetSize = texture._sphericalPolynomialTargetSize, targetSize = rawTargetSize > 0 ? this._NearestPow2Floor(rawTargetSize) : 0, hasMipmaps = !texture.noMipmap && texture._texture?.generateMipMaps === !0, useMip = targetSize > 0 && targetSize < size && hasMipmaps, mipLevel = useMip ? Math.max(0, Math.round(Math.log2(size / targetSize))) : 0, mipSize = useMip ? Math.max(1, Math.floor(size / Math.pow(2, mipLevel))) : size, rightPromise = texture.readPixels(0, mipLevel, void 0, !1), leftPromise = texture.readPixels(1, mipLevel, void 0, !1);
+    let upPromise, downPromise;
+    texture.isRenderTarget ? (upPromise = texture.readPixels(3, mipLevel, void 0, !1), downPromise = texture.readPixels(2, mipLevel, void 0, !1)) : (upPromise = texture.readPixels(2, mipLevel, void 0, !1), downPromise = texture.readPixels(3, mipLevel, void 0, !1));
+    const frontPromise = texture.readPixels(4, mipLevel, void 0, !1), backPromise = texture.readPixels(5, mipLevel, void 0, !1), gammaSpace = texture.gammaSpace, format = 5, needsCpuDownsample = targetSize > 0 && targetSize < size && !useMip;
+    return new Promise((resolve) => {
+      Promise.all([
+        leftPromise,
+        rightPromise,
+        upPromise,
+        downPromise,
+        frontPromise,
+        backPromise
+      ]).then(([left, right, up, down, front, back]) => {
+        let effectiveSize = mipSize;
+        needsCpuDownsample && (left = this._DownsampleFace(left, size, targetSize, 4), right = this._DownsampleFace(right, size, targetSize, 4), up = this._DownsampleFace(up, size, targetSize, 4), down = this._DownsampleFace(down, size, targetSize, 4), front = this._DownsampleFace(front, size, targetSize, 4), back = this._DownsampleFace(back, size, targetSize, 4), effectiveSize = targetSize);
+        const cubeInfo = {
+          size: effectiveSize,
+          right,
+          left,
+          up,
+          down,
+          front,
+          back,
+          format,
+          type: left instanceof Float32Array ? 1 : 0,
+          gammaSpace
+        };
+        resolve(this.ConvertCubeMapToSphericalPolynomial(cubeInfo));
+      });
+    });
+  }
+  static _AreaElement(x, y) {
+    return Math.atan2(x * y, Math.sqrt(x * x + y * y + 1));
+  }
+  static _DownsampleFace(data, srcSize, dstSize, stride) {
+    const src = data instanceof Float32Array ? data : Float32Array.from(data), dstLength = dstSize * dstSize * stride, avg = new Float32Array(dstLength), blockSize = srcSize / dstSize, invArea = 1 / (blockSize * blockSize);
+    for (let dy = 0; dy < dstSize; dy++) {
+      const sy0 = Math.floor(dy * blockSize), sy1 = Math.floor((dy + 1) * blockSize);
+      for (let dx = 0; dx < dstSize; dx++) {
+        const sx0 = Math.floor(dx * blockSize), sx1 = Math.floor((dx + 1) * blockSize), dstIdx = (dy * dstSize + dx) * stride;
+        for (let c = 0; c < stride; c++) {
+          let sum = 0;
+          for (let sy = sy0; sy < sy1; sy++) for (let sx = sx0; sx < sx1; sx++) sum += src[(sy * srcSize + sx) * stride + c];
+          avg[dstIdx + c] = sum * invArea;
+        }
+      }
+    }
+    if (data instanceof Float32Array) return avg;
+    const ctor = data.constructor, dst = new ctor(dstLength);
+    for (let i = 0; i < dstLength; i++) dst[i] = avg[i] + 0.5 | 0;
+    return dst;
+  }
+  static ConvertCubeMapToSphericalPolynomial(cubeInfo, targetSize = 0) {
+    const effectiveTarget = targetSize > 0 ? this._NearestPow2Floor(targetSize) : 0;
+    if (effectiveTarget > 0 && cubeInfo.size > effectiveTarget) {
+      const stride = cubeInfo.format === 5 ? 4 : 3, faces = [
+        "right",
+        "left",
+        "up",
+        "down",
+        "front",
+        "back"
+      ], downsampled = {};
+      for (const face of faces) downsampled[face] = this._DownsampleFace(cubeInfo[face], cubeInfo.size, effectiveTarget, stride);
+      cubeInfo = {
+        ...cubeInfo,
+        ...downsampled,
+        size: effectiveTarget
+      };
+    }
+    const sphericalHarmonics = new SphericalHarmonics();
+    let totalSolidAngle = 0;
+    const du = 2 / cubeInfo.size, dv = du, halfTexel = 0.5 * du, minUV = halfTexel - 1;
+    for (let faceIndex = 0; faceIndex < 6; faceIndex++) {
+      const fileFace = this._FileFaces[faceIndex], dataArray = cubeInfo[fileFace.name];
+      let v = minUV;
+      const stride = cubeInfo.format === 5 ? 4 : 3;
+      for (let y = 0; y < cubeInfo.size; y++) {
+        let u = minUV;
+        for (let x = 0; x < cubeInfo.size; x++) {
+          const worldDirection = fileFace.worldAxisForFileX.scale(u).add(fileFace.worldAxisForFileY.scale(v)).add(fileFace.worldAxisForNormal);
+          worldDirection.normalize();
+          const deltaSolidAngle = this._AreaElement(u - halfTexel, v - halfTexel) - this._AreaElement(u - halfTexel, v + halfTexel) - this._AreaElement(u + halfTexel, v - halfTexel) + this._AreaElement(u + halfTexel, v + halfTexel);
+          let r = dataArray[y * cubeInfo.size * stride + x * stride + 0], g = dataArray[y * cubeInfo.size * stride + x * stride + 1], b = dataArray[y * cubeInfo.size * stride + x * stride + 2];
+          isNaN(r) && (r = 0), isNaN(g) && (g = 0), isNaN(b) && (b = 0), cubeInfo.type === 0 && (r /= 255, g /= 255, b /= 255), cubeInfo.gammaSpace && (r = Math.pow(Clamp(r), ToLinearSpace), g = Math.pow(Clamp(g), ToLinearSpace), b = Math.pow(Clamp(b), ToLinearSpace));
+          const max = this.MAX_HDRI_VALUE;
+          if (this.PRESERVE_CLAMPED_COLORS) {
+            const currentMax = Math.max(r, g, b);
+            if (currentMax > max) {
+              const factor = max / currentMax;
+              r *= factor, g *= factor, b *= factor;
+            }
+          } else
+            r = Clamp(r, 0, max), g = Clamp(g, 0, max), b = Clamp(b, 0, max);
+          const color = new Color3(r, g, b);
+          sphericalHarmonics.addLight(worldDirection, color, deltaSolidAngle), totalSolidAngle += deltaSolidAngle, u += du;
+        }
+        v += dv;
+      }
+    }
+    const correctionFactor = 4 * Math.PI * 6 / 6 / totalSolidAngle;
+    return sphericalHarmonics.scaleInPlace(correctionFactor), sphericalHarmonics.convertIncidentRadianceToIrradiance(), sphericalHarmonics.convertIrradianceToLambertianRadiance(), SphericalPolynomial.FromHarmonics(sphericalHarmonics);
+  }
+};
+CubeMapToSphericalPolynomialTools._FileFaces = [
+  new FileFaceOrientation("right", new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector3(0, -1, 0)),
+  new FileFaceOrientation("left", new Vector3(-1, 0, 0), new Vector3(0, 0, 1), new Vector3(0, -1, 0)),
+  new FileFaceOrientation("up", new Vector3(0, 1, 0), new Vector3(1, 0, 0), new Vector3(0, 0, 1)),
+  new FileFaceOrientation("down", new Vector3(0, -1, 0), new Vector3(1, 0, 0), new Vector3(0, 0, -1)),
+  new FileFaceOrientation("front", new Vector3(0, 0, 1), new Vector3(1, 0, 0), new Vector3(0, -1, 0)),
+  new FileFaceOrientation("back", new Vector3(0, 0, -1), new Vector3(-1, 0, 0), new Vector3(0, -1, 0))
+];
+CubeMapToSphericalPolynomialTools.MAX_HDRI_VALUE = 4096;
+CubeMapToSphericalPolynomialTools.PRESERVE_CLAMPED_COLORS = !1;
+export {
+  CubeMapToSphericalPolynomialTools as t
+};

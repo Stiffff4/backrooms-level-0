@@ -1,0 +1,411 @@
+diff --git a/DECISIONS.md b/DECISIONS.md
+index cf1bbed..7fc0b2b 100644
+--- a/DECISIONS.md
++++ b/DECISIONS.md
+@@ -400,3 +400,15 @@ La suite principal permanece serial en Chromium por el presupuesto GPU compartid
+ separada prueba el flujo normal y el fallback sin WebGL en Chromium, Firefox y Edge actuales; Safari y
+ móviles permanecen fuera del alcance. Los números de rendimiento automatizado registran explícitamente
+ SwiftShader para no presentarlos como benchmark de una GPU física.
++
++## D-047 — Las superficies de salida se proyectan sobre la cara interior renderizada
++
++**Estado:** aceptada — hotfix posterior a 1.0.0.
++
++Las `exitCompatibleSurfaces` del catálogo describen el límite lógico de la huella. Las paredes
++modulares, en cambio, ocupan todo su grosor hacia el interior para evitar geometría coplanar entre
++habitaciones. Crear la salida directamente sobre el límite ocultaba el overlay detrás de la pared
++normal. La colocación nominal se desplaza ahora exactamente `MODULAR_WALL_THICKNESS` a lo largo de su
++normal interior y luego la presentación añade solo una separación visual pequeña. Visual, trigger y
++beacon comparten la misma colocación y reciben juntos los rebases, evitando constantes duplicadas y
++deriva entre sistemas.
+diff --git a/KNOWN_ISSUES.md b/KNOWN_ISSUES.md
+index e90061a..c32b322 100644
+--- a/KNOWN_ISSUES.md
++++ b/KNOWN_ISSUES.md
+@@ -8,7 +8,7 @@
+ 
+ ## Estado de release 1.0.0
+ 
+-- Ningún defecto bloqueante conocido tras la Fase 9.
++- El bloqueo reproducible de salida invisible en `threshold-2026-07-14 / room-0137` fue corregido en código y cubierto por regresión; queda pendiente confirmar manualmente el artefacto aplicado antes de cerrar el hotfix.
+ - No hay tests ignorados, fallos de consola conocidos, assets de procedencia desconocida ni
+   vulnerabilidades npm detectadas en el lockfile actual.
+ 
+diff --git a/PROGRESS.md b/PROGRESS.md
+index b43f0ab..86e7dba 100644
+--- a/PROGRESS.md
++++ b/PROGRESS.md
+@@ -379,3 +379,32 @@ en 1,100 kB, después de medir el bundle y sin modificar los presupuestos de pro
+ 
+ **Estado final:** Fases 0–9 y Definition of Done completadas. La publicación pública permanece fuera
+ del alcance autorizado; el mismo artefacto fue validado mediante URL HTTP local de raíz y subruta.
++
++## Hotfix QA — salida oculta en paredes renderizadas
++
++- QA humano reprodujo el bloqueo con la seed `threshold-2026-07-14`: el HUD asignaba
++  `room-0137` como habitación de salida después de 16 rebases, pero no existía una pared visible y
++  la partida no podía completarse de forma descubrible.
++- La causa raíz fue una discrepancia espacial entre el catálogo y el render: las superficies
++  `exitCompatible` viven en el límite lógico de la habitación, mientras `ModularRoomBuilder` desplaza
++  las paredes 0.2 m hacia el interior. La presentación de salida se construía en el límite y quedaba
++  enterrada dentro de la pared normal.
++- `MODULAR_WALL_THICKNESS` ahora es una constante compartida; `App` desplaza la colocación completa
++  de la salida hasta la cara interior renderizada antes de crear visual, trigger y audio.
++- El overlay tiene 0.05 m adicionales de separación visual para evitar oclusión/z-fighting sin
++  cambiar la posición lógica del trigger respecto a la cara transitable.
++- El HUD debug distingue salida `ACTIVE`, `RESERVED`, `ELIGIBLE` y `LOCKED`, y expone estado del
++  trigger y posición mundial.
++- Se añadió una regresión específica para `threshold-2026-07-14 / room-0137` que verifica visibilidad
++  delante de la pared, trigger funcional y conservación tras 16 rebases.
++
++### Validación del hotfix
++
++- TypeScript strict: correcto.
++- Build de producción: correcto, 557 módulos.
++- Suite unitaria completa: 45 archivos / 184 tests correctos con timeout ampliado para la simulación
++  pesada de streaming; la prueba lenta aislada también pasa.
++- Regresiones focales de salida: correctas, incluida la seed reportada y el trigger tras rebases.
++- ESLint y Prettier de los archivos modificados: correctos.
++- El navegador E2E no pudo ejecutarse en el entorno de reparación porque el acceso automatizado a
++  localhost está bloqueado por política; queda pendiente el QA humano final de la build aplicada.
+diff --git a/src/app/App.ts b/src/app/App.ts
+index 096209f..ba5837e 100644
+--- a/src/app/App.ts
++++ b/src/app/App.ts
+@@ -35,6 +35,7 @@ import { QualityManager } from '../rendering/QualityManager';
+ import { LightingDirector, type LightingFrameSnapshot } from '../lighting/LightingDirector';
+ import { FIXTURE_FLICKER_PROFILES, type FixtureFlickerProfile } from '../lighting/lighting.types';
+ import { ModularWorld } from '../rooms/ModularWorld';
++import { MODULAR_WALL_THICKNESS } from '../rooms/builders/ModularRoomBuilder';
+ import type { BuiltModularRoom } from '../rooms/rendering/rendering.types';
+ import { ExitDirector } from '../exit/ExitDirector';
+ import type { ExitCandidate, ExitReservation, ExitSnapshot } from '../exit/exit.types';
+@@ -42,6 +43,7 @@ import type { ExitWallPlacement } from '../exit/exit.presentation.types';
+ import { exitPresentationConfig } from '../exit/exit.presentation.config';
+ import { ExitAudioBeacon } from '../exit/ExitAudioBeacon';
+ import { ExitWallPresentation } from '../exit/ExitWallPresentation';
++import { insetExitWallPlacement } from '../exit/ExitPlacement';
+ import { TensionDirector } from '../tension/TensionDirector';
+ import {
+   TENSION_EVENT_TYPES,
+@@ -754,7 +756,7 @@ export class App {
+       `RENDER ${this.qualityManager.presetName.toUpperCase()} ${renderMetrics?.bufferWidth ?? 0}x${renderMetrics?.bufferHeight ?? 0}`,
+       `LIGHTS ${this.lightingSnapshot?.metrics.pool.activeLightCount ?? 0}/${this.lightingSnapshot?.metrics.pool.activeBudget ?? 0} / ${this.lightingSnapshot?.metrics.animatedFixtureCount ?? 0} FLICKER`,
+       `TENSION ${this.tensionSnapshot?.phase.toUpperCase() ?? 'OFF'} ${(this.tensionSnapshot?.intensity ?? 0).toFixed(2)} / ${this.tensionSnapshot?.activeEventType ?? 'QUIET'}`,
+-      `EXIT ${this.exitSnapshot?.exitSpawned ? this.exitReservation?.roomId : this.exitSnapshot?.eligible ? `${(this.exitSnapshot.probability * 100).toFixed(1)}%` : 'LOCKED'}`,
++      `EXIT ${this.exitPresentation ? `ACTIVE ${this.exitReservation?.roomId ?? 'unknown'}` : this.exitSnapshot?.exitSpawned ? `RESERVED ${this.exitReservation?.roomId ?? 'unknown'}` : this.exitSnapshot?.eligible ? `ELIGIBLE ${(this.exitSnapshot.probability * 100).toFixed(1)}%` : 'LOCKED'}`,
+       `SEED ${this.debugOptions.seed}`,
+     ]);
+   }
+@@ -1391,7 +1393,7 @@ export class App {
+       new Vector3(surface.localForward.x, surface.localForward.y, surface.localForward.z),
+       matrix,
+     ).normalize();
+-    const placement: ExitWallPlacement = {
++    const nominalPlacement: ExitWallPlacement = {
+       roomId: reservation.roomId,
+       surfaceId: reservation.surfaceId,
+       center,
+@@ -1400,6 +1402,12 @@ export class App {
+       height: surface.height,
+       seed: reservation.seed,
+     };
++    // Catalog surfaces are placed on the logical room boundary. The rendered
++    // wall occupies MODULAR_WALL_THICKNESS metres inside that boundary, so an
++    // uninset exit overlay is buried inside the normal wall and becomes
++    // invisible. Move the complete placement (visual, trigger and audio) onto
++    // the interior wall face before creating the presentation.
++    const placement = insetExitWallPlacement(nominalPlacement, MODULAR_WALL_THICKNESS);
+     this.exitPresentation?.dispose();
+     this.exitPresentation = new ExitWallPresentation(scene, placement, world.materialLibrary.wall, {
+       reducedFlashing: this.settings.value.reducedFlashing,
+@@ -1466,6 +1474,16 @@ export class App {
+   private syncExitDebugSnapshot(): void {
+     const snapshot = this.exitSnapshot;
+     const reservation = this.exitReservation;
++    const state = this.exitPresentation
++      ? 'active'
++      : reservation
++        ? 'reserved'
++        : snapshot?.forcedPending
++          ? 'forced-pending'
++          : snapshot?.eligible
++            ? 'eligible'
++            : 'locked';
++    this.root.dataset.exitState = state;
+     this.root.dataset.exitEligible = String(snapshot?.eligible ?? false);
+     this.root.dataset.exitProbability = (snapshot?.probability ?? 0).toFixed(5);
+     this.root.dataset.exitForcedPending = String(snapshot?.forcedPending ?? false);
+@@ -1483,6 +1501,11 @@ export class App {
+         this.modularWorld?.isRoomLoaded(reservation.roomId),
+     );
+     this.root.dataset.exitVisualMeshes = String(this.exitPresentation?.meshes.length ?? 0);
++    this.root.dataset.exitTriggerActive = String(this.exitPresentation !== null);
++    const placement = this.exitPresentation?.placement;
++    this.root.dataset.exitWorldPosition = placement
++      ? `${placement.center.x.toFixed(3)},${placement.center.y.toFixed(3)},${placement.center.z.toFixed(3)}`
++      : '';
+     this.root.dataset.exitAudioNodes = String(this.exitAudioBeacon?.nodeCount ?? 0);
+     this.root.dataset.exitAudioActive = String(this.exitAudioBeacon?.snapshot.active ?? false);
+     this.root.dataset.exitAudioTransitionPlayed = String(
+diff --git a/src/exit/ExitPlacement.ts b/src/exit/ExitPlacement.ts
+index 67a7048..b794e3b 100644
+--- a/src/exit/ExitPlacement.ts
++++ b/src/exit/ExitPlacement.ts
+@@ -56,3 +56,27 @@ export function translateExitWallPlacement(
+     }),
+   });
+ }
++
++/**
++ * Moves a nominal room-boundary placement onto the visible interior face of
++ * the room wall. Room catalog exit surfaces live on the logical footprint
++ * boundary, while rendered walls extend inward by their full thickness.
++ */
++export function insetExitWallPlacement(
++  placement: ExitWallPlacement,
++  inwardDistance: number,
++): ExitWallPlacement {
++  const normalized = normalizeExitWallPlacement(placement);
++  assertFinite(inwardDistance, 'exit placement inwardDistance');
++  if (inwardDistance < 0) {
++    throw new RangeError('Exit placement inwardDistance must be non-negative.');
++  }
++  return Object.freeze({
++    ...normalized,
++    center: Object.freeze({
++      x: normalized.center.x + normalized.inwardNormal.x * inwardDistance,
++      y: normalized.center.y + normalized.inwardNormal.y * inwardDistance,
++      z: normalized.center.z + normalized.inwardNormal.z * inwardDistance,
++    }),
++  });
++}
+diff --git a/src/exit/exit.presentation.config.ts b/src/exit/exit.presentation.config.ts
+index b71ce95..d4dbb1e 100644
+--- a/src/exit/exit.presentation.config.ts
++++ b/src/exit/exit.presentation.config.ts
+@@ -2,7 +2,7 @@
+ export const exitPresentationConfig = Object.freeze({
+   visual: Object.freeze({
+     thickness: 0.055,
+-    surfaceOffset: 0.032,
++    surfaceOffset: 0.05,
+     minimumLightResponse: 0.845,
+     reducedMinimumLightResponse: 0.925,
+     maximumLightResponse: 1,
+diff --git a/src/rooms/builders/ModularRoomBuilder.ts b/src/rooms/builders/ModularRoomBuilder.ts
+index 59ab855..b9af48d 100644
+--- a/src/rooms/builders/ModularRoomBuilder.ts
++++ b/src/rooms/builders/ModularRoomBuilder.ts
+@@ -54,7 +54,7 @@ interface FixtureRecipe {
+   readonly enabled: boolean;
+ }
+ 
+-const WALL_THICKNESS = 0.2;
++export const MODULAR_WALL_THICKNESS = 0.2;
+ const FLOOR_THICKNESS = 0.16;
+ const FLOOR_JOIN_OVERLAP = 0.12;
+ const TRIM_HEIGHT = 0.14;
+@@ -340,7 +340,7 @@ export class ModularRoomBuilder {
+             opening.end,
+             lintelHeight,
+             roomHeight - lintelHeight / 2,
+-            WALL_THICKNESS,
++            MODULAR_WALL_THICKNESS,
+             uvOffset,
+             WALL_UV_METERS_PER_TILE,
+           ),
+@@ -388,7 +388,7 @@ export class ModularRoomBuilder {
+         end,
+         roomHeight,
+         roomHeight / 2,
+-        WALL_THICKNESS,
++        MODULAR_WALL_THICKNESS,
+         uvOffset,
+         WALL_UV_METERS_PER_TILE,
+       ),
+@@ -401,7 +401,7 @@ export class ModularRoomBuilder {
+         end,
+         TRIM_HEIGHT,
+         TRIM_HEIGHT / 2,
+-        WALL_THICKNESS + TRIM_DEPTH,
++        MODULAR_WALL_THICKNESS + TRIM_DEPTH,
+         uvOffset,
+         TRIM_UV_METERS_PER_TILE,
+       ),
+diff --git a/tests/e2e/exit.spec.ts b/tests/e2e/exit.spec.ts
+index 7e4cc57..6da182f 100644
+--- a/tests/e2e/exit.spec.ts
++++ b/tests/e2e/exit.spec.ts
+@@ -14,6 +14,8 @@ async function enterAndApproachExit(page: Page, withAudio = false): Promise<void
+   );
+   const app = page.locator('#app');
+   await expect(app).toHaveAttribute('data-exit-spawned', 'true');
++  await expect(app).toHaveAttribute('data-exit-state', 'active');
++  await expect(app).toHaveAttribute('data-exit-trigger-active', 'true');
+   await expect(app).toHaveAttribute('data-exit-forced', 'true');
+   await expect(app).toHaveAttribute('data-exit-force-reason', 'debug');
+   await expect(app).toHaveAttribute('data-exit-protected', 'true');
+diff --git a/tests/unit/ExitPlacement.test.ts b/tests/unit/ExitPlacement.test.ts
+new file mode 100644
+index 0000000..3c7e1b1
+--- /dev/null
++++ b/tests/unit/ExitPlacement.test.ts
+@@ -0,0 +1,28 @@
++import { describe, expect, it } from 'vitest';
++import type { ExitWallPlacement } from '../../src/exit/exit.presentation.types';
++import { insetExitWallPlacement } from '../../src/exit/ExitPlacement';
++
++const nominalPlacement: ExitWallPlacement = {
++  roomId: 'room-test',
++  surfaceId: 'north-wall',
++  center: { x: 4, y: 1.15, z: 8 },
++  inwardNormal: { x: 0, y: 0, z: -2 },
++  width: 2.8,
++  height: 2.45,
++  seed: 'placement-test',
++};
++
++describe('insetExitWallPlacement', () => {
++  it('moves the whole placement from the logical boundary to the visible wall face', () => {
++    const inset = insetExitWallPlacement(nominalPlacement, 0.2);
++
++    expect(inset.center).toEqual({ x: 4, y: 1.15, z: 7.8 });
++    expect(inset.inwardNormal).toEqual({ x: 0, y: 0, z: -1 });
++    expect(nominalPlacement.center).toEqual({ x: 4, y: 1.15, z: 8 });
++  });
++
++  it('rejects negative or non-finite inset distances', () => {
++    expect(() => insetExitWallPlacement(nominalPlacement, -0.01)).toThrow(/non-negative/i);
++    expect(() => insetExitWallPlacement(nominalPlacement, Number.NaN)).toThrow(RangeError);
++  });
++});
+diff --git a/tests/unit/ExitRoomRegression.test.ts b/tests/unit/ExitRoomRegression.test.ts
+new file mode 100644
+index 0000000..f07299d
+--- /dev/null
++++ b/tests/unit/ExitRoomRegression.test.ts
+@@ -0,0 +1,123 @@
++import { NullEngine } from '@babylonjs/core/Engines/nullEngine';
++import { Vector3 } from '@babylonjs/core/Maths/math.vector';
++import { Scene } from '@babylonjs/core/scene';
++import { describe, expect, it } from 'vitest';
++import { exitPresentationConfig } from '../../src/exit/exit.presentation.config';
++import type { ExitWallPlacement } from '../../src/exit/exit.presentation.types';
++import { insetExitWallPlacement } from '../../src/exit/ExitPlacement';
++import { ExitWallPresentation } from '../../src/exit/ExitWallPresentation';
++import { generateRoomGraph } from '../../src/procedural/RoomGraphGenerator';
++import { MODULAR_WALL_THICKNESS } from '../../src/rooms/builders/ModularRoomBuilder';
++import { ModularWorld } from '../../src/rooms/ModularWorld';
++
++function horizontalDot(left: Vector3, right: Vector3): number {
++  return left.x * right.x + left.z * right.z;
++}
++
++describe('seed regression: threshold-2026-07-14 / room-0137', () => {
++  it('places the visible exit in front of the rendered wall and keeps its trigger usable after rebases', () => {
++    const engine = new NullEngine();
++    const scene = new Scene(engine);
++    const graph = generateRoomGraph({
++      seed: 'threshold-2026-07-14',
++      targetRooms: 1_024,
++      frontierStrategy: 'deep',
++    });
++    const world = new ModularWorld(scene);
++
++    try {
++      world.setGraph(graph);
++      const view = world.loadRoom('room-0137');
++      expect(view.definition.id).toBe('room_medium_rect');
++      const surface = view.definition.exitCompatibleSurfaces.find(
++        (candidate) => candidate.id === 'north-wall-left',
++      );
++      expect(surface).toBeDefined();
++      if (!surface) return;
++
++      view.root.computeWorldMatrix(true);
++      const matrix = view.root.getWorldMatrix();
++      const nominalCenter = Vector3.TransformCoordinates(
++        new Vector3(surface.localPosition.x, surface.localPosition.y, surface.localPosition.z),
++        matrix,
++      );
++      const outward = Vector3.TransformNormal(
++        new Vector3(surface.localForward.x, surface.localForward.y, surface.localForward.z),
++        matrix,
++      ).normalize();
++      const inward = outward.scale(-1);
++      const nominalPlacement: ExitWallPlacement = {
++        roomId: view.id,
++        surfaceId: surface.id,
++        center: nominalCenter,
++        inwardNormal: inward,
++        width: surface.width,
++        height: surface.height,
++        seed: 'room-0137-regression',
++      };
++      const placement = insetExitWallPlacement(nominalPlacement, MODULAR_WALL_THICKNESS);
++      const presentation = new ExitWallPresentation(scene, placement, world.materialLibrary.wall);
++
++      try {
++        presentation.root.computeWorldMatrix(true);
++        presentation.wallMesh.computeWorldMatrix(true);
++        const triggerOffset = horizontalDot(
++          new Vector3(
++            presentation.trigger.placement.center.x - nominalCenter.x,
++            presentation.trigger.placement.center.y - nominalCenter.y,
++            presentation.trigger.placement.center.z - nominalCenter.z,
++          ),
++          inward,
++        );
++        const visualOffset = horizontalDot(
++          presentation.wallMesh.getAbsolutePosition().subtract(nominalCenter),
++          inward,
++        );
++
++        expect(triggerOffset).toBeCloseTo(MODULAR_WALL_THICKNESS, 5);
++        expect(visualOffset).toBeCloseTo(
++          MODULAR_WALL_THICKNESS + exitPresentationConfig.visual.surfaceOffset,
++          5,
++        );
++        expect(visualOffset - exitPresentationConfig.visual.thickness / 2).toBeGreaterThan(
++          MODULAR_WALL_THICKNESS,
++        );
++
++        for (let index = 0; index < 16; index += 1) {
++          const delta = { x: index % 2 === 0 ? -40 : 0, y: 0, z: index % 2 === 0 ? 0 : -40 };
++          presentation.translate(delta);
++        }
++
++        const translated = presentation.trigger.placement;
++        const approach = new Vector3(
++          translated.center.x + translated.inwardNormal.x * 0.42,
++          0.04,
++          translated.center.z + translated.inwardNormal.z * 0.42,
++        );
++        const outwardVelocity = {
++          x: -translated.inwardNormal.x * 2.65,
++          y: 0,
++          z: -translated.inwardNormal.z * 2.65,
++        };
++
++        let entered = false;
++        for (let index = 0; index < 4; index += 1) {
++          entered = presentation.trigger.update({
++            previousPosition: approach,
++            position: approach,
++            forward: outwardVelocity,
++            velocity: outwardVelocity,
++            deltaSeconds: 0.04,
++          }).entered;
++        }
++        expect(entered).toBe(true);
++      } finally {
++        presentation.dispose();
++      }
++    } finally {
++      world.dispose();
++      scene.dispose();
++      engine.dispose();
++    }
++  });
++});

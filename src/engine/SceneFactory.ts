@@ -9,6 +9,8 @@ import { gameConfig } from '../config/game.config';
 export function createGameplayScene(engine: Engine): Scene {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.215, 0.205, 0.125, 1);
+  scene.autoClear = true;
+  scene.autoClearDepthAndStencil = true;
   scene.fogMode = Scene.FOGMODE_LINEAR;
   scene.fogStart = gameConfig.world.fogStart;
   scene.fogEnd = gameConfig.world.fogEnd;

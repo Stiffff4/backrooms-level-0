@@ -1,0 +1,986 @@
+import { a as ToHalfFloat, r as FromHalfFloat } from "./typeStore-CRwQ34I6.js";
+import { t as Logger } from "./logger-X7NGrhaj.js";
+function IsWindowObjectExist() {
+  return typeof window !== "undefined";
+}
+function IsNavigatorAvailable() {
+  return typeof navigator !== "undefined";
+}
+function IsDocumentAvailable() {
+  return typeof document !== "undefined";
+}
+function GetDOMTextContent(element) {
+  let result = "";
+  let child = element.firstChild;
+  while (child) {
+    if (child.nodeType === 3) result += child.textContent;
+    child = child.nextSibling;
+  }
+  return result;
+}
+var PrecisionDate = class {
+  static get Now() {
+    if (IsWindowObjectExist() && window.performance && window.performance.now) return window.performance.now();
+    return Date.now();
+  }
+};
+var WarnedMap = {};
+function _WarnImport(name, warnOnce = false) {
+  if (warnOnce && WarnedMap[name]) return;
+  WarnedMap[name] = true;
+  return `${name} needs to be imported before as it contains a side-effect required by your code.`;
+}
+var _StubWarnedMap = {};
+var _MissingSideEffectWarningsEnabled = false;
+var _MissingSideEffectWarningsSuppressionDepth = 0;
+function _MissingSideEffect(className, methodName, warn = false) {
+  const stub = function() {
+    if ((warn || _MissingSideEffectWarningsEnabled) && _MissingSideEffectWarningsSuppressionDepth === 0) {
+      const key = `${className}.${methodName}`;
+      if (!_StubWarnedMap[key]) {
+        _StubWarnedMap[key] = true;
+        console.warn(`[Babylon.js] ${key}() requires a side-effect import. See: https://doc.babylonjs.com/setup/treeshaking`);
+      }
+    }
+  };
+  stub.__isSideEffectStub = true;
+  return stub;
+}
+function _IsSideEffectImplemented(fn) {
+  if (!fn) return false;
+  return !fn.__isSideEffectStub;
+}
+function _MissingSideEffectProperty(className, propName) {
+  return {
+    get() {
+    },
+    set(value) {
+      Object.defineProperty(this, propName, {
+        value,
+        writable: true,
+        configurable: true,
+        enumerable: true
+      });
+    },
+    configurable: true,
+    enumerable: true
+  };
+}
+var EngineFunctionContext = {};
+function _ConcatenateShader(source, defines, shaderVersion = "") {
+  return shaderVersion + (defines ? defines + "\n" : "") + source;
+}
+function _LoadFile(url, onSuccess, onProgress, offlineProvider, useArrayBuffer, onError, injectedLoadFile) {
+  const loadFileFn = injectedLoadFile || EngineFunctionContext.loadFile;
+  if (!loadFileFn) throw _WarnImport("FileTools");
+  return loadFileFn(url, onSuccess, onProgress, offlineProvider, useArrayBuffer, onError);
+}
+function _GetGlobalDefines(defines, isNDCHalfZRange, useReverseDepthBuffer, useExactSrgbConversions) {
+  if (defines) {
+    if (isNDCHalfZRange) defines["IS_NDC_HALF_ZRANGE"] = "";
+    else delete defines["IS_NDC_HALF_ZRANGE"];
+    if (useReverseDepthBuffer) defines["USE_REVERSE_DEPTHBUFFER"] = "";
+    else delete defines["USE_REVERSE_DEPTHBUFFER"];
+    if (useExactSrgbConversions) defines["USE_EXACT_SRGB_CONVERSIONS"] = "";
+    else delete defines["USE_EXACT_SRGB_CONVERSIONS"];
+    return;
+  } else {
+    let s = "";
+    if (isNDCHalfZRange) s += "#define IS_NDC_HALF_ZRANGE";
+    if (useReverseDepthBuffer) {
+      if (s) s += "\n";
+      s += "#define USE_REVERSE_DEPTHBUFFER";
+    }
+    if (useExactSrgbConversions) {
+      if (s) s += "\n";
+      s += "#define USE_EXACT_SRGB_CONVERSIONS";
+    }
+    return s;
+  }
+}
+function allocateAndCopyTypedBuffer(type, sizeOrDstBuffer, sizeInBytes = false, copyBuffer) {
+  switch (type) {
+    case 3: {
+      const buffer2 = new Int8Array(sizeOrDstBuffer);
+      if (copyBuffer) buffer2.set(new Int8Array(copyBuffer));
+      return buffer2;
+    }
+    case 0: {
+      const buffer2 = new Uint8Array(sizeOrDstBuffer);
+      if (copyBuffer) buffer2.set(new Uint8Array(copyBuffer));
+      return buffer2;
+    }
+    case 4: {
+      const buffer2 = typeof sizeOrDstBuffer !== "number" ? new Int16Array(sizeOrDstBuffer) : new Int16Array(sizeInBytes ? sizeOrDstBuffer / 2 : sizeOrDstBuffer);
+      if (copyBuffer) buffer2.set(new Int16Array(copyBuffer));
+      return buffer2;
+    }
+    case 5:
+    case 8:
+    case 9:
+    case 10:
+    case 2: {
+      const buffer2 = typeof sizeOrDstBuffer !== "number" ? new Uint16Array(sizeOrDstBuffer) : new Uint16Array(sizeInBytes ? sizeOrDstBuffer / 2 : sizeOrDstBuffer);
+      if (copyBuffer) buffer2.set(new Uint16Array(copyBuffer));
+      return buffer2;
+    }
+    case 6: {
+      const buffer2 = typeof sizeOrDstBuffer !== "number" ? new Int32Array(sizeOrDstBuffer) : new Int32Array(sizeInBytes ? sizeOrDstBuffer / 4 : sizeOrDstBuffer);
+      if (copyBuffer) buffer2.set(new Int32Array(copyBuffer));
+      return buffer2;
+    }
+    case 7:
+    case 11:
+    case 12:
+    case 13:
+    case 14:
+    case 15: {
+      const buffer2 = typeof sizeOrDstBuffer !== "number" ? new Uint32Array(sizeOrDstBuffer) : new Uint32Array(sizeInBytes ? sizeOrDstBuffer / 4 : sizeOrDstBuffer);
+      if (copyBuffer) buffer2.set(new Uint32Array(copyBuffer));
+      return buffer2;
+    }
+    case 1: {
+      const buffer2 = typeof sizeOrDstBuffer !== "number" ? new Float32Array(sizeOrDstBuffer) : new Float32Array(sizeInBytes ? sizeOrDstBuffer / 4 : sizeOrDstBuffer);
+      if (copyBuffer) buffer2.set(new Float32Array(copyBuffer));
+      return buffer2;
+    }
+  }
+  const buffer = new Uint8Array(sizeOrDstBuffer);
+  if (copyBuffer) buffer.set(new Uint8Array(copyBuffer));
+  return buffer;
+}
+var DefaultAttributeKeywordName = "attribute";
+var DefaultVaryingKeywordName = "varying";
+var ShaderCodeNode = class {
+  constructor() {
+    this.children = [];
+  }
+  isValid(preprocessors) {
+    return true;
+  }
+  process(preprocessors, options, preProcessorsFromCode) {
+    let result = "";
+    if (this.line) {
+      let value = this.line;
+      const processor = options.processor;
+      if (processor) {
+        if (processor.lineProcessor) value = processor.lineProcessor(value, options.isFragment, options.processingContext);
+        const attributeKeyword = options.processor?.attributeKeywordName ?? DefaultAttributeKeywordName;
+        const varyingKeyword = options.isFragment && options.processor?.varyingFragmentKeywordName ? options.processor?.varyingFragmentKeywordName : !options.isFragment && options.processor?.varyingVertexKeywordName ? options.processor?.varyingVertexKeywordName : DefaultVaryingKeywordName;
+        if (!options.isFragment && processor.attributeProcessor && this.line.startsWith(attributeKeyword)) value = processor.attributeProcessor(this.line, preprocessors, options.processingContext);
+        else if (processor.varyingProcessor && (processor.varyingCheck?.(this.line, options.isFragment) || !processor.varyingCheck && this.line.startsWith(varyingKeyword))) value = processor.varyingProcessor(this.line, options.isFragment, preprocessors, options.processingContext);
+        else if (processor.uniformProcessor && processor.uniformRegexp && processor.uniformRegexp.test(this.line)) {
+          if (!options.lookForClosingBracketForUniformBuffer) value = processor.uniformProcessor(this.line, options.isFragment, preprocessors, options.processingContext);
+        } else if (processor.uniformBufferProcessor && processor.uniformBufferRegexp && processor.uniformBufferRegexp.test(this.line)) {
+          if (!options.lookForClosingBracketForUniformBuffer) {
+            value = processor.uniformBufferProcessor(this.line, options.isFragment, options.processingContext);
+            options.lookForClosingBracketForUniformBuffer = true;
+          }
+        } else if (processor.textureProcessor && processor.textureRegexp && processor.textureRegexp.test(this.line)) value = processor.textureProcessor(this.line, options.isFragment, preprocessors, options.processingContext);
+        else if ((processor.uniformProcessor || processor.uniformBufferProcessor) && this.line.startsWith("uniform") && !options.lookForClosingBracketForUniformBuffer) {
+          if (/uniform\s+(?:(?:highp)?|(?:lowp)?)\s*(\S+)\s+(\S+)\s*;/.test(this.line)) {
+            if (processor.uniformProcessor) value = processor.uniformProcessor(this.line, options.isFragment, preprocessors, options.processingContext);
+          } else if (processor.uniformBufferProcessor) {
+            value = processor.uniformBufferProcessor(this.line, options.isFragment, options.processingContext);
+            options.lookForClosingBracketForUniformBuffer = true;
+          }
+        }
+        if (options.lookForClosingBracketForUniformBuffer && this.line.indexOf("}") !== -1) {
+          options.lookForClosingBracketForUniformBuffer = false;
+          if (processor.endOfUniformBufferProcessor) value = processor.endOfUniformBufferProcessor(this.line, options.isFragment, options.processingContext);
+        }
+      }
+      result += value + "\n";
+    }
+    for (const child of this.children) result += child.process(preprocessors, options, preProcessorsFromCode);
+    if (this.additionalDefineKey) {
+      preprocessors[this.additionalDefineKey] = this.additionalDefineValue || "true";
+      preProcessorsFromCode[this.additionalDefineKey] = preprocessors[this.additionalDefineKey];
+    }
+    return result;
+  }
+};
+var ShaderCodeCursor = class {
+  constructor() {
+    this._lines = [];
+  }
+  get currentLine() {
+    return this._lines[this.lineIndex];
+  }
+  get canRead() {
+    return this.lineIndex < this._lines.length - 1;
+  }
+  set lines(value) {
+    this._lines.length = 0;
+    for (const line of value) {
+      if (!line || line === "\r") continue;
+      if (line[0] === "#") {
+        this._lines.push(line);
+        continue;
+      }
+      const trimmedLine = line.trim();
+      if (!trimmedLine) continue;
+      if (trimmedLine.startsWith("//")) {
+        this._lines.push(line);
+        continue;
+      }
+      const semicolonIndex = trimmedLine.indexOf(";");
+      if (semicolonIndex === -1) this._lines.push(trimmedLine);
+      else if (semicolonIndex === trimmedLine.length - 1) {
+        if (trimmedLine.length > 1) this._lines.push(trimmedLine);
+      } else {
+        const split = line.split(";");
+        for (let index = 0; index < split.length; index++) {
+          let subLine = split[index];
+          if (!subLine) continue;
+          subLine = subLine.trim();
+          if (!subLine) continue;
+          this._lines.push(subLine + (index !== split.length - 1 ? ";" : ""));
+        }
+      }
+    }
+  }
+};
+var ShaderCodeConditionNode = class extends ShaderCodeNode {
+  process(preprocessors, options, preProcessorsFromCode) {
+    for (let index = 0; index < this.children.length; index++) {
+      const node = this.children[index];
+      if (node.isValid(preprocessors)) return node.process(preprocessors, options, preProcessorsFromCode);
+    }
+    return "";
+  }
+};
+var ShaderCodeTestNode = class extends ShaderCodeNode {
+  isValid(preprocessors) {
+    return this.testExpression.isTrue(preprocessors);
+  }
+};
+var ShaderDefineExpression = class ShaderDefineExpression2 {
+  isTrue(preprocessors) {
+    return true;
+  }
+  static postfixToInfix(postfix) {
+    const stack = [];
+    for (const c of postfix) if (ShaderDefineExpression2._OperatorPriority[c] === void 0) stack.push(c);
+    else {
+      const v1 = stack[stack.length - 1], v2 = stack[stack.length - 2];
+      stack.length -= 2;
+      stack.push(`(${v2}${c}${v1})`);
+    }
+    return stack[stack.length - 1];
+  }
+  static infixToPostfix(infix) {
+    const cacheItem = ShaderDefineExpression2._InfixToPostfixCache.get(infix);
+    if (cacheItem) {
+      cacheItem.accessTime = Date.now();
+      return cacheItem.result;
+    }
+    if (!infix.includes("&&") && !infix.includes("||") && !infix.includes(")") && !infix.includes("(")) return [infix];
+    const result = [];
+    let stackIdx = -1;
+    const pushOperand = () => {
+      operand = operand.trim();
+      if (operand !== "") {
+        result.push(operand);
+        operand = "";
+      }
+    };
+    const push = (s) => {
+      if (stackIdx < ShaderDefineExpression2._Stack.length - 1) ShaderDefineExpression2._Stack[++stackIdx] = s;
+    };
+    const peek = () => ShaderDefineExpression2._Stack[stackIdx];
+    const pop = () => stackIdx === -1 ? "!!INVALID EXPRESSION!!" : ShaderDefineExpression2._Stack[stackIdx--];
+    let idx = 0, operand = "";
+    while (idx < infix.length) {
+      const c = infix.charAt(idx), token = idx < infix.length - 1 ? infix.substring(idx, 2 + idx) : "";
+      if (c === "(") {
+        operand = "";
+        push(c);
+      } else if (c === ")") {
+        pushOperand();
+        while (stackIdx !== -1 && peek() !== "(") result.push(pop());
+        pop();
+      } else if (ShaderDefineExpression2._OperatorPriority[token] > 1) {
+        pushOperand();
+        while (stackIdx !== -1 && ShaderDefineExpression2._OperatorPriority[peek()] >= ShaderDefineExpression2._OperatorPriority[token]) result.push(pop());
+        push(token);
+        idx++;
+      } else operand += c;
+      idx++;
+    }
+    pushOperand();
+    while (stackIdx !== -1) if (peek() === "(") pop();
+    else result.push(pop());
+    if (ShaderDefineExpression2._InfixToPostfixCache.size >= ShaderDefineExpression2.InfixToPostfixCacheLimitSize) ShaderDefineExpression2.ClearCache();
+    ShaderDefineExpression2._InfixToPostfixCache.set(infix, {
+      result,
+      accessTime: Date.now()
+    });
+    return result;
+  }
+  static ClearCache() {
+    const sortedCache = Array.from(ShaderDefineExpression2._InfixToPostfixCache.entries()).sort((a, b) => a[1].accessTime - b[1].accessTime);
+    for (let i = 0; i < ShaderDefineExpression2.InfixToPostfixCacheCleanupSize; i++) ShaderDefineExpression2._InfixToPostfixCache.delete(sortedCache[i][0]);
+  }
+};
+ShaderDefineExpression.InfixToPostfixCacheLimitSize = 5e4;
+ShaderDefineExpression.InfixToPostfixCacheCleanupSize = 25e3;
+ShaderDefineExpression._InfixToPostfixCache = /* @__PURE__ */ new Map();
+ShaderDefineExpression._OperatorPriority = {
+  ")": 0,
+  "(": 1,
+  "||": 2,
+  "&&": 3
+};
+ShaderDefineExpression._Stack = [
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  ""
+];
+var ShaderDefineIsDefinedOperator = class extends ShaderDefineExpression {
+  constructor(define, not = false) {
+    super();
+    this.define = define;
+    this.not = not;
+  }
+  isTrue(preprocessors) {
+    let condition = preprocessors[this.define] !== void 0;
+    if (this.not) condition = !condition;
+    return condition;
+  }
+};
+var ShaderDefineOrOperator = class extends ShaderDefineExpression {
+  isTrue(preprocessors) {
+    return this.leftOperand.isTrue(preprocessors) || this.rightOperand.isTrue(preprocessors);
+  }
+};
+var ShaderDefineAndOperator = class extends ShaderDefineExpression {
+  isTrue(preprocessors) {
+    return this.leftOperand.isTrue(preprocessors) && this.rightOperand.isTrue(preprocessors);
+  }
+};
+var ShaderDefineArithmeticOperator = class extends ShaderDefineExpression {
+  constructor(define, operand, testValue) {
+    super();
+    this.define = define;
+    this.operand = operand;
+    this.testValue = testValue;
+  }
+  toString() {
+    return `${this.define} ${this.operand} ${this.testValue}`;
+  }
+  isTrue(preprocessors) {
+    let condition = false;
+    const left = parseInt(preprocessors[this.define] != void 0 ? preprocessors[this.define] : this.define);
+    const right = parseInt(preprocessors[this.testValue] != void 0 ? preprocessors[this.testValue] : this.testValue);
+    if (isNaN(left) || isNaN(right)) return false;
+    switch (this.operand) {
+      case ">":
+        condition = left > right;
+        break;
+      case "<":
+        condition = left < right;
+        break;
+      case "<=":
+        condition = left <= right;
+        break;
+      case ">=":
+        condition = left >= right;
+        break;
+      case "==":
+        condition = left === right;
+        break;
+      case "!=":
+        condition = left !== right;
+        break;
+    }
+    return condition;
+  }
+};
+var RegexSe = /defined\s*?\((.+?)\)/g;
+var RegexSeRevert = /defined\s*?\[(.+?)\]/g;
+var RegexShaderInclude = /#include\s?<(.+)>(\((.*)\))*(\[(.*)\])*/g;
+var RegexShaderDecl = /__decl__/;
+var RegexLightX = /light\{X\}.(\w*)/g;
+var RegexX = /\{X\}/g;
+var ReusableMatches = [];
+var MoveCursorRegex = /(#ifdef)|(#else)|(#elif)|(#endif)|(#ifndef)|(#if)/;
+function Initialize(options) {
+  if (options.processor && options.processor.initializeShaders) options.processor.initializeShaders(options.processingContext);
+}
+function Process(sourceCode, options, callback, engine) {
+  if (options.processor?.preProcessShaderCode) sourceCode = options.processor.preProcessShaderCode(sourceCode, options.isFragment);
+  ProcessIncludes(sourceCode, options, (codeWithIncludes) => {
+    if (options.processCodeAfterIncludes) codeWithIncludes = options.processCodeAfterIncludes(options.isFragment ? "fragment" : "vertex", codeWithIncludes, options.defines);
+    callback(ProcessShaderConversion(codeWithIncludes, options, engine), codeWithIncludes);
+  });
+}
+function Finalize(vertexCode, fragmentCode, options) {
+  if (!options.processor || !options.processor.finalizeShaders) return {
+    vertexCode,
+    fragmentCode
+  };
+  return options.processor.finalizeShaders(vertexCode, fragmentCode, options.processingContext);
+}
+function ProcessPrecision(source, options) {
+  if (options.processor?.noPrecision) return source;
+  const shouldUseHighPrecisionShader = options.shouldUseHighPrecisionShader;
+  if (source.indexOf("precision highp float") === -1) if (!shouldUseHighPrecisionShader) source = "precision mediump float;\n" + source;
+  else source = "precision highp float;\n" + source;
+  else if (!shouldUseHighPrecisionShader) source = source.replace("precision highp float", "precision mediump float");
+  return source;
+}
+function ExtractOperation(expression) {
+  const match = /defined\((.+)\)/.exec(expression);
+  if (match && match.length) return new ShaderDefineIsDefinedOperator(match[1].trim(), expression[0] === "!");
+  const operators = [
+    "==",
+    "!=",
+    ">=",
+    "<=",
+    "<",
+    ">"
+  ];
+  let operator = "";
+  let indexOperator = 0;
+  for (operator of operators) {
+    indexOperator = expression.indexOf(operator);
+    if (indexOperator > -1) break;
+  }
+  if (indexOperator === -1) return new ShaderDefineIsDefinedOperator(expression);
+  const define = expression.substring(0, indexOperator).trim();
+  const value = expression.substring(indexOperator + operator.length).trim();
+  return new ShaderDefineArithmeticOperator(define, operator, value);
+}
+function BuildSubExpression(expression) {
+  expression = expression.replace(RegexSe, "defined[$1]");
+  const postfix = ShaderDefineExpression.infixToPostfix(expression);
+  const stack = [];
+  for (const c of postfix) if (c !== "||" && c !== "&&") stack.push(c);
+  else if (stack.length >= 2) {
+    let v1 = stack[stack.length - 1], v2 = stack[stack.length - 2];
+    stack.length -= 2;
+    const operator = c == "&&" ? new ShaderDefineAndOperator() : new ShaderDefineOrOperator();
+    if (typeof v1 === "string") v1 = v1.replace(RegexSeRevert, "defined($1)");
+    if (typeof v2 === "string") v2 = v2.replace(RegexSeRevert, "defined($1)");
+    operator.leftOperand = typeof v2 === "string" ? ExtractOperation(v2) : v2;
+    operator.rightOperand = typeof v1 === "string" ? ExtractOperation(v1) : v1;
+    stack.push(operator);
+  }
+  let result = stack[stack.length - 1];
+  if (typeof result === "string") result = result.replace(RegexSeRevert, "defined($1)");
+  return typeof result === "string" ? ExtractOperation(result) : result;
+}
+function BuildExpression(line, start) {
+  const node = new ShaderCodeTestNode();
+  const command = line.substring(0, start);
+  let expression = line.substring(start);
+  expression = expression.substring(0, (expression.indexOf("//") + 1 || expression.length + 1) - 1).trim();
+  if (command === "#ifdef") node.testExpression = new ShaderDefineIsDefinedOperator(expression);
+  else if (command === "#ifndef") node.testExpression = new ShaderDefineIsDefinedOperator(expression, true);
+  else node.testExpression = BuildSubExpression(expression);
+  return node;
+}
+function MoveCursorWithinIf(cursor, rootNode, ifNode, preProcessorsFromCode) {
+  let line;
+  while (MoveCursor(cursor, ifNode, preProcessorsFromCode)) {
+    line = cursor.currentLine;
+    const first5 = line.substring(0, 5).toLowerCase();
+    if (first5 === "#else") {
+      const elseNode = new ShaderCodeNode();
+      rootNode.children.push(elseNode);
+      MoveCursor(cursor, elseNode, preProcessorsFromCode);
+      return;
+    } else if (first5 === "#elif") {
+      const elifNode = BuildExpression(line, 5);
+      rootNode.children.push(elifNode);
+      ifNode = elifNode;
+    }
+  }
+}
+function MoveCursor(cursor, rootNode, preProcessorsFromCode) {
+  while (cursor.canRead) {
+    cursor.lineIndex++;
+    const line = cursor.currentLine;
+    if (line.indexOf("#") >= 0) {
+      const matches = MoveCursorRegex.exec(line);
+      if (matches && matches.length) {
+        switch (matches[0]) {
+          case "#ifdef": {
+            const newRootNode = new ShaderCodeConditionNode();
+            rootNode.children.push(newRootNode);
+            const ifNode = BuildExpression(line, 6);
+            newRootNode.children.push(ifNode);
+            MoveCursorWithinIf(cursor, newRootNode, ifNode, preProcessorsFromCode);
+            break;
+          }
+          case "#else":
+          case "#elif":
+            return true;
+          case "#endif":
+            return false;
+          case "#ifndef": {
+            const newRootNode = new ShaderCodeConditionNode();
+            rootNode.children.push(newRootNode);
+            const ifNode = BuildExpression(line, 7);
+            newRootNode.children.push(ifNode);
+            MoveCursorWithinIf(cursor, newRootNode, ifNode, preProcessorsFromCode);
+            break;
+          }
+          case "#if": {
+            const newRootNode = new ShaderCodeConditionNode();
+            const ifNode = BuildExpression(line, 3);
+            rootNode.children.push(newRootNode);
+            newRootNode.children.push(ifNode);
+            MoveCursorWithinIf(cursor, newRootNode, ifNode, preProcessorsFromCode);
+            break;
+          }
+        }
+        continue;
+      }
+    }
+    const newNode = new ShaderCodeNode();
+    newNode.line = line;
+    rootNode.children.push(newNode);
+    if (line[0] === "#" && line[1] === "d") {
+      const split = line.replace(";", "").split(" ");
+      newNode.additionalDefineKey = split[1];
+      if (split.length === 3) newNode.additionalDefineValue = split[2];
+    }
+  }
+  return false;
+}
+function EvaluatePreProcessors(sourceCode, preprocessors, options, preProcessorsFromCode) {
+  const rootNode = new ShaderCodeNode();
+  const cursor = new ShaderCodeCursor();
+  cursor.lineIndex = -1;
+  cursor.lines = sourceCode.split("\n");
+  MoveCursor(cursor, rootNode, preProcessorsFromCode);
+  return rootNode.process(preprocessors, options, preProcessorsFromCode);
+}
+function PreparePreProcessors(options, engine) {
+  const defines = options.defines;
+  const preprocessors = {};
+  for (const define of defines) {
+    const split = define.replace("#define", "").replace(";", "").trim().split(" ");
+    preprocessors[split[0]] = split.length > 1 ? split[1] : "";
+  }
+  if (options.processor?.shaderLanguage === 0) preprocessors["GL_ES"] = "true";
+  preprocessors["__VERSION__"] = options.version;
+  preprocessors[options.platformName] = "true";
+  _GetGlobalDefines(preprocessors, engine?.isNDCHalfZRange, engine?.useReverseDepthBuffer, engine?.useExactSrgbConversions);
+  return preprocessors;
+}
+function ProcessShaderConversion(sourceCode, options, engine) {
+  let preparedSourceCode = ProcessPrecision(sourceCode, options);
+  if (!options.processor) return preparedSourceCode;
+  if (options.processor.shaderLanguage === 0 && preparedSourceCode.indexOf("#version 3") !== -1) {
+    preparedSourceCode = preparedSourceCode.replace("#version 300 es", "");
+    if (!options.processor.parseGLES3) return preparedSourceCode;
+  }
+  const defines = options.defines;
+  const preprocessors = PreparePreProcessors(options, engine);
+  if (options.processor.preProcessor) preparedSourceCode = options.processor.preProcessor(preparedSourceCode, defines, preprocessors, options.isFragment, options.processingContext);
+  const preProcessorsFromCode = {};
+  preparedSourceCode = EvaluatePreProcessors(preparedSourceCode, preprocessors, options, preProcessorsFromCode);
+  if (options.processor.postProcessor) preparedSourceCode = options.processor.postProcessor(preparedSourceCode, defines, options.isFragment, options.processingContext, engine ? { drawBuffersExtensionDisabled: engine.getCaps().drawBuffersExtension ? false : true } : {}, preprocessors, preProcessorsFromCode);
+  if (engine?._features.needShaderCodeInlining) preparedSourceCode = engine.inlineShaderCode(preparedSourceCode);
+  return preparedSourceCode;
+}
+function ProcessIncludes(sourceCode, options, callback) {
+  ReusableMatches.length = 0;
+  let match;
+  while ((match = RegexShaderInclude.exec(sourceCode)) !== null) ReusableMatches.push(match);
+  let parts = [sourceCode];
+  let keepProcessing = false;
+  for (const match2 of ReusableMatches) {
+    let includeFile = match2[1];
+    if (includeFile.indexOf("__decl__") !== -1) {
+      includeFile = includeFile.replace(RegexShaderDecl, "");
+      if (options.supportsUniformBuffers) includeFile = includeFile.replace("Vertex", "Ubo").replace("Fragment", "Ubo");
+      includeFile = includeFile + "Declaration";
+    }
+    if (options.includesShadersStore[includeFile]) {
+      let includeContent = options.includesShadersStore[includeFile];
+      if (match2[2]) {
+        const splits = match2[3].split(",");
+        for (let index = 0; index < splits.length; index += 2) {
+          const source = new RegExp(splits[index], "g");
+          const dest = splits[index + 1];
+          includeContent = includeContent.replace(source, dest);
+        }
+      }
+      if (match2[4]) {
+        const indexString = match2[5];
+        if (indexString.indexOf("..") !== -1) {
+          const indexSplits = indexString.split("..");
+          const minIndex = parseInt(indexSplits[0]);
+          let maxIndex = parseInt(indexSplits[1]);
+          let sourceIncludeContent = includeContent.slice(0);
+          includeContent = "";
+          if (isNaN(maxIndex)) maxIndex = options.indexParameters[indexSplits[1]];
+          for (let i = minIndex; i < maxIndex; i++) {
+            if (!options.supportsUniformBuffers) sourceIncludeContent = sourceIncludeContent.replace(RegexLightX, (str, p1) => {
+              return p1 + "{X}";
+            });
+            includeContent += sourceIncludeContent.replace(RegexX, i.toString()) + "\n";
+          }
+        } else {
+          if (!options.supportsUniformBuffers) includeContent = includeContent.replace(RegexLightX, (str, p1) => {
+            return p1 + "{X}";
+          });
+          includeContent = includeContent.replace(RegexX, indexString);
+        }
+      }
+      const newParts = [];
+      for (const part of parts) {
+        const splitPart = part.split(match2[0]);
+        for (let i = 0; i < splitPart.length - 1; i++) {
+          newParts.push(splitPart[i]);
+          newParts.push(includeContent);
+        }
+        newParts.push(splitPart[splitPart.length - 1]);
+      }
+      parts = newParts;
+      keepProcessing = keepProcessing || includeContent.indexOf("#include<") >= 0 || includeContent.indexOf("#include <") >= 0;
+    } else {
+      const includeShaderUrl = options.shadersRepository + "ShadersInclude/" + includeFile + ".fx";
+      _FunctionContainer.loadFile(includeShaderUrl, (fileContent) => {
+        options.includesShadersStore[includeFile] = fileContent;
+        ProcessIncludes(parts.join(""), options, callback);
+      });
+      return;
+    }
+  }
+  ReusableMatches.length = 0;
+  const returnValue = parts.join("");
+  if (keepProcessing) ProcessIncludes(returnValue.toString(), options, callback);
+  else callback(returnValue);
+}
+var _FunctionContainer = { loadFile: (url, onSuccess, onProgress, offlineProvider, useArrayBuffer, onError) => {
+  throw _WarnImport("FileTools");
+} };
+var ImmediateQueue = [];
+var TimingTools = class {
+  static SetImmediate(action) {
+    if (ImmediateQueue.length === 0) setTimeout(() => {
+      const functionsToCall = ImmediateQueue;
+      ImmediateQueue = [];
+      for (const func of functionsToCall) func();
+    }, 1);
+    ImmediateQueue.push(action);
+  }
+};
+function RunWithCondition(condition, onSuccess, onError) {
+  try {
+    if (condition()) {
+      onSuccess();
+      return true;
+    }
+  } catch (e) {
+    onError?.(e);
+    return true;
+  }
+  return false;
+}
+var _RetryWithInterval = (condition, onSuccess, onError, step = 16, maxTimeout = 3e4, checkConditionOnCall = true, additionalStringOnTimeout) => {
+  if (checkConditionOnCall) {
+    if (RunWithCondition(condition, onSuccess, onError)) return null;
+  }
+  const int = setInterval(() => {
+    if (RunWithCondition(condition, onSuccess, onError)) clearInterval(int);
+    else {
+      maxTimeout -= step;
+      if (maxTimeout < 0) {
+        clearInterval(int);
+        onError?.(/* @__PURE__ */ new Error("Operation timed out after maximum retries. " + (additionalStringOnTimeout || "")), true);
+      }
+    }
+  }, step);
+  return () => clearInterval(int);
+};
+function GetFloatValue(dataView, type, byteOffset, normalized) {
+  switch (type) {
+    case 5120: {
+      let value = dataView.getInt8(byteOffset);
+      if (normalized) value = Math.max(value / 127, -1);
+      return value;
+    }
+    case 5121: {
+      let value = dataView.getUint8(byteOffset);
+      if (normalized) value = value / 255;
+      return value;
+    }
+    case 5122: {
+      let value = dataView.getInt16(byteOffset, true);
+      if (normalized) value = Math.max(value / 32767, -1);
+      return value;
+    }
+    case 5123: {
+      let value = dataView.getUint16(byteOffset, true);
+      if (normalized) value = value / 65535;
+      return value;
+    }
+    case 5131:
+      return FromHalfFloat(dataView.getUint16(byteOffset, true));
+    case 5124:
+      return dataView.getInt32(byteOffset, true);
+    case 5125:
+      return dataView.getUint32(byteOffset, true);
+    case 5126:
+      return dataView.getFloat32(byteOffset, true);
+    default:
+      throw new Error(`Invalid component type ${type}`);
+  }
+}
+function SetFloatValue(dataView, type, byteOffset, normalized, value) {
+  switch (type) {
+    case 5120:
+      if (normalized) value = Math.round(value * 127);
+      dataView.setInt8(byteOffset, value);
+      break;
+    case 5121:
+      if (normalized) value = Math.round(value * 255);
+      dataView.setUint8(byteOffset, value);
+      break;
+    case 5122:
+      if (normalized) value = Math.round(value * 32767);
+      dataView.setInt16(byteOffset, value, true);
+      break;
+    case 5123:
+      if (normalized) value = Math.round(value * 65535);
+      dataView.setUint16(byteOffset, value, true);
+      break;
+    case 5131:
+      dataView.setUint16(byteOffset, ToHalfFloat(value), true);
+      break;
+    case 5124:
+      dataView.setInt32(byteOffset, value, true);
+      break;
+    case 5125:
+      dataView.setUint32(byteOffset, value, true);
+      break;
+    case 5126:
+      dataView.setFloat32(byteOffset, value, true);
+      break;
+    default:
+      throw new Error(`Invalid component type ${type}`);
+  }
+}
+function GetTypeByteLength(type) {
+  switch (type) {
+    case 5120:
+    case 5121:
+      return 1;
+    case 5122:
+    case 5123:
+    case 5131:
+      return 2;
+    case 5124:
+    case 5125:
+    case 5126:
+      return 4;
+    default:
+      throw new Error(`Invalid type '${type}'`);
+  }
+}
+function GetTypedArrayConstructor(componentType) {
+  switch (componentType) {
+    case 5120:
+      return Int8Array;
+    case 5121:
+      return Uint8Array;
+    case 5122:
+      return Int16Array;
+    case 5123:
+      return Uint16Array;
+    case 5131:
+      return Uint16Array;
+    case 5124:
+      return Int32Array;
+    case 5125:
+      return Uint32Array;
+    case 5126:
+      return Float32Array;
+    default:
+      throw new Error(`Invalid component type '${componentType}'`);
+  }
+}
+function EnumerateFloatValues(data, byteOffset, byteStride, componentCount, componentType, count, normalized, callback) {
+  const oldValues = new Array(componentCount);
+  const newValues = new Array(componentCount);
+  if (data instanceof Array) {
+    let offset = byteOffset / 4;
+    const stride = byteStride / 4;
+    for (let index = 0; index < count; index += componentCount) {
+      for (let componentIndex = 0; componentIndex < componentCount; componentIndex++) oldValues[componentIndex] = newValues[componentIndex] = data[offset + componentIndex];
+      callback(newValues, index);
+      for (let componentIndex = 0; componentIndex < componentCount; componentIndex++) if (oldValues[componentIndex] !== newValues[componentIndex]) data[offset + componentIndex] = newValues[componentIndex];
+      offset += stride;
+    }
+  } else {
+    const dataView = !ArrayBuffer.isView(data) ? new DataView(data) : new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const componentByteLength = GetTypeByteLength(componentType);
+    for (let index = 0; index < count; index += componentCount) {
+      for (let componentIndex = 0, componentByteOffset = byteOffset; componentIndex < componentCount; componentIndex++, componentByteOffset += componentByteLength) oldValues[componentIndex] = newValues[componentIndex] = GetFloatValue(dataView, componentType, componentByteOffset, normalized);
+      callback(newValues, index);
+      for (let componentIndex = 0, componentByteOffset = byteOffset; componentIndex < componentCount; componentIndex++, componentByteOffset += componentByteLength) if (oldValues[componentIndex] !== newValues[componentIndex]) SetFloatValue(dataView, componentType, componentByteOffset, normalized, newValues[componentIndex]);
+      byteOffset += byteStride;
+    }
+  }
+}
+function GetFloatData(data, size, type, byteOffset, byteStride, normalized, totalVertices, forceCopy) {
+  const tightlyPackedByteStride = size * GetTypeByteLength(type);
+  const count = totalVertices * size;
+  if (type !== 5126 || byteStride !== tightlyPackedByteStride) {
+    const copy = new Float32Array(count);
+    EnumerateFloatValues(data, byteOffset, byteStride, size, type, count, normalized, (values, index) => {
+      for (let i = 0; i < size; i++) copy[index + i] = values[i];
+    });
+    return copy;
+  }
+  if (!(data instanceof Array || data instanceof Float32Array) || byteOffset !== 0 || data.length !== count) if (data instanceof Array) {
+    const offset = byteOffset / 4;
+    return data.slice(offset, offset + count);
+  } else if (ArrayBuffer.isView(data)) {
+    const offset = data.byteOffset + byteOffset;
+    if ((offset & 3) !== 0) {
+      Logger.Warn("Float array must be aligned to 4-bytes border");
+      forceCopy = true;
+    }
+    if (forceCopy) return new Float32Array(data.buffer.slice(offset, offset + count * Float32Array.BYTES_PER_ELEMENT));
+    else return new Float32Array(data.buffer, offset, count);
+  } else return new Float32Array(data, byteOffset, count);
+  if (forceCopy) return data.slice();
+  return data;
+}
+function GetTypedArrayData(data, size, type, byteOffset, byteStride, totalVertices, forceCopy) {
+  const typeByteLength = GetTypeByteLength(type);
+  const constructor = GetTypedArrayConstructor(type);
+  const count = totalVertices * size;
+  if (Array.isArray(data)) {
+    if ((byteOffset & 3) !== 0 || (byteStride & 3) !== 0) throw new Error("byteOffset and byteStride must be a multiple of 4 for number[] data.");
+    const offset = byteOffset / 4;
+    const stride = byteStride / 4;
+    if (offset + (totalVertices - 1) * stride + size > data.length) throw new Error("Last accessed index is out of bounds.");
+    if (stride < size) throw new Error("Data stride cannot be smaller than the component size.");
+    if (stride !== size) {
+      const copy = new constructor(count);
+      EnumerateFloatValues(data, byteOffset, byteStride, size, type, count, false, (values, index) => {
+        for (let i = 0; i < size; i++) copy[index + i] = values[i];
+      });
+      return copy;
+    }
+    return new constructor(data.slice(offset, offset + count));
+  }
+  let buffer;
+  let adjustedByteOffset = byteOffset;
+  if (ArrayBuffer.isView(data)) {
+    buffer = data.buffer;
+    adjustedByteOffset += data.byteOffset;
+  } else buffer = data;
+  if (adjustedByteOffset + (totalVertices - 1) * byteStride + size * typeByteLength > buffer.byteLength) throw new Error("Last accessed byte is out of bounds.");
+  const tightlyPackedByteStride = size * typeByteLength;
+  if (byteStride < tightlyPackedByteStride) throw new Error("Byte stride cannot be smaller than the component's byte size.");
+  if (byteStride !== tightlyPackedByteStride) {
+    const copy = new constructor(count);
+    const src = new Uint8Array(buffer, adjustedByteOffset);
+    const dst = new Uint8Array(copy.buffer);
+    const rowBytes = size * typeByteLength;
+    for (let v = 0, s = 0, d = 0; v < totalVertices; v++, s += byteStride, d += rowBytes) dst.set(src.subarray(s, s + rowBytes), d);
+    return copy;
+  }
+  if (typeByteLength !== 1 && (adjustedByteOffset & typeByteLength - 1) !== 0) {
+    Logger.Warn("Array must be aligned to border of element size. Data will be copied.");
+    forceCopy = true;
+  }
+  if (forceCopy) return new constructor(buffer.slice(adjustedByteOffset, adjustedByteOffset + count * typeByteLength));
+  return new constructor(buffer, adjustedByteOffset, count);
+}
+function CopyFloatData(input, size, type, byteOffset, byteStride, normalized, totalVertices, output) {
+  const tightlyPackedByteStride = size * GetTypeByteLength(type);
+  const count = totalVertices * size;
+  if (output.length !== count) throw new Error("Output length is not valid");
+  if (type !== 5126 || byteStride !== tightlyPackedByteStride) {
+    EnumerateFloatValues(input, byteOffset, byteStride, size, type, count, normalized, (values, index) => {
+      for (let i = 0; i < size; i++) output[index + i] = values[i];
+    });
+    return;
+  }
+  if (input instanceof Array) {
+    const offset = byteOffset / 4;
+    output.set(input, offset);
+  } else if (ArrayBuffer.isView(input)) {
+    const offset = input.byteOffset + byteOffset;
+    if ((offset & 3) !== 0) {
+      Logger.Warn("Float array must be aligned to 4-bytes border");
+      output.set(new Float32Array(input.buffer.slice(offset, offset + count * Float32Array.BYTES_PER_ELEMENT)));
+      return;
+    }
+    const floatData = new Float32Array(input.buffer, offset, count);
+    output.set(floatData);
+  } else {
+    const floatData = new Float32Array(input, byteOffset, count);
+    output.set(floatData);
+  }
+}
+function GetBlobBufferSource(view) {
+  const buffer = view.buffer;
+  if (buffer instanceof ArrayBuffer) return view;
+  const unsharedBuffer = new ArrayBuffer(view.byteLength);
+  new Uint8Array(unsharedBuffer).set(new Uint8Array(buffer, view.byteOffset, view.byteLength));
+  return unsharedBuffer;
+}
+function RandomGUID() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    return (c === "x" ? r : r & 3 | 8).toString(16);
+  });
+}
+export {
+  _WarnImport as C,
+  IsNavigatorAvailable as D,
+  IsDocumentAvailable as E,
+  IsWindowObjectExist as O,
+  _MissingSideEffectProperty as S,
+  GetDOMTextContent as T,
+  _GetGlobalDefines as _,
+  GetFloatData as a,
+  _IsSideEffectImplemented as b,
+  TimingTools as c,
+  Initialize as d,
+  Process as f,
+  _ConcatenateShader as g,
+  EngineFunctionContext as h,
+  GetBlobBufferSource as i,
+  _RetryWithInterval as l,
+  _FunctionContainer as m,
+  CopyFloatData as n,
+  GetTypeByteLength as o,
+  ProcessIncludes as p,
+  EnumerateFloatValues as r,
+  GetTypedArrayData as s,
+  RandomGUID as t,
+  Finalize as u,
+  _LoadFile as v,
+  PrecisionDate as w,
+  _MissingSideEffect as x,
+  allocateAndCopyTypedBuffer as y
+};

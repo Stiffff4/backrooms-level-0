@@ -143,6 +143,12 @@ export class PixelRenderPipeline {
     return this.effectiveEffectsSnapshot;
   }
 
+  /** Requests a one-frame color/depth/stencil clear at the bound low-res target. */
+  public requestFrameClear(onCleared?: () => void): void {
+    this.assertActive();
+    this.adapter.requestFrameClear(onCleared);
+  }
+
   /** Requests one coalesced size refresh on the next animation frame. */
   public refresh(): void {
     this.assertActive();

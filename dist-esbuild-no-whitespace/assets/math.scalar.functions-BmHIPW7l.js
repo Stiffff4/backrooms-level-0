@@ -1,0 +1,46 @@
+function WithinEpsilon(a, b, epsilon = 1401298e-51) {
+  return Math.abs(a - b) <= epsilon;
+}
+function RandomRange(min, max) {
+  return min === max ? min : Math.random() * (max - min) + min;
+}
+function Lerp(start, end, amount) {
+  return start + (end - start) * amount;
+}
+function Clamp(value, min = 0, max = 1) {
+  return Math.min(max, Math.max(min, value));
+}
+function NormalizeRadians(angle) {
+  return angle -= Math.PI * 2 * Math.floor((angle + Math.PI) / (Math.PI * 2)), angle;
+}
+function ToHex(i) {
+  const str = i.toString(16);
+  return i <= 15 ? ("0" + str).toUpperCase() : str.toUpperCase();
+}
+function ILog2(value) {
+  if (Math.log2) return Math.floor(Math.log2(value));
+  if (value < 0) return NaN;
+  if (value === 0) return -1 / 0;
+  let n = 0;
+  if (value < 1) {
+    for (; value < 1; )
+      n++, value = value * 2;
+    n = -n;
+  } else if (value > 1) for (; value > 1; )
+    n++, value = Math.floor(value / 2);
+  return n;
+}
+function HighestCommonFactor(a, b) {
+  const r = a % b;
+  return r === 0 ? b : HighestCommonFactor(b, r);
+}
+export {
+  NormalizeRadians as a,
+  WithinEpsilon as c,
+  Lerp as i,
+  HighestCommonFactor as n,
+  RandomRange as o,
+  ILog2 as r,
+  ToHex as s,
+  Clamp as t
+};

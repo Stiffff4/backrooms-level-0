@@ -54,7 +54,7 @@ interface FixtureRecipe {
   readonly enabled: boolean;
 }
 
-const WALL_THICKNESS = 0.2;
+export const MODULAR_WALL_THICKNESS = 0.2;
 const FLOOR_THICKNESS = 0.16;
 const FLOOR_JOIN_OVERLAP = 0.12;
 const TRIM_HEIGHT = 0.14;
@@ -340,7 +340,7 @@ export class ModularRoomBuilder {
             opening.end,
             lintelHeight,
             roomHeight - lintelHeight / 2,
-            WALL_THICKNESS,
+            MODULAR_WALL_THICKNESS,
             uvOffset,
             WALL_UV_METERS_PER_TILE,
           ),
@@ -388,7 +388,7 @@ export class ModularRoomBuilder {
         end,
         roomHeight,
         roomHeight / 2,
-        WALL_THICKNESS,
+        MODULAR_WALL_THICKNESS,
         uvOffset,
         WALL_UV_METERS_PER_TILE,
       ),
@@ -401,7 +401,7 @@ export class ModularRoomBuilder {
         end,
         TRIM_HEIGHT,
         TRIM_HEIGHT / 2,
-        WALL_THICKNESS + TRIM_DEPTH,
+        MODULAR_WALL_THICKNESS + TRIM_DEPTH,
         uvOffset,
         TRIM_UV_METERS_PER_TILE,
       ),

@@ -1,0 +1,66 @@
+import { t as RandomGUID } from "./guid-D83Ubj_G.js";
+import { t as Logger } from "./logger-Ck8R5Aic.js";
+import { a as LoadImage } from "./fileTools.pure-ChVaRlUk.js";
+import { n as AbstractEngine } from "./preload-helper-ClLh1cPK.js";
+import { t as InternalTexture } from "./internalTexture-B93WpvQN.js";
+import { t as _GetCompatibleTextureLoader } from "./textureLoaderManager-CQ-frsbj.js";
+import { t as DDSTools } from "./dds.pure-W4a2iIsw.js";
+function GetExtensionFromUrl(url) {
+  const urlWithoutUriParams = url.split("?")[0], lastDot = urlWithoutUriParams.lastIndexOf(".");
+  return lastDot > -1 ? urlWithoutUriParams.substring(lastDot).toLowerCase() : "";
+}
+var _Registered = !1;
+function RegisterAbstractEngineCubeTexture() {
+  _Registered || (_Registered = !0, AbstractEngine.prototype._partialLoadFile = function(url, index, loadedFiles, onfinish, onErrorCallBack = null) {
+    const onload = (data) => {
+      loadedFiles[index] = data, loadedFiles._internalCount++, loadedFiles._internalCount === 6 && onfinish(loadedFiles);
+    }, onerror = (request, exception) => {
+      onErrorCallBack && request && onErrorCallBack(request.status + " " + request.statusText, exception);
+    };
+    this._loadFile(url, onload, void 0, void 0, !0, onerror);
+  }, AbstractEngine.prototype._cascadeLoadFiles = function(scene, onfinish, files, onError = null) {
+    const loadedFiles = [];
+    loadedFiles._internalCount = 0;
+    for (let index = 0; index < 6; index++) this._partialLoadFile(files[index], index, loadedFiles, onfinish, onError);
+  }, AbstractEngine.prototype._cascadeLoadImgs = function(scene, texture, onfinish, files, onError = null, mimeType) {
+    const loadedImages = [];
+    loadedImages._internalCount = 0;
+    for (let index = 0; index < 6; index++) this._partialLoadImg(files[index], index, loadedImages, scene, texture, onfinish, onError, mimeType);
+  }, AbstractEngine.prototype._partialLoadImg = function(url, index, loadedImages, scene, texture, onfinish, onErrorCallBack = null, mimeType) {
+    const tokenPendingData = RandomGUID();
+    LoadImage(url, (img) => {
+      loadedImages[index] = img, loadedImages._internalCount++, scene && scene.removePendingData(tokenPendingData), loadedImages._internalCount === 6 && onfinish && onfinish(texture, loadedImages);
+    }, (message, exception) => {
+      scene && scene.removePendingData(tokenPendingData), onErrorCallBack && onErrorCallBack(message, exception);
+    }, scene ? scene.offlineProvider : null, mimeType), scene && scene.addPendingData(tokenPendingData);
+  }, AbstractEngine.prototype.createCubeTextureBase = function(rootUrl, scene, files, noMipmap, onLoad = null, onError = null, format, forcedExtension = null, createPolynomials = !1, lodScale = 0, lodOffset = 0, fallback = null, beforeLoadCubeDataCallback = null, imageHandler = null, useSRGBBuffer = !1, buffer = null) {
+    const texture = fallback || new InternalTexture(this, 7);
+    texture.isCube = !0, texture.url = rootUrl, texture.generateMipMaps = !noMipmap, texture._lodGenerationScale = lodScale, texture._lodGenerationOffset = lodOffset, texture._useSRGBBuffer = !!useSRGBBuffer && this._caps.supportSRGBBuffers && (this.version > 1 || this.isWebGPU || !!noMipmap), texture !== fallback && (texture.label = rootUrl.substring(0, 60)), this._doNotHandleContextLost || (texture._extension = forcedExtension, texture._files = files, texture._buffer = buffer);
+    const originalRootUrl = rootUrl;
+    this._transformTextureUrl && !fallback && (rootUrl = this._transformTextureUrl(rootUrl));
+    const loaderPromise = _GetCompatibleTextureLoader(forcedExtension ?? GetExtensionFromUrl(rootUrl)), localOnError = (message, exception) => {
+      texture.dispose(), onError ? onError(message, exception) : message && Logger.Warn(message);
+    }, onInternalError = (request, exception) => {
+      rootUrl === originalRootUrl ? request && localOnError(request.status + " " + request.statusText, exception) : (Logger.Warn(`Failed to load ${rootUrl}, falling back to the ${originalRootUrl}`), this.createCubeTextureBase(originalRootUrl, scene, files, !!noMipmap, onLoad, localOnError, format, forcedExtension, createPolynomials, lodScale, lodOffset, texture, beforeLoadCubeDataCallback, imageHandler, useSRGBBuffer, buffer));
+    };
+    if (loaderPromise) loaderPromise.then((loader) => {
+      const onLoadData = (data) => {
+        beforeLoadCubeDataCallback && beforeLoadCubeDataCallback(texture, data), loader.loadCubeData(data, texture, createPolynomials, onLoad, (message, exception) => {
+          localOnError(message, exception);
+        });
+      };
+      buffer ? onLoadData(buffer) : files && files.length === 6 ? loader.supportCascades ? this._cascadeLoadFiles(scene, (images) => onLoadData(images.map((image) => new Uint8Array(image))), files, localOnError) : localOnError("Textures type does not support cascades.") : this._loadFile(rootUrl, (data) => onLoadData(new Uint8Array(data)), void 0, scene ? scene.offlineProvider || null : void 0, !0, onInternalError);
+    });
+    else {
+      if (!files || files.length === 0) throw new Error("Cannot load cubemap because files were not defined, or the correct loader was not found.");
+      this._cascadeLoadImgs(scene, texture, (texture2, imgs) => {
+        imageHandler && imageHandler(texture2, imgs);
+      }, files, localOnError);
+    }
+    return this._internalTexturesCache.push(texture), texture;
+  });
+}
+RegisterAbstractEngineCubeTexture();
+export {
+  DDSTools
+};

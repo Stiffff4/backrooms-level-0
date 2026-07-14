@@ -14,6 +14,8 @@ async function enterAndApproachExit(page: Page, withAudio = false): Promise<void
   );
   const app = page.locator('#app');
   await expect(app).toHaveAttribute('data-exit-spawned', 'true');
+  await expect(app).toHaveAttribute('data-exit-state', 'active');
+  await expect(app).toHaveAttribute('data-exit-trigger-active', 'true');
   await expect(app).toHaveAttribute('data-exit-forced', 'true');
   await expect(app).toHaveAttribute('data-exit-force-reason', 'debug');
   await expect(app).toHaveAttribute('data-exit-protected', 'true');

@@ -8,7 +8,7 @@
 
 ## Estado de release 1.0.0
 
-- Ningún defecto bloqueante conocido tras la Fase 9.
+- El bloqueo reproducible de salida invisible en `threshold-2026-07-14 / room-0137` fue corregido en código y cubierto por regresión; queda pendiente confirmar manualmente el artefacto aplicado antes de cerrar el hotfix.
 - No hay tests ignorados, fallos de consola conocidos, assets de procedencia desconocida ni
   vulnerabilidades npm detectadas en el lockfile actual.
 

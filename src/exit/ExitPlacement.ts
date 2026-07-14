@@ -56,3 +56,27 @@ export function translateExitWallPlacement(
     }),
   });
 }
+
+/**
+ * Moves a nominal room-boundary placement onto the visible interior face of
+ * the room wall. Room catalog exit surfaces live on the logical footprint
+ * boundary, while rendered walls extend inward by their full thickness.
+ */
+export function insetExitWallPlacement(
+  placement: ExitWallPlacement,
+  inwardDistance: number,
+): ExitWallPlacement {
+  const normalized = normalizeExitWallPlacement(placement);
+  assertFinite(inwardDistance, 'exit placement inwardDistance');
+  if (inwardDistance < 0) {
+    throw new RangeError('Exit placement inwardDistance must be non-negative.');
+  }
+  return Object.freeze({
+    ...normalized,
+    center: Object.freeze({
+      x: normalized.center.x + normalized.inwardNormal.x * inwardDistance,
+      y: normalized.center.y + normalized.inwardNormal.y * inwardDistance,
+      z: normalized.center.z + normalized.inwardNormal.z * inwardDistance,
+    }),
+  });
+}

@@ -1,0 +1,53 @@
+THRESHOLD — DISTRIBUTION NOTICE
+===============================
+
+THRESHOLD is a browser game created by contributors to this repository.
+
+BACKROOMS WIKI ADAPTATION
+-------------------------
+
+This game adapts “Level 0 — Threshold” from Backrooms Wiki:
+https://backrooms-wiki.wikidot.com/level-0
+
+Credited authors: DivineAtlas, DrAkimoto and RobertGoerman, plus contributors identified in the
+revision history of the source page.
+Source license: Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0).
+License: https://creativecommons.org/licenses/by-sa/3.0/
+Wiki licensing guide: https://backrooms-wiki.wikidot.com/licensing-guide
+
+Adapted elements include the Level 0 name and general description, its yellow office architecture,
+fluorescent hum, damp carpet, and the concept of a flickering wall as an exit toward Level 1.
+THRESHOLD changes these elements into a seeded procedural first-person game with original runtime
+geometry, procedural textures, synthesized audio, controlled anomalies and an original ending UI.
+No images from the wiki were copied. Backrooms Wiki and its contributors do not endorse this game.
+
+The adapted creative content is offered under CC BY-SA 3.0 to the extent applicable. The source
+repository contains the full scope statement and legal caution in LICENSE-CONTENT.md.
+
+ORIGINAL PROJECT ASSETS
+-----------------------
+
+The 12 PNG textures in assets/generated/, the project favicon, and runtime audio synthesis recipes
+are original local work. The generated texture manifest records seed, dimensions, SHA-256 and the
+CC0-1.0 SPDX identifier. No external image, model, recording, music or font is loaded by the game.
+CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
+
+PROJECT CODE
+------------
+
+Original project code is offered under the MIT License to the extent the contributors have the
+right to license it. That license does not relicense adapted content, project assets under a
+different license, or third-party components. The full permission and warranty text is included in
+PROJECT-MIT.txt; the source distribution also contains LICENSE-CODE.md.
+
+THIRD-PARTY SOFTWARE
+--------------------
+
+The runtime bundle uses Babylon.js 9.16.1 under Apache License 2.0.
+Copyright 2023 The Babylon.js team.
+
+The supplied Apache license is in BABYLON-APACHE-2.0.md and Babylon.js attribution notices are in
+BABYLON-NOTICE.md. Third-party names and marks belong to their respective owners.
+
+This notice documents provenance and intended licensing; it is not legal advice. Obtain legal
+review before commercial publication or relicensing.

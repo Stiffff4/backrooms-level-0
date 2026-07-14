@@ -13,8 +13,17 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: normalizeBasePath(env.VITE_BASE_PATH),
+    esbuild: {
+      // Both tested Oxc minification and esbuild identifier mangling reduce the
+      // Babylon scene to its clear/fog buffer in production. Esbuild remains
+      // correct when bindings stay stable while syntax/whitespace are minified.
+      minifyIdentifiers: false,
+      minifySyntax: false,
+      minifyWhitespace: false,
+    },
     build: {
       target: 'es2022',
+      minify: 'esbuild',
       sourcemap: mode !== 'production',
       chunkSizeWarningLimit: 1_250,
     },

@@ -2,7 +2,7 @@
 export const exitPresentationConfig = Object.freeze({
   visual: Object.freeze({
     thickness: 0.055,
-    surfaceOffset: 0.032,
+    surfaceOffset: 0.05,
     minimumLightResponse: 0.845,
     reducedMinimumLightResponse: 0.925,
     maximumLightResponse: 1,

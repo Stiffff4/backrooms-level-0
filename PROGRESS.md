@@ -379,3 +379,32 @@ en 1,100 kB, después de medir el bundle y sin modificar los presupuestos de pro
 
 **Estado final:** Fases 0–9 y Definition of Done completadas. La publicación pública permanece fuera
 del alcance autorizado; el mismo artefacto fue validado mediante URL HTTP local de raíz y subruta.
+
+## Hotfix QA — salida oculta en paredes renderizadas
+
+- QA humano reprodujo el bloqueo con la seed `threshold-2026-07-14`: el HUD asignaba
+  `room-0137` como habitación de salida después de 16 rebases, pero no existía una pared visible y
+  la partida no podía completarse de forma descubrible.
+- La causa raíz fue una discrepancia espacial entre el catálogo y el render: las superficies
+  `exitCompatible` viven en el límite lógico de la habitación, mientras `ModularRoomBuilder` desplaza
+  las paredes 0.2 m hacia el interior. La presentación de salida se construía en el límite y quedaba
+  enterrada dentro de la pared normal.
+- `MODULAR_WALL_THICKNESS` ahora es una constante compartida; `App` desplaza la colocación completa
+  de la salida hasta la cara interior renderizada antes de crear visual, trigger y audio.
+- El overlay tiene 0.05 m adicionales de separación visual para evitar oclusión/z-fighting sin
+  cambiar la posición lógica del trigger respecto a la cara transitable.
+- El HUD debug distingue salida `ACTIVE`, `RESERVED`, `ELIGIBLE` y `LOCKED`, y expone estado del
+  trigger y posición mundial.
+- Se añadió una regresión específica para `threshold-2026-07-14 / room-0137` que verifica visibilidad
+  delante de la pared, trigger funcional y conservación tras 16 rebases.
+
+### Validación del hotfix
+
+- TypeScript strict: correcto.
+- Build de producción: correcto, 557 módulos.
+- Suite unitaria completa: 45 archivos / 184 tests correctos con timeout ampliado para la simulación
+  pesada de streaming; la prueba lenta aislada también pasa.
+- Regresiones focales de salida: correctas, incluida la seed reportada y el trigger tras rebases.
+- ESLint y Prettier de los archivos modificados: correctos.
+- El navegador E2E no pudo ejecutarse en el entorno de reparación porque el acceso automatizado a
+  localhost está bloqueado por política; queda pendiente el QA humano final de la build aplicada.

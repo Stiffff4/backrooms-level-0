@@ -35,6 +35,7 @@ import { QualityManager } from '../rendering/QualityManager';
 import { LightingDirector, type LightingFrameSnapshot } from '../lighting/LightingDirector';
 import { FIXTURE_FLICKER_PROFILES, type FixtureFlickerProfile } from '../lighting/lighting.types';
 import { ModularWorld } from '../rooms/ModularWorld';
+import { MODULAR_WALL_THICKNESS } from '../rooms/builders/ModularRoomBuilder';
 import type { BuiltModularRoom } from '../rooms/rendering/rendering.types';
 import { ExitDirector } from '../exit/ExitDirector';
 import type { ExitCandidate, ExitReservation, ExitSnapshot } from '../exit/exit.types';
@@ -42,6 +43,7 @@ import type { ExitWallPlacement } from '../exit/exit.presentation.types';
 import { exitPresentationConfig } from '../exit/exit.presentation.config';
 import { ExitAudioBeacon } from '../exit/ExitAudioBeacon';
 import { ExitWallPresentation } from '../exit/ExitWallPresentation';
+import { insetExitWallPlacement } from '../exit/ExitPlacement';
 import { TensionDirector } from '../tension/TensionDirector';
 import {
   TENSION_EVENT_TYPES,
@@ -129,6 +131,7 @@ export class App {
   private currentRoomDefinitionId: string | null = null;
   private advancedRoomCount = 0;
   private debugStreamingAdvanceToken = 0;
+  private debugFrameClearRevision = 0;
   private debugTensionElapsedSeconds: number | null = null;
   private lastMovementAtSeconds = 0;
   private lastAppliedTensionRevision = -1;
@@ -258,6 +261,19 @@ export class App {
     } catch {
       this.root.dataset.debugContextLoss = 'failed';
     }
+  };
+
+  private readonly handleDebugForceFrameClear = (): void => {
+    if (!this.debugOptions.debug || !this.pixelPipeline) {
+      return;
+    }
+    const revision = ++this.debugFrameClearRevision;
+    this.root.dataset.debugFrameClear = `pending-${String(revision)}`;
+    this.pixelPipeline.requestFrameClear(() => {
+      if (!this.disposed) {
+        this.root.dataset.debugFrameClear = String(revision);
+      }
+    });
   };
 
   private readonly handleWindowBlur = (): void => {
@@ -414,6 +430,10 @@ export class App {
         this.root.addEventListener('backrooms:debug-tension-event', this.handleDebugTensionEvent);
         this.root.addEventListener('backrooms:debug-approach-exit', this.handleDebugApproachExit);
         this.root.addEventListener('backrooms:debug-context-loss', this.handleDebugContextLoss);
+        this.root.addEventListener(
+          'backrooms:debug-force-frame-clear',
+          this.handleDebugForceFrameClear,
+        );
       }
 
       this.startRenderLoop();
@@ -452,6 +472,10 @@ export class App {
     this.root.removeEventListener('backrooms:debug-tension-event', this.handleDebugTensionEvent);
     this.root.removeEventListener('backrooms:debug-approach-exit', this.handleDebugApproachExit);
     this.root.removeEventListener('backrooms:debug-context-loss', this.handleDebugContextLoss);
+    this.root.removeEventListener(
+      'backrooms:debug-force-frame-clear',
+      this.handleDebugForceFrameClear,
+    );
     this.stopRenderLoop();
     this.contextRecovery?.dispose();
     this.contextRecovery = null;
@@ -732,7 +756,7 @@ export class App {
       `RENDER ${this.qualityManager.presetName.toUpperCase()} ${renderMetrics?.bufferWidth ?? 0}x${renderMetrics?.bufferHeight ?? 0}`,
       `LIGHTS ${this.lightingSnapshot?.metrics.pool.activeLightCount ?? 0}/${this.lightingSnapshot?.metrics.pool.activeBudget ?? 0} / ${this.lightingSnapshot?.metrics.animatedFixtureCount ?? 0} FLICKER`,
       `TENSION ${this.tensionSnapshot?.phase.toUpperCase() ?? 'OFF'} ${(this.tensionSnapshot?.intensity ?? 0).toFixed(2)} / ${this.tensionSnapshot?.activeEventType ?? 'QUIET'}`,
-      `EXIT ${this.exitSnapshot?.exitSpawned ? this.exitReservation?.roomId : this.exitSnapshot?.eligible ? `${(this.exitSnapshot.probability * 100).toFixed(1)}%` : 'LOCKED'}`,
+      `EXIT ${this.exitPresentation ? `ACTIVE ${this.exitReservation?.roomId ?? 'unknown'}` : this.exitSnapshot?.exitSpawned ? `RESERVED ${this.exitReservation?.roomId ?? 'unknown'}` : this.exitSnapshot?.eligible ? `ELIGIBLE ${(this.exitSnapshot.probability * 100).toFixed(1)}%` : 'LOCKED'}`,
       `SEED ${this.debugOptions.seed}`,
     ]);
   }
@@ -1369,7 +1393,7 @@ export class App {
       new Vector3(surface.localForward.x, surface.localForward.y, surface.localForward.z),
       matrix,
     ).normalize();
-    const placement: ExitWallPlacement = {
+    const nominalPlacement: ExitWallPlacement = {
       roomId: reservation.roomId,
       surfaceId: reservation.surfaceId,
       center,
@@ -1378,6 +1402,12 @@ export class App {
       height: surface.height,
       seed: reservation.seed,
     };
+    // Catalog surfaces are placed on the logical room boundary. The rendered
+    // wall occupies MODULAR_WALL_THICKNESS metres inside that boundary, so an
+    // uninset exit overlay is buried inside the normal wall and becomes
+    // invisible. Move the complete placement (visual, trigger and audio) onto
+    // the interior wall face before creating the presentation.
+    const placement = insetExitWallPlacement(nominalPlacement, MODULAR_WALL_THICKNESS);
     this.exitPresentation?.dispose();
     this.exitPresentation = new ExitWallPresentation(scene, placement, world.materialLibrary.wall, {
       reducedFlashing: this.settings.value.reducedFlashing,
@@ -1444,6 +1474,16 @@ export class App {
   private syncExitDebugSnapshot(): void {
     const snapshot = this.exitSnapshot;
     const reservation = this.exitReservation;
+    const state = this.exitPresentation
+      ? 'active'
+      : reservation
+        ? 'reserved'
+        : snapshot?.forcedPending
+          ? 'forced-pending'
+          : snapshot?.eligible
+            ? 'eligible'
+            : 'locked';
+    this.root.dataset.exitState = state;
     this.root.dataset.exitEligible = String(snapshot?.eligible ?? false);
     this.root.dataset.exitProbability = (snapshot?.probability ?? 0).toFixed(5);
     this.root.dataset.exitForcedPending = String(snapshot?.forcedPending ?? false);
@@ -1461,6 +1501,11 @@ export class App {
         this.modularWorld?.isRoomLoaded(reservation.roomId),
     );
     this.root.dataset.exitVisualMeshes = String(this.exitPresentation?.meshes.length ?? 0);
+    this.root.dataset.exitTriggerActive = String(this.exitPresentation !== null);
+    const placement = this.exitPresentation?.placement;
+    this.root.dataset.exitWorldPosition = placement
+      ? `${placement.center.x.toFixed(3)},${placement.center.y.toFixed(3)},${placement.center.z.toFixed(3)}`
+      : '';
     this.root.dataset.exitAudioNodes = String(this.exitAudioBeacon?.nodeCount ?? 0);
     this.root.dataset.exitAudioActive = String(this.exitAudioBeacon?.snapshot.active ?? false);
     this.root.dataset.exitAudioTransitionPlayed = String(
@@ -1736,6 +1781,8 @@ export class App {
     this.root.dataset.playerMoving = String(movement.moving);
     this.root.dataset.playerSprinting = String(movement.sprinting);
     this.root.dataset.playerGrounded = String(movement.grounded);
+    this.root.dataset.cameraYaw = this.player.camera.rotation.y.toFixed(6);
+    this.root.dataset.cameraPitch = this.player.camera.rotation.x.toFixed(6);
     this.root.dataset.elapsedSeconds = this.clock.elapsedSeconds.toFixed(2);
     this.root.dataset.fps = (this.engineBootstrap?.engine.getFps() ?? 0).toFixed(1);
     this.syncAudioDebugSnapshot();

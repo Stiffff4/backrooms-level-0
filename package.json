@@ -32,8 +32,9 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@types/node": "24.13.3",
     "@playwright/test": "1.61.1",
+    "@types/node": "24.13.3",
+    "esbuild": "0.28.0",
     "eslint": "10.7.0",
     "eslint-config-prettier": "10.1.8",
     "fast-check": "4.9.0",

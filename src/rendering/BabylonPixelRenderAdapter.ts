@@ -78,7 +78,9 @@ void main(void) {
   float grain = spatialNoise(stablePixel) - 0.5;
   color += vec3(grain * grainStrength);
 
-  gl_FragColor = vec4(clamp(color, 0.0, 1.0), source.a);
+  // The fullscreen composition pass is deliberately opaque. The game canvas is
+  // configured without alpha and no previous framebuffer content may contribute.
+  gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
 }
 `;
 
@@ -119,7 +121,11 @@ export class BabylonPixelRenderAdapter implements PixelRenderAdapter {
       reusable: false,
     });
     this.postProcess.enablePixelPerfectMode = true;
-    this.postProcess.autoClear = false;
+    // Babylon binds the first postprocess input target after Scene has cleared
+    // the default framebuffer. This target therefore owns its per-frame clear.
+    this.postProcess.autoClear = true;
+    this.postProcess.alphaMode = Constants.ALPHA_DISABLE;
+    this.postProcess.forceAutoClearInAlphaMode = true;
     this.postProcess.samples = 1;
     this.postProcess.onApply = (effect): void => {
       effect.setFloat2(
@@ -143,6 +149,24 @@ export class BabylonPixelRenderAdapter implements PixelRenderAdapter {
   public setPostProcessSettings(settings: PixelPostProcessSettings): void {
     this.assertActive();
     this.settings = Object.freeze({ ...settings });
+  }
+
+  /**
+   * Clears the postprocess input target on its next activation. This is used by
+   * deterministic debug QA to compare a rendered frame with a known-clean frame
+   * at the exact same camera pose; the normal path already clears every frame.
+   */
+  public requestFrameClear(onCleared?: () => void): void {
+    this.assertActive();
+    const scene = this.attachedCamera?.getScene();
+    if (!scene) {
+      onCleared?.();
+      return;
+    }
+    this.postProcess.onActivateObservable.addOnce(() => {
+      this.engine.clear(scene.clearColor, true, true, true);
+      onCleared?.();
+    });
   }
 
   public attach(camera: Camera): void {

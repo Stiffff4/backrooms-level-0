@@ -1,0 +1,289 @@
+var IsWeakRefSupported = typeof WeakRef !== "undefined";
+var EventState = class {
+  constructor(mask, skipNextObservers = false, target, currentTarget) {
+    this.initialize(mask, skipNextObservers, target, currentTarget);
+  }
+  initialize(mask, skipNextObservers = false, target, currentTarget) {
+    this.mask = mask;
+    this.skipNextObservers = skipNextObservers;
+    this.target = target;
+    this.currentTarget = currentTarget;
+    return this;
+  }
+};
+var Observer = class {
+  constructor(callback, mask, scope = null) {
+    this.callback = callback;
+    this.mask = mask;
+    this.scope = scope;
+    this._willBeUnregistered = false;
+    this.unregisterOnNextCall = false;
+    this._remove = null;
+  }
+  remove(defer = false) {
+    if (this._remove) this._remove(defer);
+  }
+};
+var Observable = class Observable2 {
+  static FromPromise(promise, onErrorObservable) {
+    const observable = new Observable2();
+    promise.then((ret) => {
+      observable.notifyObservers(ret);
+    }).catch((err) => {
+      if (onErrorObservable) onErrorObservable.notifyObservers(err);
+      else throw err;
+    });
+    return observable;
+  }
+  get observers() {
+    return this._observers;
+  }
+  constructor(onObserverAdded, notifyIfTriggered = false) {
+    this.notifyIfTriggered = notifyIfTriggered;
+    this._observers = new Array();
+    this._numObserversMarkedAsDeleted = 0;
+    this._hasNotified = false;
+    this._eventState = new EventState(0);
+    if (onObserverAdded) this._onObserverAdded = onObserverAdded;
+  }
+  add(callback, mask = -1, insertFirst = false, scope = null, unregisterOnFirstCall = false) {
+    if (!callback) return null;
+    const observer = new Observer(callback, mask, scope);
+    observer.unregisterOnNextCall = unregisterOnFirstCall;
+    if (insertFirst) this._observers.unshift(observer);
+    else this._observers.push(observer);
+    if (this._onObserverAdded) this._onObserverAdded(observer);
+    if (this._hasNotified && this.notifyIfTriggered) {
+      if (this._lastNotifiedValue !== void 0) this.notifyObserver(observer, this._lastNotifiedValue);
+    }
+    const observableWeakRef = IsWeakRefSupported ? new WeakRef(this) : { deref: () => this };
+    observer._remove = (defer = false) => {
+      const observable = observableWeakRef.deref();
+      if (observable) defer ? observable.remove(observer) : observable._remove(observer);
+    };
+    return observer;
+  }
+  addOnce(callback) {
+    return this.add(callback, void 0, void 0, void 0, true);
+  }
+  remove(observer) {
+    if (!observer) return false;
+    observer._remove = null;
+    if (this._observers.indexOf(observer) !== -1) {
+      this._deferUnregister(observer);
+      return true;
+    }
+    return false;
+  }
+  removeCallback(callback, scope) {
+    for (let index = 0; index < this._observers.length; index++) {
+      const observer = this._observers[index];
+      if (observer._willBeUnregistered) continue;
+      if (observer.callback === callback && (!scope || scope === observer.scope)) {
+        this._deferUnregister(observer);
+        return true;
+      }
+    }
+    return false;
+  }
+  _deferUnregister(observer) {
+    if (observer._willBeUnregistered) return;
+    this._numObserversMarkedAsDeleted++;
+    observer.unregisterOnNextCall = false;
+    observer._willBeUnregistered = true;
+    setTimeout(() => {
+      this._remove(observer);
+    }, 0);
+  }
+  _remove(observer, updateCounter = true) {
+    if (!observer) return false;
+    const index = this._observers.indexOf(observer);
+    if (index !== -1) {
+      if (updateCounter) this._numObserversMarkedAsDeleted--;
+      this._observers.splice(index, 1);
+      return true;
+    }
+    return false;
+  }
+  makeObserverTopPriority(observer) {
+    this._remove(observer, false);
+    this._observers.unshift(observer);
+  }
+  makeObserverBottomPriority(observer) {
+    this._remove(observer, false);
+    this._observers.push(observer);
+  }
+  notifyObservers(eventData, mask = -1, target, currentTarget, userInfo) {
+    if (this.notifyIfTriggered) {
+      this._hasNotified = true;
+      this._lastNotifiedValue = eventData;
+    }
+    if (!this._observers.length) return true;
+    const state = this._eventState;
+    state.mask = mask;
+    state.target = target;
+    state.currentTarget = currentTarget;
+    state.skipNextObservers = false;
+    state.lastReturnValue = eventData;
+    state.userInfo = userInfo;
+    for (const obs of this._observers) {
+      if (obs._willBeUnregistered) continue;
+      if (obs.mask & mask) {
+        if (obs.unregisterOnNextCall) this._deferUnregister(obs);
+        if (obs.scope) state.lastReturnValue = obs.callback.apply(obs.scope, [eventData, state]);
+        else state.lastReturnValue = obs.callback(eventData, state);
+      }
+      if (state.skipNextObservers) return false;
+    }
+    return true;
+  }
+  notifyObserver(observer, eventData, mask = -1) {
+    if (this.notifyIfTriggered) {
+      this._hasNotified = true;
+      this._lastNotifiedValue = eventData;
+    }
+    if (observer._willBeUnregistered) return;
+    const state = this._eventState;
+    state.mask = mask;
+    state.skipNextObservers = false;
+    if (observer.unregisterOnNextCall) this._deferUnregister(observer);
+    observer.callback(eventData, state);
+  }
+  hasObservers() {
+    return this._observers.length - this._numObserversMarkedAsDeleted > 0;
+  }
+  clear() {
+    while (this._observers.length) {
+      const o = this._observers.pop();
+      if (o) o._remove = null;
+    }
+    this._onObserverAdded = null;
+    this._numObserversMarkedAsDeleted = 0;
+    this.cleanLastNotifiedState();
+  }
+  cleanLastNotifiedState() {
+    this._hasNotified = false;
+    this._lastNotifiedValue = void 0;
+  }
+  clone() {
+    const result = new Observable2();
+    result._observers = this._observers.slice(0);
+    return result;
+  }
+  hasSpecificMask(mask = -1) {
+    for (const obs of this._observers) if (obs.mask & mask || obs.mask === mask) return true;
+    return false;
+  }
+};
+var EngineStore = class {
+  static get LastCreatedEngine() {
+    if (this.Instances.length === 0) return null;
+    return this.Instances[this.Instances.length - 1];
+  }
+  static get LastCreatedScene() {
+    return this._LastCreatedScene;
+  }
+};
+EngineStore.Instances = [];
+EngineStore.OnEnginesDisposedObservable = new Observable();
+EngineStore._LastCreatedScene = null;
+EngineStore.UseFallbackTexture = true;
+EngineStore.FallbackTexture = "";
+var Tables = null;
+function GenerateTables() {
+  if (Tables) return Tables;
+  const buffer = /* @__PURE__ */ new ArrayBuffer(4);
+  const floatView = new Float32Array(buffer);
+  const uint32View = new Uint32Array(buffer);
+  const baseTable = /* @__PURE__ */ new Uint32Array(512);
+  const shiftTable = /* @__PURE__ */ new Uint32Array(512);
+  for (let i = 0; i < 256; ++i) {
+    const e = i - 127;
+    if (e < -24) {
+      baseTable[i] = 0;
+      baseTable[i | 256] = 32768;
+      shiftTable[i] = 24;
+      shiftTable[i | 256] = 24;
+    } else if (e < -14) {
+      baseTable[i] = 1024 >> -e - 14;
+      baseTable[i | 256] = 1024 >> -e - 14 | 32768;
+      shiftTable[i] = -e - 1;
+      shiftTable[i | 256] = -e - 1;
+    } else if (e <= 15) {
+      baseTable[i] = e + 15 << 10;
+      baseTable[i | 256] = e + 15 << 10 | 32768;
+      shiftTable[i] = 13;
+      shiftTable[i | 256] = 13;
+    } else if (e < 128) {
+      baseTable[i] = 31744;
+      baseTable[i | 256] = 64512;
+      shiftTable[i] = 24;
+      shiftTable[i | 256] = 24;
+    } else {
+      baseTable[i] = 31744;
+      baseTable[i | 256] = 64512;
+      shiftTable[i] = 13;
+      shiftTable[i | 256] = 13;
+    }
+  }
+  const mantissaTable = /* @__PURE__ */ new Uint32Array(2048);
+  const exponentTable = /* @__PURE__ */ new Uint32Array(64);
+  const offsetTable = /* @__PURE__ */ new Uint32Array(64);
+  for (let i = 1; i < 1024; ++i) {
+    let m = i << 13;
+    let e = 0;
+    while ((m & 8388608) === 0) {
+      m <<= 1;
+      e -= 8388608;
+    }
+    m &= -8388609;
+    e += 947912704;
+    mantissaTable[i] = m | e;
+  }
+  for (let i = 1024; i < 2048; ++i) mantissaTable[i] = 939524096 + (i - 1024 << 13);
+  for (let i = 1; i < 31; ++i) exponentTable[i] = i << 23;
+  exponentTable[31] = 1199570944;
+  exponentTable[32] = 2147483648;
+  for (let i = 33; i < 63; ++i) exponentTable[i] = 2147483648 + (i - 32 << 23);
+  exponentTable[63] = 3347054592;
+  for (let i = 1; i < 64; ++i) if (i !== 32) offsetTable[i] = 1024;
+  Tables = {
+    floatView,
+    uint32View,
+    baseTable,
+    shiftTable,
+    mantissaTable,
+    exponentTable,
+    offsetTable
+  };
+  return Tables;
+}
+var MaxHalfFloat = 65504;
+function ToHalfFloat(value) {
+  const tables = GenerateTables();
+  tables.floatView[0] = value;
+  const f = tables.uint32View[0];
+  const e = f >> 23 & 511;
+  return tables.baseTable[e] + ((f & 8388607) >> tables.shiftTable[e]);
+}
+function FromHalfFloat(value) {
+  const tables = GenerateTables();
+  tables.uint32View[0] = tables.mantissaTable[tables.offsetTable[value >> 10] + (value & 1023)] + tables.exponentTable[value >> 10];
+  return tables.floatView[0];
+}
+var RegisteredTypes = {};
+function RegisterClass(className, type) {
+  RegisteredTypes[className] = type;
+}
+function GetClass(fqdn) {
+  return RegisteredTypes[fqdn];
+}
+export {
+  ToHalfFloat as a,
+  MaxHalfFloat as i,
+  RegisterClass as n,
+  EngineStore as o,
+  FromHalfFloat as r,
+  Observable as s,
+  GetClass as t
+};

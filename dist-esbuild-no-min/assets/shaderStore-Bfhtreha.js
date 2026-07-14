@@ -1,0 +1,20 @@
+var ShaderStore = class ShaderStore2 {
+  static GetShadersRepository(shaderLanguage = 0) {
+    return shaderLanguage === 0 ? ShaderStore2.ShadersRepository : ShaderStore2.ShadersRepositoryWGSL;
+  }
+  static GetShadersStore(shaderLanguage = 0) {
+    return shaderLanguage === 0 ? ShaderStore2.ShadersStore : ShaderStore2.ShadersStoreWGSL;
+  }
+  static GetIncludesShadersStore(shaderLanguage = 0) {
+    return shaderLanguage === 0 ? ShaderStore2.IncludesShadersStore : ShaderStore2.IncludesShadersStoreWGSL;
+  }
+};
+ShaderStore.ShadersRepository = "src/Shaders/";
+ShaderStore.ShadersStore = {};
+ShaderStore.IncludesShadersStore = {};
+ShaderStore.ShadersRepositoryWGSL = "src/ShadersWGSL/";
+ShaderStore.ShadersStoreWGSL = {};
+ShaderStore.IncludesShadersStoreWGSL = {};
+export {
+  ShaderStore as t
+};

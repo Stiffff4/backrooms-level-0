@@ -32,6 +32,7 @@ export interface EffectivePixelEffects
 export interface PixelRenderAdapter {
   setBufferSize(metrics: PixelBufferMetrics): void;
   setPostProcessSettings(settings: PixelPostProcessSettings): void;
+  requestFrameClear(onCleared?: () => void): void;
   attach(camera: Camera): void;
   detach(camera: Camera): void;
   dispose(): void;

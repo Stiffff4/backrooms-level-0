@@ -400,3 +400,15 @@ La suite principal permanece serial en Chromium por el presupuesto GPU compartid
 separada prueba el flujo normal y el fallback sin WebGL en Chromium, Firefox y Edge actuales; Safari y
 móviles permanecen fuera del alcance. Los números de rendimiento automatizado registran explícitamente
 SwiftShader para no presentarlos como benchmark de una GPU física.
+
+## D-047 — Las superficies de salida se proyectan sobre la cara interior renderizada
+
+**Estado:** aceptada — hotfix posterior a 1.0.0.
+
+Las `exitCompatibleSurfaces` del catálogo describen el límite lógico de la huella. Las paredes
+modulares, en cambio, ocupan todo su grosor hacia el interior para evitar geometría coplanar entre
+habitaciones. Crear la salida directamente sobre el límite ocultaba el overlay detrás de la pared
+normal. La colocación nominal se desplaza ahora exactamente `MODULAR_WALL_THICKNESS` a lo largo de su
+normal interior y luego la presentación añade solo una separación visual pequeña. Visual, trigger y
+beacon comparten la misma colocación y reciben juntos los rebases, evitando constantes duplicadas y
+deriva entre sistemas.

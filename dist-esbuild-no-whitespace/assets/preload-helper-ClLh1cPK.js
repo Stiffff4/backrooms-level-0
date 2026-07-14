@@ -1,0 +1,1743 @@
+import { o as EngineStore, s as Observable } from "./typeStore-BMcSg10V.js";
+import { C as _WarnImport, D as IsNavigatorAvailable, E as IsDocumentAvailable, O as IsWindowObjectExist, T as GetDOMTextContent, d as Initialize, f as Process, g as _ConcatenateShader, h as EngineFunctionContext, l as _RetryWithInterval, u as Finalize, v as _LoadFile, w as PrecisionDate } from "./guid-D83Ubj_G.js";
+import { t as Logger } from "./logger-Ck8R5Aic.js";
+import { m as PerformanceConfigurator } from "./math.color.pure-DA4Mm_Z5.js";
+import { t as ShaderStore } from "./shaderStore-Bfhtreha.js";
+import { t as InternalTexture } from "./internalTexture-B93WpvQN.js";
+var WebGLPipelineContext = class {
+  constructor() {
+    this._valueCache = {}, this.vertexCompilationError = null, this.fragmentCompilationError = null, this.programLinkError = null, this.programValidationError = null, this._isDisposed = !1;
+  }
+  get isAsync() {
+    return this.isParallelCompiled;
+  }
+  get isReady() {
+    return this.program ? this.isParallelCompiled ? this.engine._isRenderingStateCompiled(this) : !0 : !1;
+  }
+  _handlesSpectorRebuildCallback(onCompiled) {
+    onCompiled && this.program && onCompiled(this.program);
+  }
+  setEngine(engine) {
+    this.engine = engine;
+  }
+  _fillEffectInformation(effect, uniformBuffersNames, uniformsNames, uniforms, samplerList, samplers, attributesNames, attributes) {
+    const engine = this.engine;
+    if (engine.supportsUniformBuffers) for (const name in uniformBuffersNames) effect.bindUniformBlock(name, uniformBuffersNames[name]);
+    this.engine.getUniforms(this, uniformsNames).forEach((uniform, index2) => {
+      uniforms[uniformsNames[index2]] = uniform;
+    }), this._uniforms = uniforms;
+    let index;
+    for (index = 0; index < samplerList.length; index++) effect.getUniform(samplerList[index]) == null && (samplerList.splice(index, 1), index--);
+    samplerList.forEach((name, index2) => {
+      samplers[name] = index2;
+    });
+    for (const attr of engine.getAttributes(this, attributesNames)) attributes.push(attr);
+  }
+  dispose() {
+    this._uniforms = {}, this._isDisposed = !0;
+  }
+  _cacheMatrix(uniformName, matrix) {
+    const cache = this._valueCache[uniformName], flag = matrix.updateFlag;
+    return cache !== void 0 && cache === flag ? !1 : (this._valueCache[uniformName] = flag, !0);
+  }
+  _cacheFloat2(uniformName, x, y) {
+    let cache = this._valueCache[uniformName];
+    if (!cache || cache.length !== 2)
+      return cache = [x, y], this._valueCache[uniformName] = cache, !0;
+    let changed = !1;
+    return cache[0] !== x && (cache[0] = x, changed = !0), cache[1] !== y && (cache[1] = y, changed = !0), changed;
+  }
+  _cacheFloat3(uniformName, x, y, z) {
+    let cache = this._valueCache[uniformName];
+    if (!cache || cache.length !== 3)
+      return cache = [
+        x,
+        y,
+        z
+      ], this._valueCache[uniformName] = cache, !0;
+    let changed = !1;
+    return cache[0] !== x && (cache[0] = x, changed = !0), cache[1] !== y && (cache[1] = y, changed = !0), cache[2] !== z && (cache[2] = z, changed = !0), changed;
+  }
+  _cacheFloat4(uniformName, x, y, z, w) {
+    let cache = this._valueCache[uniformName];
+    if (!cache || cache.length !== 4)
+      return cache = [
+        x,
+        y,
+        z,
+        w
+      ], this._valueCache[uniformName] = cache, !0;
+    let changed = !1;
+    return cache[0] !== x && (cache[0] = x, changed = !0), cache[1] !== y && (cache[1] = y, changed = !0), cache[2] !== z && (cache[2] = z, changed = !0), cache[3] !== w && (cache[3] = w, changed = !0), changed;
+  }
+  setInt(uniformName, value) {
+    const cache = this._valueCache[uniformName];
+    cache !== void 0 && cache === value || this.engine.setInt(this._uniforms[uniformName], value) && (this._valueCache[uniformName] = value);
+  }
+  setInt2(uniformName, x, y) {
+    this._cacheFloat2(uniformName, x, y) && (this.engine.setInt2(this._uniforms[uniformName], x, y) || (this._valueCache[uniformName] = null));
+  }
+  setInt3(uniformName, x, y, z) {
+    this._cacheFloat3(uniformName, x, y, z) && (this.engine.setInt3(this._uniforms[uniformName], x, y, z) || (this._valueCache[uniformName] = null));
+  }
+  setInt4(uniformName, x, y, z, w) {
+    this._cacheFloat4(uniformName, x, y, z, w) && (this.engine.setInt4(this._uniforms[uniformName], x, y, z, w) || (this._valueCache[uniformName] = null));
+  }
+  setIntArray(uniformName, array) {
+    this._valueCache[uniformName] = null, this.engine.setIntArray(this._uniforms[uniformName], array);
+  }
+  setIntArray2(uniformName, array) {
+    this._valueCache[uniformName] = null, this.engine.setIntArray2(this._uniforms[uniformName], array);
+  }
+  setIntArray3(uniformName, array) {
+    this._valueCache[uniformName] = null, this.engine.setIntArray3(this._uniforms[uniformName], array);
+  }
+  setIntArray4(uniformName, array) {
+    this._valueCache[uniformName] = null, this.engine.setIntArray4(this._uniforms[uniformName], array);
+  }
+  setUInt(uniformName, value) {
+    const cache = this._valueCache[uniformName];
+    cache !== void 0 && cache === value || this.engine.setUInt(this._uniforms[uniformName], value) && (this._valueCache[uniformName] = value);
+  }
+  setUInt2(uniformName, x, y) {
+    this._cacheFloat2(uniformName, x, y) && (this.engine.setUInt2(this._uniforms[uniformName], x, y) || (this._valueCache[uniformName] = null));
+  }
+  setUInt3(uniformName, x, y, z) {
+    this._cacheFloat3(uniformName, x, y, z) && (this.engine.setUInt3(this._uniforms[uniformName], x, y, z) || (this._valueCache[uniformName] = null));
+  }
+  setUInt4(uniformName, x, y, z, w) {
+    this._cacheFloat4(uniformName, x, y, z, w) && (this.engine.setUInt4(this._uniforms[uniformName], x, y, z, w) || (this._valueCache[uniformName] = null));
+  }
+  setUIntArray(uniformName, array) {
+    this._valueCache[uniformName] = null, this.engine.setUIntArray(this._uniforms[uniformName], array);
+  }
+  setUIntArray2(uniformName, array) {
+    this._valueCache[uniformName] = null, this.engine.setUIntArray2(this._uniforms[uniformName], array);
+  }
+  setUIntArray3(uniformName, array) {
+    this._valueCache[uniformName] = null, this.engine.setUIntArray3(this._uniforms[uniformName], array);
+  }
+  setUIntArray4(uniformName, array) {
+    this._valueCache[uniformName] = null, this.engine.setUIntArray4(this._uniforms[uniformName], array);
+  }
+  setArray(uniformName, array) {
+    this._valueCache[uniformName] = null, this.engine.setArray(this._uniforms[uniformName], array);
+  }
+  setArray2(uniformName, array) {
+    this._valueCache[uniformName] = null, this.engine.setArray2(this._uniforms[uniformName], array);
+  }
+  setArray3(uniformName, array) {
+    this._valueCache[uniformName] = null, this.engine.setArray3(this._uniforms[uniformName], array);
+  }
+  setArray4(uniformName, array) {
+    this._valueCache[uniformName] = null, this.engine.setArray4(this._uniforms[uniformName], array);
+  }
+  setMatrices(uniformName, matrices) {
+    matrices && (this._valueCache[uniformName] = null, this.engine.setMatrices(this._uniforms[uniformName], matrices));
+  }
+  setMatrix(uniformName, matrix) {
+    this._cacheMatrix(uniformName, matrix) && (this.engine.setMatrices(this._uniforms[uniformName], matrix.asArray()) || (this._valueCache[uniformName] = null));
+  }
+  setMatrix3x3(uniformName, matrix) {
+    this._valueCache[uniformName] = null, this.engine.setMatrix3x3(this._uniforms[uniformName], matrix);
+  }
+  setMatrix2x2(uniformName, matrix) {
+    this._valueCache[uniformName] = null, this.engine.setMatrix2x2(this._uniforms[uniformName], matrix);
+  }
+  setFloat(uniformName, value) {
+    const cache = this._valueCache[uniformName];
+    cache !== void 0 && cache === value || this.engine.setFloat(this._uniforms[uniformName], value) && (this._valueCache[uniformName] = value);
+  }
+  setVector2(uniformName, vector2) {
+    this._cacheFloat2(uniformName, vector2.x, vector2.y) && (this.engine.setFloat2(this._uniforms[uniformName], vector2.x, vector2.y) || (this._valueCache[uniformName] = null));
+  }
+  setFloat2(uniformName, x, y) {
+    this._cacheFloat2(uniformName, x, y) && (this.engine.setFloat2(this._uniforms[uniformName], x, y) || (this._valueCache[uniformName] = null));
+  }
+  setVector3(uniformName, vector3) {
+    this._cacheFloat3(uniformName, vector3.x, vector3.y, vector3.z) && (this.engine.setFloat3(this._uniforms[uniformName], vector3.x, vector3.y, vector3.z) || (this._valueCache[uniformName] = null));
+  }
+  setFloat3(uniformName, x, y, z) {
+    this._cacheFloat3(uniformName, x, y, z) && (this.engine.setFloat3(this._uniforms[uniformName], x, y, z) || (this._valueCache[uniformName] = null));
+  }
+  setVector4(uniformName, vector4) {
+    this._cacheFloat4(uniformName, vector4.x, vector4.y, vector4.z, vector4.w) && (this.engine.setFloat4(this._uniforms[uniformName], vector4.x, vector4.y, vector4.z, vector4.w) || (this._valueCache[uniformName] = null));
+  }
+  setQuaternion(uniformName, quaternion) {
+    this._cacheFloat4(uniformName, quaternion.x, quaternion.y, quaternion.z, quaternion.w) && (this.engine.setFloat4(this._uniforms[uniformName], quaternion.x, quaternion.y, quaternion.z, quaternion.w) || (this._valueCache[uniformName] = null));
+  }
+  setFloat4(uniformName, x, y, z, w) {
+    this._cacheFloat4(uniformName, x, y, z, w) && (this.engine.setFloat4(this._uniforms[uniformName], x, y, z, w) || (this._valueCache[uniformName] = null));
+  }
+  setColor3(uniformName, color3) {
+    this._cacheFloat3(uniformName, color3.r, color3.g, color3.b) && (this.engine.setFloat3(this._uniforms[uniformName], color3.r, color3.g, color3.b) || (this._valueCache[uniformName] = null));
+  }
+  setColor4(uniformName, color3, alpha) {
+    this._cacheFloat4(uniformName, color3.r, color3.g, color3.b, alpha) && (this.engine.setFloat4(this._uniforms[uniformName], color3.r, color3.g, color3.b, alpha) || (this._valueCache[uniformName] = null));
+  }
+  setDirectColor4(uniformName, color4) {
+    this._cacheFloat4(uniformName, color4.r, color4.g, color4.b, color4.a) && (this.engine.setFloat4(this._uniforms[uniformName], color4.r, color4.g, color4.b, color4.a) || (this._valueCache[uniformName] = null));
+  }
+  _getVertexShaderCode() {
+    return this.vertexShader ? this.engine._getShaderSource(this.vertexShader) : null;
+  }
+  _getFragmentShaderCode() {
+    return this.fragmentShader ? this.engine._getShaderSource(this.fragmentShader) : null;
+  }
+}, StateObject = /* @__PURE__ */ new WeakMap(), SingleStateObject = {
+  _webGLVersion: 2,
+  cachedPipelines: {}
+};
+function getStateObject(context) {
+  let state = StateObject.get(context);
+  if (!state) {
+    if (!context) return SingleStateObject;
+    state = {
+      _webGLVersion: context.TEXTURE_BINDING_3D ? 2 : 1,
+      _context: context,
+      parallelShaderCompile: context.getExtension("KHR_parallel_shader_compile") || void 0,
+      cachedPipelines: {}
+    }, StateObject.set(context, state);
+  }
+  return state;
+}
+function deleteStateObject(context) {
+  StateObject.delete(context);
+}
+function createRawShaderProgram(pipelineContext, vertexCode, fragmentCode, context, transformFeedbackVaryings, _createShaderProgramInjection) {
+  const stateObject = getStateObject(context);
+  _createShaderProgramInjection || (_createShaderProgramInjection = stateObject._createShaderProgramInjection ?? _createShaderProgram);
+  const vertexShader = CompileRawShader(vertexCode, "vertex", context, stateObject._contextWasLost), fragmentShader = CompileRawShader(fragmentCode, "fragment", context, stateObject._contextWasLost);
+  return _createShaderProgramInjection(pipelineContext, vertexShader, fragmentShader, context, transformFeedbackVaryings, stateObject.validateShaderPrograms);
+}
+function createShaderProgram(pipelineContext, vertexCode, fragmentCode, defines, context, transformFeedbackVaryings = null, _createShaderProgramInjection) {
+  const stateObject = getStateObject(context);
+  _createShaderProgramInjection || (_createShaderProgramInjection = stateObject._createShaderProgramInjection ?? _createShaderProgram);
+  const shaderVersion = stateObject._webGLVersion > 1 ? `#version 300 es
+#define WEBGL2 
+` : "", vertexShader = CompileShader(vertexCode, "vertex", defines, shaderVersion, context, stateObject._contextWasLost), fragmentShader = CompileShader(fragmentCode, "fragment", defines, shaderVersion, context, stateObject._contextWasLost);
+  return _createShaderProgramInjection(pipelineContext, vertexShader, fragmentShader, context, transformFeedbackVaryings, stateObject.validateShaderPrograms);
+}
+function createPipelineContext(context, _shaderProcessingContext) {
+  const pipelineContext = new WebGLPipelineContext(), stateObject = getStateObject(context);
+  return stateObject.parallelShaderCompile && !stateObject.disableParallelShaderCompile && (pipelineContext.isParallelCompiled = !0), pipelineContext.context = stateObject._context, pipelineContext;
+}
+function _createShaderProgram(pipelineContext, vertexShader, fragmentShader, context, _transformFeedbackVaryings = null, validateShaderPrograms) {
+  const shaderProgram = context.createProgram();
+  if (pipelineContext.program = shaderProgram, !shaderProgram) throw new Error("Unable to create program");
+  return context.attachShader(shaderProgram, vertexShader), context.attachShader(shaderProgram, fragmentShader), context.linkProgram(shaderProgram), pipelineContext.context = context, pipelineContext.vertexShader = vertexShader, pipelineContext.fragmentShader = fragmentShader, pipelineContext.isParallelCompiled || _finalizePipelineContext(pipelineContext, context, validateShaderPrograms), shaderProgram;
+}
+function _isRenderingStateCompiled(pipelineContext, gl, validateShaderPrograms) {
+  const webGLPipelineContext = pipelineContext;
+  if (webGLPipelineContext._isDisposed) return !1;
+  const stateObject = getStateObject(gl);
+  return stateObject && stateObject.parallelShaderCompile && stateObject.parallelShaderCompile.COMPLETION_STATUS_KHR && webGLPipelineContext.program && gl.getProgramParameter(webGLPipelineContext.program, stateObject.parallelShaderCompile.COMPLETION_STATUS_KHR) ? (_finalizePipelineContext(webGLPipelineContext, gl, validateShaderPrograms), !0) : !1;
+}
+function _finalizePipelineContext(pipelineContext, gl, validateShaderPrograms) {
+  const context = pipelineContext.context, vertexShader = pipelineContext.vertexShader, fragmentShader = pipelineContext.fragmentShader, program = pipelineContext.program;
+  if (!context.getProgramParameter(program, context.LINK_STATUS)) {
+    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+      const log = gl.getShaderInfoLog(vertexShader);
+      if (log)
+        throw pipelineContext.vertexCompilationError = log, new Error("VERTEX SHADER " + log);
+    }
+    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+      const log = gl.getShaderInfoLog(fragmentShader);
+      if (log)
+        throw pipelineContext.fragmentCompilationError = log, new Error("FRAGMENT SHADER " + log);
+    }
+    const error = context.getProgramInfoLog(program);
+    if (error)
+      throw pipelineContext.programLinkError = error, new Error(error);
+  }
+  if (validateShaderPrograms && (context.validateProgram(program), !context.getProgramParameter(program, context.VALIDATE_STATUS))) {
+    const error = context.getProgramInfoLog(program);
+    if (error)
+      throw pipelineContext.programValidationError = error, new Error(error);
+  }
+  context.deleteShader(vertexShader), context.deleteShader(fragmentShader), pipelineContext.vertexShader = void 0, pipelineContext.fragmentShader = void 0, pipelineContext.onCompiled && (pipelineContext.onCompiled(), pipelineContext.onCompiled = void 0);
+}
+function _preparePipelineContext(pipelineContext, vertexSourceCode, fragmentSourceCode, createAsRaw, _rawVertexSourceCode, _rawFragmentSourceCode, rebuildRebind, defines, transformFeedbackVaryings, _key = "", onReady, createRawShaderProgramInjection, createShaderProgramInjection) {
+  const stateObject = getStateObject(pipelineContext.context);
+  createRawShaderProgramInjection || (createRawShaderProgramInjection = stateObject.createRawShaderProgramInjection ?? createRawShaderProgram), createShaderProgramInjection || (createShaderProgramInjection = stateObject.createShaderProgramInjection ?? createShaderProgram);
+  const webGLRenderingState = pipelineContext;
+  createAsRaw ? webGLRenderingState.program = createRawShaderProgramInjection(webGLRenderingState, vertexSourceCode, fragmentSourceCode, webGLRenderingState.context, transformFeedbackVaryings) : webGLRenderingState.program = createShaderProgramInjection(webGLRenderingState, vertexSourceCode, fragmentSourceCode, defines, webGLRenderingState.context, transformFeedbackVaryings), webGLRenderingState.program.__SPECTOR_rebuildProgram = rebuildRebind, onReady();
+}
+function CompileShader(source, type, defines, shaderVersion, gl, _contextWasLost) {
+  return CompileRawShader(_ConcatenateShader(source, defines, shaderVersion), type, gl, _contextWasLost);
+}
+function CompileRawShader(source, type, gl, _contextWasLost) {
+  const shader = gl.createShader(type === "vertex" ? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER);
+  if (!shader) {
+    let error = gl.NO_ERROR, tempError;
+    for (; (tempError = gl.getError()) !== gl.NO_ERROR; ) error = tempError;
+    throw new Error(`Something went wrong while creating a gl ${type} shader object. gl error=${error}, gl isContextLost=${gl.isContextLost()}, _contextWasLost=${_contextWasLost}`);
+  }
+  return gl.shaderSource(shader, source), gl.compileShader(shader), shader;
+}
+function _setProgram(program, gl) {
+  gl.useProgram(program);
+}
+function _executeWhenRenderingStateIsCompiled(pipelineContext, action) {
+  const webGLPipelineContext = pipelineContext;
+  if (!webGLPipelineContext.isParallelCompiled) {
+    action(pipelineContext);
+    return;
+  }
+  const oldHandler = webGLPipelineContext.onCompiled;
+  webGLPipelineContext.onCompiled = () => {
+    oldHandler?.(), action(pipelineContext);
+  };
+}
+function getCachedPipeline(name, context) {
+  return getStateObject(context).cachedPipelines[name];
+}
+function resetCachedPipeline(pipeline) {
+  const name = pipeline._name, context = pipeline.context;
+  if (name && context) {
+    const stateObject = getStateObject(context);
+    stateObject.cachedPipelines[name]?.dispose(), delete stateObject.cachedPipelines[name];
+  }
+}
+function _ProcessShaderCode(processorOptions, baseName, processFinalCode, onFinalCodeReady, shaderLanguage, engine, effectContext) {
+  let vertexSource, fragmentSource;
+  const hostDocument = IsWindowObjectExist() ? engine?.getHostDocument() : null;
+  typeof baseName == "string" ? vertexSource = baseName : typeof baseName.vertexSource == "string" ? vertexSource = "source:" + baseName.vertexSource : typeof baseName.vertexElement == "string" ? vertexSource = hostDocument?.getElementById(baseName.vertexElement) || baseName.vertexElement : vertexSource = baseName.vertex || baseName, typeof baseName == "string" ? fragmentSource = baseName : typeof baseName.fragmentSource == "string" ? fragmentSource = "source:" + baseName.fragmentSource : typeof baseName.fragmentElement == "string" ? fragmentSource = hostDocument?.getElementById(baseName.fragmentElement) || baseName.fragmentElement : fragmentSource = baseName.fragment || baseName;
+  const shaderCodes = [void 0, void 0], shadersLoaded = () => {
+    if (shaderCodes[0] && shaderCodes[1]) {
+      const [vertexCode, fragmentCode] = shaderCodes;
+      Initialize(processorOptions), Process(vertexCode, processorOptions, (migratedVertexCode, codeBeforeMigration) => {
+        effectContext && (effectContext._vertexSourceCodeBeforeMigration = codeBeforeMigration), processFinalCode && (migratedVertexCode = processFinalCode("vertex", migratedVertexCode)), processorOptions.isFragment = !0, Process(fragmentCode, processorOptions, (migratedFragmentCode, codeBeforeMigration2) => {
+          effectContext && (effectContext._fragmentSourceCodeBeforeMigration = codeBeforeMigration2), processFinalCode && (migratedFragmentCode = processFinalCode("fragment", migratedFragmentCode));
+          const finalShaders = Finalize(migratedVertexCode, migratedFragmentCode, processorOptions);
+          processorOptions = null;
+          const finalCode = UseFinalCode(finalShaders.vertexCode, finalShaders.fragmentCode, baseName, shaderLanguage);
+          onFinalCodeReady?.(finalCode.vertexSourceCode, finalCode.fragmentSourceCode);
+        }, engine);
+      }, engine);
+    }
+  };
+  LoadShader(vertexSource, "Vertex", "", (vertexCode) => {
+    effectContext && (effectContext._rawVertexSourceCode = vertexCode), shaderCodes[0] = vertexCode, shadersLoaded();
+  }, shaderLanguage), LoadShader(fragmentSource, "Fragment", "Pixel", (fragmentCode) => {
+    effectContext && (effectContext._rawFragmentSourceCode = fragmentCode), shaderCodes[1] = fragmentCode, shadersLoaded();
+  }, shaderLanguage);
+}
+function LoadShader(shader, key, optionalKey, callback, shaderLanguage, _loadFileInjection) {
+  if (typeof HTMLElement < "u" && shader instanceof HTMLElement) {
+    callback(GetDOMTextContent(shader));
+    return;
+  }
+  if (shader.substring(0, 7) === "source:") {
+    callback(shader.substring(7));
+    return;
+  }
+  if (shader.substring(0, 7) === "base64:") {
+    callback(window.atob(shader.substring(7)));
+    return;
+  }
+  const shaderStore = ShaderStore.GetShadersStore(shaderLanguage);
+  if (shaderStore[shader + key + "Shader"]) {
+    callback(shaderStore[shader + key + "Shader"]);
+    return;
+  }
+  if (optionalKey && shaderStore[shader + optionalKey + "Shader"]) {
+    callback(shaderStore[shader + optionalKey + "Shader"]);
+    return;
+  }
+  let shaderUrl;
+  if (shader[0] === "." || shader[0] === "/" || shader.indexOf("http") > -1 ? shaderUrl = shader : shaderUrl = ShaderStore.GetShadersRepository(shaderLanguage) + shader, _loadFileInjection = _loadFileInjection || _LoadFile, !_loadFileInjection) throw new Error("loadFileInjection is not defined");
+  _loadFileInjection(shaderUrl + "." + key.toLowerCase() + ".fx", callback);
+}
+function UseFinalCode(migratedVertexCode, migratedFragmentCode, baseName, shaderLanguage) {
+  if (baseName) {
+    const vertex = baseName.vertexElement || baseName.vertex || baseName.spectorName || baseName, fragment = baseName.fragmentElement || baseName.fragment || baseName.spectorName || baseName;
+    return {
+      vertexSourceCode: (shaderLanguage === 1 ? "//" : "") + "#define SHADER_NAME vertex:" + vertex + `
+` + migratedVertexCode,
+      fragmentSourceCode: (shaderLanguage === 1 ? "//" : "") + "#define SHADER_NAME fragment:" + fragment + `
+` + migratedFragmentCode
+    };
+  } else return {
+    vertexSourceCode: migratedVertexCode,
+    fragmentSourceCode: migratedFragmentCode
+  };
+}
+var createAndPreparePipelineContext = (options, createPipelineContext2, _preparePipelineContext2, _executeWhenRenderingStateIsCompiled2) => {
+  try {
+    const stateObject = options.context ? getStateObject(options.context) : null;
+    stateObject && (stateObject.disableParallelShaderCompile = options.disableParallelCompilation);
+    const pipelineContext = options.existingPipelineContext || createPipelineContext2(options.shaderProcessingContext);
+    return pipelineContext._name = options.name, options.name && stateObject && (stateObject.cachedPipelines[options.name] = pipelineContext), _preparePipelineContext2(pipelineContext, options.vertex, options.fragment, !!options.createAsRaw, "", "", options.rebuildRebind, options.defines, options.transformFeedbackVaryings, "", () => {
+      _executeWhenRenderingStateIsCompiled2(pipelineContext, () => {
+        options.onRenderingStateCompiled?.(pipelineContext);
+      });
+    }), pipelineContext;
+  } catch (e) {
+    throw Logger.Error("Error compiling effect"), e;
+  }
+}, Effect = class Effect2 {
+  static get ShadersRepository() {
+    return ShaderStore.ShadersRepository;
+  }
+  static set ShadersRepository(repo) {
+    ShaderStore.ShadersRepository = repo;
+  }
+  get isDisposed() {
+    return this._isDisposed;
+  }
+  get onBindObservable() {
+    return this._onBindObservable || (this._onBindObservable = new Observable()), this._onBindObservable;
+  }
+  get shaderLanguage() {
+    return this._shaderLanguage;
+  }
+  constructor(baseName, attributesNamesOrOptions, uniformsNamesOrEngine, samplers = null, engine, defines = null, fallbacks = null, onCompiled = null, onError = null, indexParameters, key = "", shaderLanguage = 0, extraInitializationsAsync) {
+    this.defines = "", this.onCompiled = null, this.onError = null, this.onBind = null, this.uniqueId = 0, this.onCompileObservable = new Observable(), this.onErrorObservable = new Observable(), this._onBindObservable = null, this._isDisposed = !1, this._refCount = 1, this._bonesComputationForcedToCPU = !1, this._uniformBuffersNames = {}, this._multiTarget = !1, this._samplers = {}, this._isReady = !1, this._compilationError = "", this._allFallbacksProcessed = !1, this._uniforms = {}, this._key = "", this._fallbacks = null, this._vertexSourceCodeOverride = "", this._fragmentSourceCodeOverride = "", this._transformFeedbackVaryings = null, this._disableParallelShaderCompilation = !1, this._pipelineContext = null, this._vertexSourceCode = "", this._fragmentSourceCode = "", this._vertexSourceCodeBeforeMigration = "", this._fragmentSourceCodeBeforeMigration = "", this._rawVertexSourceCode = "", this._rawFragmentSourceCode = "", this._processCodeAfterIncludes = void 0, this._processFinalCode = null, this._onReleaseEffectsObserver = null, this.name = baseName, this._key = key;
+    const pipelineName = this._key.replace(/\r/g, "").replace(/\n/g, "|");
+    let cachedPipeline;
+    if (attributesNamesOrOptions.attributes) {
+      const options = attributesNamesOrOptions;
+      if (this._engine = uniformsNamesOrEngine, this._attributesNames = options.attributes, this._uniformsNames = options.uniformsNames.concat(options.samplers), this._samplerList = options.samplers.slice(), this.defines = options.defines, this.onError = options.onError, this.onCompiled = options.onCompiled, this._fallbacks = options.fallbacks, this._indexParameters = options.indexParameters, this._transformFeedbackVaryings = options.transformFeedbackVaryings || null, this._multiTarget = !!options.multiTarget, this._shaderLanguage = options.shaderLanguage ?? 0, this._disableParallelShaderCompilation = !!options.disableParallelShaderCompilation, options.uniformBuffersNames) {
+        this._uniformBuffersNamesList = options.uniformBuffersNames.slice();
+        for (let i = 0; i < options.uniformBuffersNames.length; i++) this._uniformBuffersNames[options.uniformBuffersNames[i]] = i;
+      }
+      this._processFinalCode = options.processFinalCode ?? null, this._processCodeAfterIncludes = options.processCodeAfterIncludes ?? void 0, extraInitializationsAsync = options.extraInitializationsAsync, cachedPipeline = options.existingPipelineContext;
+    } else
+      this._engine = engine, this.defines = defines ?? "", this._uniformsNames = uniformsNamesOrEngine.concat(samplers), this._samplerList = samplers ? samplers.slice() : [], this._attributesNames = attributesNamesOrOptions, this._uniformBuffersNamesList = [], this._shaderLanguage = shaderLanguage, this.onError = onError, this.onCompiled = onCompiled, this._indexParameters = indexParameters, this._fallbacks = fallbacks;
+    this._engine.shaderPlatformName === "WEBGL2" && (cachedPipeline = getCachedPipeline(pipelineName, this._engine._gl) ?? cachedPipeline), this._attributeLocationByName = {}, this.uniqueId = Effect2._UniqueIdSeed++, cachedPipeline ? (this._pipelineContext = cachedPipeline, this._pipelineContext.setEngine(this._engine), this._onRenderingStateCompiled(this._pipelineContext), this._pipelineContext.program && (this._pipelineContext.program.__SPECTOR_rebuildProgram = this._rebuildProgram.bind(this))) : this._processShaderCodeAsync(null, !1, null, extraInitializationsAsync).catch((error) => {
+      const message = error?.message ?? String(error), asyncError = /* @__PURE__ */ new Error(`Effect async shader preparation failed for "${String(this.name)}": ${message}`);
+      error && typeof error.stack == "string" && (asyncError.stack = `${asyncError.message}
+Caused by: ${error.stack}`), this._processCompilationErrors(asyncError);
+    }), this._onReleaseEffectsObserver = this._engine.onReleaseEffectsObservable.addOnce(() => {
+      this._onReleaseEffectsObserver = null, !this.isDisposed && this.dispose(!0);
+    });
+  }
+  async _processShaderCodeAsync(shaderProcessor = null, keepExistingPipelineContext = !1, shaderProcessingContext = null, extraInitializationsAsync) {
+    extraInitializationsAsync && await extraInitializationsAsync(), this._processingContext = shaderProcessingContext || this._engine._getShaderProcessingContext(this._shaderLanguage, !1), _ProcessShaderCode({
+      defines: this.defines.split(`
+`),
+      indexParameters: this._indexParameters,
+      isFragment: !1,
+      shouldUseHighPrecisionShader: this._engine._shouldUseHighPrecisionShader,
+      processor: shaderProcessor ?? this._engine._getShaderProcessor(this._shaderLanguage),
+      supportsUniformBuffers: this._engine.supportsUniformBuffers,
+      shadersRepository: ShaderStore.GetShadersRepository(this._shaderLanguage),
+      includesShadersStore: ShaderStore.GetIncludesShadersStore(this._shaderLanguage),
+      version: (this._engine.version * 100).toString(),
+      platformName: this._engine.shaderPlatformName,
+      processingContext: this._processingContext,
+      isNDCHalfZRange: this._engine.isNDCHalfZRange,
+      useReverseDepthBuffer: this._engine.useReverseDepthBuffer,
+      processCodeAfterIncludes: this._processCodeAfterIncludes
+    }, this.name, this._processFinalCode, (migratedVertexCode, migratedFragmentCode) => {
+      this._vertexSourceCode = migratedVertexCode, this._fragmentSourceCode = migratedFragmentCode, this._prepareEffect(keepExistingPipelineContext);
+    }, this._shaderLanguage, this._engine, this);
+  }
+  get key() {
+    return this._key;
+  }
+  isReady() {
+    try {
+      return this._isReadyInternal();
+    } catch {
+      return !1;
+    }
+  }
+  _isReadyInternal() {
+    return this._engine.isDisposed || this._isReady ? !0 : this._pipelineContext ? this._pipelineContext.isReady : !1;
+  }
+  getEngine() {
+    return this._engine;
+  }
+  getPipelineContext() {
+    return this._pipelineContext;
+  }
+  getAttributesNames() {
+    return this._attributesNames;
+  }
+  getAttributeLocation(index) {
+    return this._attributes[index];
+  }
+  getAttributeLocationByName(name) {
+    return this._attributeLocationByName[name];
+  }
+  getAttributesCount() {
+    return this._attributes.length;
+  }
+  getUniformIndex(uniformName) {
+    return this._uniformsNames.indexOf(uniformName);
+  }
+  getUniform(uniformName) {
+    return this._uniforms[uniformName];
+  }
+  getSamplers() {
+    return this._samplerList;
+  }
+  getUniformNames() {
+    return this._uniformsNames;
+  }
+  getUniformBuffersNames() {
+    return this._uniformBuffersNamesList;
+  }
+  getIndexParameters() {
+    return this._indexParameters;
+  }
+  getCompilationError() {
+    return this._compilationError;
+  }
+  allFallbacksProcessed() {
+    return this._allFallbacksProcessed;
+  }
+  async whenCompiledAsync() {
+    return await new Promise((resolve) => {
+      this.executeWhenCompiled(resolve);
+    });
+  }
+  executeWhenCompiled(func) {
+    if (this.isReady()) {
+      func(this);
+      return;
+    }
+    this.onCompileObservable.add((effect) => {
+      func(effect);
+    }), (!this._pipelineContext || this._pipelineContext.isAsync) && this._checkIsReady(null);
+  }
+  _checkIsReady(previousPipelineContext) {
+    _RetryWithInterval(() => this._isReadyInternal() || this._isDisposed, () => {
+    }, (e) => {
+      this._processCompilationErrors(e, previousPipelineContext);
+    }, 16, 12e4, !0, ` - Effect: ${typeof this.name == "string" ? this.name : this.key}`);
+  }
+  get vertexSourceCode() {
+    return this._vertexSourceCodeOverride && this._fragmentSourceCodeOverride ? this._vertexSourceCodeOverride : this._pipelineContext?._getVertexShaderCode() ?? this._vertexSourceCode;
+  }
+  get fragmentSourceCode() {
+    return this._vertexSourceCodeOverride && this._fragmentSourceCodeOverride ? this._fragmentSourceCodeOverride : this._pipelineContext?._getFragmentShaderCode() ?? this._fragmentSourceCode;
+  }
+  get vertexSourceCodeBeforeMigration() {
+    return this._vertexSourceCodeBeforeMigration;
+  }
+  get fragmentSourceCodeBeforeMigration() {
+    return this._fragmentSourceCodeBeforeMigration;
+  }
+  get rawVertexSourceCode() {
+    return this._rawVertexSourceCode;
+  }
+  get rawFragmentSourceCode() {
+    return this._rawFragmentSourceCode;
+  }
+  getPipelineGenerationOptions() {
+    return {
+      platformName: this._engine.shaderPlatformName,
+      shaderLanguage: this._shaderLanguage,
+      shaderNameOrContent: this.name,
+      key: this._key,
+      defines: this.defines.split(`
+`),
+      addGlobalDefines: !1,
+      extendedProcessingOptions: {
+        indexParameters: this._indexParameters,
+        isNDCHalfZRange: this._engine.isNDCHalfZRange,
+        useReverseDepthBuffer: this._engine.useReverseDepthBuffer,
+        supportsUniformBuffers: this._engine.supportsUniformBuffers
+      },
+      extendedCreatePipelineOptions: {
+        transformFeedbackVaryings: this._transformFeedbackVaryings,
+        createAsRaw: !!(this._vertexSourceCodeOverride && this._fragmentSourceCodeOverride)
+      }
+    };
+  }
+  _rebuildProgram(vertexSourceCode, fragmentSourceCode, onCompiled, onError) {
+    this._isReady = !1, this._vertexSourceCodeOverride = vertexSourceCode, this._fragmentSourceCodeOverride = fragmentSourceCode, this.onError = (effect, error) => {
+      onError && onError(error);
+    }, this.onCompiled = () => {
+      const scenes = this.getEngine().scenes;
+      if (scenes) for (let i = 0; i < scenes.length; i++) scenes[i].markAllMaterialsAsDirty(127);
+      this._pipelineContext._handlesSpectorRebuildCallback?.(onCompiled);
+    }, this._fallbacks = null, this._prepareEffect();
+  }
+  _onRenderingStateCompiled(pipelineContext) {
+    if (this._pipelineContext = pipelineContext, this._pipelineContext.setEngine(this._engine), this._attributes = [], this._pipelineContext._fillEffectInformation(this, this._uniformBuffersNames, this._uniformsNames, this._uniforms, this._samplerList, this._samplers, this._attributesNames, this._attributes), this._attributesNames) for (let i = 0; i < this._attributesNames.length; i++) {
+      const name = this._attributesNames[i];
+      this._attributeLocationByName[name] = this._attributes[i];
+    }
+    this._engine.bindSamplers(this), this._compilationError = "", this._isReady = !0, this.onCompiled && this.onCompiled(this), this.onCompileObservable.notifyObservers(this), this.onCompileObservable.clear(), this._fallbacks && this._fallbacks.unBindMesh(), Effect2.AutomaticallyClearCodeCache && this.clearCodeCache();
+  }
+  _prepareEffect(keepExistingPipelineContext = !1) {
+    const previousPipelineContext = this._pipelineContext;
+    this._isReady = !1;
+    try {
+      const overrides = !!(this._vertexSourceCodeOverride && this._fragmentSourceCodeOverride), defines = overrides ? null : this.defines, vertex = overrides ? this._vertexSourceCodeOverride : this._vertexSourceCode, fragment = overrides ? this._fragmentSourceCodeOverride : this._fragmentSourceCode, engine = this._engine;
+      this._pipelineContext = createAndPreparePipelineContext({
+        existingPipelineContext: keepExistingPipelineContext ? previousPipelineContext : null,
+        vertex,
+        fragment,
+        context: engine.shaderPlatformName === "WEBGL2" || engine.shaderPlatformName === "WEBGL1" ? engine._gl : void 0,
+        rebuildRebind: (vertexSourceCode, fragmentSourceCode, onCompiled, onError) => this._rebuildProgram(vertexSourceCode, fragmentSourceCode, onCompiled, onError),
+        defines,
+        transformFeedbackVaryings: this._transformFeedbackVaryings,
+        name: this._key.replace(/\r/g, "").replace(/\n/g, "|"),
+        createAsRaw: overrides,
+        disableParallelCompilation: this._disableParallelShaderCompilation,
+        shaderProcessingContext: this._processingContext,
+        onRenderingStateCompiled: (pipelineContext) => {
+          previousPipelineContext && !keepExistingPipelineContext && this._engine._deletePipelineContext(previousPipelineContext), pipelineContext && this._onRenderingStateCompiled(pipelineContext);
+        }
+      }, this._engine.createPipelineContext.bind(this._engine), this._engine._preparePipelineContextAsync.bind(this._engine), this._engine._executeWhenRenderingStateIsCompiled.bind(this._engine)), this._pipelineContext.isAsync && this._checkIsReady(previousPipelineContext);
+    } catch (e) {
+      this._processCompilationErrors(e, previousPipelineContext);
+    }
+  }
+  _getShaderCodeAndErrorLine(code, error, isFragment) {
+    const regexp = isFragment ? /FRAGMENT SHADER ERROR: 0:(\d+?):/ : /VERTEX SHADER ERROR: 0:(\d+?):/;
+    let errorLine = null;
+    if (error && code) {
+      const res = error.match(regexp);
+      if (res && res.length === 2) {
+        const lineNumber = parseInt(res[1]), lines = code.split(`
+`, -1);
+        lines.length >= lineNumber && (errorLine = `Offending line [${lineNumber}] in ${isFragment ? "fragment" : "vertex"} code: ${lines[lineNumber - 1]}`);
+      }
+    }
+    return [code, errorLine];
+  }
+  _processCompilationErrors(e, previousPipelineContext = null) {
+    this._compilationError = typeof e?.stack == "string" ? e.stack : e?.message ?? String(e);
+    const attributesNames = this._attributesNames, fallbacks = this._fallbacks;
+    if (Logger.Error("Unable to compile effect:"), Logger.Error(`Uniforms: ${this._uniformsNames.join(" ")}`), Logger.Error(`Attributes: ${attributesNames.join(" ")}`), Logger.Error(`Defines:
+` + this.defines), Effect2.LogShaderCodeOnCompilationError) {
+      let lineErrorVertex = null, lineErrorFragment = null, code;
+      this._pipelineContext?._getVertexShaderCode() && ([code, lineErrorVertex] = this._getShaderCodeAndErrorLine(this._pipelineContext._getVertexShaderCode(), this._compilationError, !1), code && (Logger.Error("Vertex code:"), Logger.Error(code))), this._pipelineContext?._getFragmentShaderCode() && ([code, lineErrorFragment] = this._getShaderCodeAndErrorLine(this._pipelineContext?._getFragmentShaderCode(), this._compilationError, !0), code && (Logger.Error("Fragment code:"), Logger.Error(code))), lineErrorVertex && Logger.Error(lineErrorVertex), lineErrorFragment && Logger.Error(lineErrorFragment);
+    }
+    Logger.Error("Error: " + this._compilationError);
+    const notifyErrors = () => {
+      this.onError && this.onError(this, this._compilationError), this.onErrorObservable.notifyObservers(this), this._engine.onEffectErrorObservable.notifyObservers({
+        effect: this,
+        errors: this._compilationError
+      });
+    };
+    previousPipelineContext && (this._pipelineContext = previousPipelineContext, this._isReady = !0, notifyErrors()), fallbacks ? (this._pipelineContext = null, fallbacks.hasMoreFallbacks ? (this._allFallbacksProcessed = !1, Logger.Error("Trying next fallback."), this.defines = fallbacks.reduce(this.defines, this), this._prepareEffect()) : (this._allFallbacksProcessed = !0, notifyErrors(), this.onErrorObservable.clear(), this._fallbacks && this._fallbacks.unBindMesh())) : (this._allFallbacksProcessed = !0, previousPipelineContext || notifyErrors());
+  }
+  get isSupported() {
+    return this._compilationError === "";
+  }
+  _bindTexture(channel, texture) {
+    this._engine._bindTexture(this._samplers[channel], texture, channel);
+  }
+  setTexture(channel, texture) {
+    this._engine.setTexture(this._samplers[channel], this._uniforms[channel], texture, channel);
+  }
+  setTextureArray(channel, textures) {
+    const exName = channel + "Ex";
+    if (this._samplerList.indexOf(exName + "0") === -1) {
+      const initialPos = this._samplerList.indexOf(channel);
+      for (let index = 1; index < textures.length; index++) {
+        const currentExName = exName + (index - 1).toString();
+        this._samplerList.splice(initialPos + index, 0, currentExName);
+      }
+      let channelIndex = 0;
+      for (const key of this._samplerList)
+        this._samplers[key] = channelIndex, channelIndex += 1;
+    }
+    this._engine.setTextureArray(this._samplers[channel], this._uniforms[channel], textures, channel);
+  }
+  bindUniformBuffer(buffer, name) {
+    const bufferName = this._uniformBuffersNames[name];
+    bufferName === void 0 || Effect2._BaseCache[bufferName] === buffer && this._engine._features.useUBOBindingCache || (Effect2._BaseCache[bufferName] = buffer, this._engine.bindUniformBufferBase(buffer, bufferName, name));
+  }
+  bindUniformBlock(blockName, index) {
+    this._engine.bindUniformBlock(this._pipelineContext, blockName, index);
+  }
+  setInt(uniformName, value) {
+    return this._pipelineContext.setInt(uniformName, value), this;
+  }
+  setInt2(uniformName, x, y) {
+    return this._pipelineContext.setInt2(uniformName, x, y), this;
+  }
+  setInt3(uniformName, x, y, z) {
+    return this._pipelineContext.setInt3(uniformName, x, y, z), this;
+  }
+  setInt4(uniformName, x, y, z, w) {
+    return this._pipelineContext.setInt4(uniformName, x, y, z, w), this;
+  }
+  setIntArray(uniformName, array) {
+    return this._pipelineContext.setIntArray(uniformName, array), this;
+  }
+  setIntArray2(uniformName, array) {
+    return this._pipelineContext.setIntArray2(uniformName, array), this;
+  }
+  setIntArray3(uniformName, array) {
+    return this._pipelineContext.setIntArray3(uniformName, array), this;
+  }
+  setIntArray4(uniformName, array) {
+    return this._pipelineContext.setIntArray4(uniformName, array), this;
+  }
+  setUInt(uniformName, value) {
+    return this._pipelineContext.setUInt(uniformName, value), this;
+  }
+  setUInt2(uniformName, x, y) {
+    return this._pipelineContext.setUInt2(uniformName, x, y), this;
+  }
+  setUInt3(uniformName, x, y, z) {
+    return this._pipelineContext.setUInt3(uniformName, x, y, z), this;
+  }
+  setUInt4(uniformName, x, y, z, w) {
+    return this._pipelineContext.setUInt4(uniformName, x, y, z, w), this;
+  }
+  setUIntArray(uniformName, array) {
+    return this._pipelineContext.setUIntArray(uniformName, array), this;
+  }
+  setUIntArray2(uniformName, array) {
+    return this._pipelineContext.setUIntArray2(uniformName, array), this;
+  }
+  setUIntArray3(uniformName, array) {
+    return this._pipelineContext.setUIntArray3(uniformName, array), this;
+  }
+  setUIntArray4(uniformName, array) {
+    return this._pipelineContext.setUIntArray4(uniformName, array), this;
+  }
+  setFloatArray(uniformName, array) {
+    return this._pipelineContext.setArray(uniformName, array), this;
+  }
+  setFloatArray2(uniformName, array) {
+    return this._pipelineContext.setArray2(uniformName, array), this;
+  }
+  setFloatArray3(uniformName, array) {
+    return this._pipelineContext.setArray3(uniformName, array), this;
+  }
+  setFloatArray4(uniformName, array) {
+    return this._pipelineContext.setArray4(uniformName, array), this;
+  }
+  setArray(uniformName, array) {
+    return this._pipelineContext.setArray(uniformName, array), this;
+  }
+  setArray2(uniformName, array) {
+    return this._pipelineContext.setArray2(uniformName, array), this;
+  }
+  setArray3(uniformName, array) {
+    return this._pipelineContext.setArray3(uniformName, array), this;
+  }
+  setArray4(uniformName, array) {
+    return this._pipelineContext.setArray4(uniformName, array), this;
+  }
+  setMatrices(uniformName, matrices) {
+    return this._pipelineContext.setMatrices(uniformName, matrices), this;
+  }
+  setMatrix(uniformName, matrix) {
+    return this._pipelineContext.setMatrix(uniformName, matrix), this;
+  }
+  setMatrix3x3(uniformName, matrix) {
+    return this._pipelineContext.setMatrix3x3(uniformName, matrix), this;
+  }
+  setMatrix2x2(uniformName, matrix) {
+    return this._pipelineContext.setMatrix2x2(uniformName, matrix), this;
+  }
+  setFloat(uniformName, value) {
+    return this._pipelineContext.setFloat(uniformName, value), this;
+  }
+  setBool(uniformName, bool) {
+    return this._pipelineContext.setInt(uniformName, bool ? 1 : 0), this;
+  }
+  setVector2(uniformName, vector2) {
+    return this._pipelineContext.setVector2(uniformName, vector2), this;
+  }
+  setFloat2(uniformName, x, y) {
+    return this._pipelineContext.setFloat2(uniformName, x, y), this;
+  }
+  setVector3(uniformName, vector3) {
+    return this._pipelineContext.setVector3(uniformName, vector3), this;
+  }
+  setFloat3(uniformName, x, y, z) {
+    return this._pipelineContext.setFloat3(uniformName, x, y, z), this;
+  }
+  setVector4(uniformName, vector4) {
+    return this._pipelineContext.setVector4(uniformName, vector4), this;
+  }
+  setQuaternion(uniformName, quaternion) {
+    return this._pipelineContext.setQuaternion(uniformName, quaternion), this;
+  }
+  setFloat4(uniformName, x, y, z, w) {
+    return this._pipelineContext.setFloat4(uniformName, x, y, z, w), this;
+  }
+  setColor3(uniformName, color3) {
+    return this._pipelineContext.setColor3(uniformName, color3), this;
+  }
+  setColor4(uniformName, color3, alpha) {
+    return this._pipelineContext.setColor4(uniformName, color3, alpha), this;
+  }
+  setDirectColor4(uniformName, color4) {
+    return this._pipelineContext.setDirectColor4(uniformName, color4), this;
+  }
+  clearCodeCache() {
+    this._vertexSourceCode = "", this._fragmentSourceCode = "", this._fragmentSourceCodeBeforeMigration = "", this._vertexSourceCodeBeforeMigration = "";
+  }
+  dispose(force = !1) {
+    if (force) this._refCount = 0;
+    else {
+      if (Effect2.PersistentMode) return;
+      this._refCount--;
+    }
+    this._refCount > 0 || this._isDisposed || (this._onReleaseEffectsObserver && (this._engine.onReleaseEffectsObservable.remove(this._onReleaseEffectsObserver), this._onReleaseEffectsObserver = null), this._pipelineContext && resetCachedPipeline(this._pipelineContext), this._engine._releaseEffect(this), this.clearCodeCache(), this._isDisposed = !0);
+  }
+  static RegisterShader(name, pixelShader, vertexShader, shaderLanguage = 0) {
+    pixelShader && (ShaderStore.GetShadersStore(shaderLanguage)[`${name}PixelShader`] = pixelShader), vertexShader && (ShaderStore.GetShadersStore(shaderLanguage)[`${name}VertexShader`] = vertexShader);
+  }
+  static ResetCache() {
+    Effect2._BaseCache = {};
+  }
+};
+Effect.LogShaderCodeOnCompilationError = !0;
+Effect.PersistentMode = !1;
+Effect.AutomaticallyClearCodeCache = !1;
+Effect._UniqueIdSeed = 0;
+Effect._BaseCache = {};
+Effect.ShadersStore = ShaderStore.ShadersStore;
+Effect.IncludesShadersStore = ShaderStore.IncludesShadersStore;
+var DepthCullingState = class {
+  constructor(reset = !0) {
+    this._isDepthTestDirty = !1, this._isDepthMaskDirty = !1, this._isDepthFuncDirty = !1, this._isCullFaceDirty = !1, this._isCullDirty = !1, this._isZOffsetDirty = !1, this._isFrontFaceDirty = !1, reset && this.reset();
+  }
+  get isDirty() {
+    return this._isDepthFuncDirty || this._isDepthTestDirty || this._isDepthMaskDirty || this._isCullFaceDirty || this._isCullDirty || this._isZOffsetDirty || this._isFrontFaceDirty;
+  }
+  get zOffset() {
+    return this._zOffset;
+  }
+  set zOffset(value) {
+    this._zOffset !== value && (this._zOffset = value, this._isZOffsetDirty = !0);
+  }
+  get zOffsetUnits() {
+    return this._zOffsetUnits;
+  }
+  set zOffsetUnits(value) {
+    this._zOffsetUnits !== value && (this._zOffsetUnits = value, this._isZOffsetDirty = !0);
+  }
+  get cullFace() {
+    return this._cullFace;
+  }
+  set cullFace(value) {
+    this._cullFace !== value && (this._cullFace = value, this._isCullFaceDirty = !0);
+  }
+  get cull() {
+    return this._cull;
+  }
+  set cull(value) {
+    this._cull !== value && (this._cull = value, this._isCullDirty = !0);
+  }
+  get depthFunc() {
+    return this._depthFunc;
+  }
+  set depthFunc(value) {
+    this._depthFunc !== value && (this._depthFunc = value, this._isDepthFuncDirty = !0);
+  }
+  get depthMask() {
+    return this._depthMask;
+  }
+  set depthMask(value) {
+    this._depthMask !== value && (this._depthMask = value, this._isDepthMaskDirty = !0);
+  }
+  get depthTest() {
+    return this._depthTest;
+  }
+  set depthTest(value) {
+    this._depthTest !== value && (this._depthTest = value, this._isDepthTestDirty = !0);
+  }
+  get frontFace() {
+    return this._frontFace;
+  }
+  set frontFace(value) {
+    this._frontFace !== value && (this._frontFace = value, this._isFrontFaceDirty = !0);
+  }
+  reset() {
+    this._depthMask = !0, this._depthTest = !0, this._depthFunc = null, this._cullFace = null, this._cull = null, this._zOffset = 0, this._zOffsetUnits = 0, this._frontFace = null, this._isDepthTestDirty = !0, this._isDepthMaskDirty = !0, this._isDepthFuncDirty = !1, this._isCullFaceDirty = !1, this._isCullDirty = !1, this._isZOffsetDirty = !0, this._isFrontFaceDirty = !1;
+  }
+  apply(gl) {
+    this.isDirty && (this._isCullDirty && (this.cull ? gl.enable(gl.CULL_FACE) : gl.disable(gl.CULL_FACE), this._isCullDirty = !1), this._isCullFaceDirty && (gl.cullFace(this.cullFace), this._isCullFaceDirty = !1), this._isDepthMaskDirty && (gl.depthMask(this.depthMask), this._isDepthMaskDirty = !1), this._isDepthTestDirty && (this.depthTest ? gl.enable(gl.DEPTH_TEST) : gl.disable(gl.DEPTH_TEST), this._isDepthTestDirty = !1), this._isDepthFuncDirty && (gl.depthFunc(this.depthFunc), this._isDepthFuncDirty = !1), this._isZOffsetDirty && (this.zOffset || this.zOffsetUnits ? (gl.enable(gl.POLYGON_OFFSET_FILL), gl.polygonOffset(this.zOffset, this.zOffsetUnits)) : gl.disable(gl.POLYGON_OFFSET_FILL), this._isZOffsetDirty = !1), this._isFrontFaceDirty && (gl.frontFace(this.frontFace), this._isFrontFaceDirty = !1));
+  }
+}, StencilStateComposer = class {
+  get isDirty() {
+    return this._isStencilTestDirty || this._isStencilMaskDirty || this._isStencilFuncDirty || this._isStencilOpDirty;
+  }
+  get func() {
+    return this._func;
+  }
+  set func(value) {
+    this._func !== value && (this._func = value, this._isStencilFuncDirty = !0);
+  }
+  get backFunc() {
+    return this._func;
+  }
+  set backFunc(value) {
+    this._backFunc !== value && (this._backFunc = value, this._isStencilFuncDirty = !0);
+  }
+  get funcRef() {
+    return this._funcRef;
+  }
+  set funcRef(value) {
+    this._funcRef !== value && (this._funcRef = value, this._isStencilFuncDirty = !0);
+  }
+  get funcMask() {
+    return this._funcMask;
+  }
+  set funcMask(value) {
+    this._funcMask !== value && (this._funcMask = value, this._isStencilFuncDirty = !0);
+  }
+  get opStencilFail() {
+    return this._opStencilFail;
+  }
+  set opStencilFail(value) {
+    this._opStencilFail !== value && (this._opStencilFail = value, this._isStencilOpDirty = !0);
+  }
+  get opDepthFail() {
+    return this._opDepthFail;
+  }
+  set opDepthFail(value) {
+    this._opDepthFail !== value && (this._opDepthFail = value, this._isStencilOpDirty = !0);
+  }
+  get opStencilDepthPass() {
+    return this._opStencilDepthPass;
+  }
+  set opStencilDepthPass(value) {
+    this._opStencilDepthPass !== value && (this._opStencilDepthPass = value, this._isStencilOpDirty = !0);
+  }
+  get backOpStencilFail() {
+    return this._backOpStencilFail;
+  }
+  set backOpStencilFail(value) {
+    this._backOpStencilFail !== value && (this._backOpStencilFail = value, this._isStencilOpDirty = !0);
+  }
+  get backOpDepthFail() {
+    return this._backOpDepthFail;
+  }
+  set backOpDepthFail(value) {
+    this._backOpDepthFail !== value && (this._backOpDepthFail = value, this._isStencilOpDirty = !0);
+  }
+  get backOpStencilDepthPass() {
+    return this._backOpStencilDepthPass;
+  }
+  set backOpStencilDepthPass(value) {
+    this._backOpStencilDepthPass !== value && (this._backOpStencilDepthPass = value, this._isStencilOpDirty = !0);
+  }
+  get mask() {
+    return this._mask;
+  }
+  set mask(value) {
+    this._mask !== value && (this._mask = value, this._isStencilMaskDirty = !0);
+  }
+  get enabled() {
+    return this._enabled;
+  }
+  set enabled(value) {
+    this._enabled !== value && (this._enabled = value, this._isStencilTestDirty = !0);
+  }
+  constructor(reset = !0) {
+    this._isStencilTestDirty = !1, this._isStencilMaskDirty = !1, this._isStencilFuncDirty = !1, this._isStencilOpDirty = !1, this.useStencilGlobalOnly = !1, reset && this.reset();
+  }
+  reset() {
+    this.stencilMaterial = void 0, this.stencilGlobal?.reset(), this._isStencilTestDirty = !0, this._isStencilMaskDirty = !0, this._isStencilFuncDirty = !0, this._isStencilOpDirty = !0;
+  }
+  apply(gl) {
+    if (!gl) return;
+    const stencilMaterialEnabled = !this.useStencilGlobalOnly && !!this.stencilMaterial?.enabled;
+    this.enabled = stencilMaterialEnabled ? this.stencilMaterial.enabled : this.stencilGlobal.enabled, this.func = stencilMaterialEnabled ? this.stencilMaterial.func : this.stencilGlobal.func, this.backFunc = stencilMaterialEnabled ? this.stencilMaterial.backFunc : this.stencilGlobal.backFunc, this.funcRef = stencilMaterialEnabled ? this.stencilMaterial.funcRef : this.stencilGlobal.funcRef, this.funcMask = stencilMaterialEnabled ? this.stencilMaterial.funcMask : this.stencilGlobal.funcMask, this.opStencilFail = stencilMaterialEnabled ? this.stencilMaterial.opStencilFail : this.stencilGlobal.opStencilFail, this.opDepthFail = stencilMaterialEnabled ? this.stencilMaterial.opDepthFail : this.stencilGlobal.opDepthFail, this.opStencilDepthPass = stencilMaterialEnabled ? this.stencilMaterial.opStencilDepthPass : this.stencilGlobal.opStencilDepthPass, this.backOpStencilFail = stencilMaterialEnabled ? this.stencilMaterial.backOpStencilFail : this.stencilGlobal.backOpStencilFail, this.backOpDepthFail = stencilMaterialEnabled ? this.stencilMaterial.backOpDepthFail : this.stencilGlobal.backOpDepthFail, this.backOpStencilDepthPass = stencilMaterialEnabled ? this.stencilMaterial.backOpStencilDepthPass : this.stencilGlobal.backOpStencilDepthPass, this.mask = stencilMaterialEnabled ? this.stencilMaterial.mask : this.stencilGlobal.mask, this.isDirty && (this._isStencilTestDirty && (this.enabled ? gl.enable(gl.STENCIL_TEST) : gl.disable(gl.STENCIL_TEST), this._isStencilTestDirty = !1), this._isStencilMaskDirty && (gl.stencilMask(this.mask), this._isStencilMaskDirty = !1), this._isStencilFuncDirty && (gl.stencilFuncSeparate(gl.FRONT, this.func, this.funcRef, this.funcMask), gl.stencilFuncSeparate(gl.BACK, this.backFunc, this.funcRef, this.funcMask), this._isStencilFuncDirty = !1), this._isStencilOpDirty && (gl.stencilOpSeparate(gl.FRONT, this.opStencilFail, this.opDepthFail, this.opStencilDepthPass), gl.stencilOpSeparate(gl.BACK, this.backOpStencilFail, this.backOpDepthFail, this.backOpStencilDepthPass), this._isStencilOpDirty = !1));
+  }
+}, StencilState = class StencilState2 {
+  constructor() {
+    this.reset();
+  }
+  reset() {
+    this.enabled = !1, this.mask = 255, this.funcRef = 1, this.funcMask = 255, this.func = StencilState2.ALWAYS, this.opStencilFail = StencilState2.KEEP, this.opDepthFail = StencilState2.KEEP, this.opStencilDepthPass = StencilState2.REPLACE, this.backFunc = StencilState2.ALWAYS, this.backOpStencilFail = StencilState2.KEEP, this.backOpDepthFail = StencilState2.KEEP, this.backOpStencilDepthPass = StencilState2.REPLACE;
+  }
+  get stencilFunc() {
+    return this.func;
+  }
+  set stencilFunc(value) {
+    this.func = value;
+  }
+  get stencilBackFunc() {
+    return this.backFunc;
+  }
+  set stencilBackFunc(value) {
+    this.backFunc = value;
+  }
+  get stencilFuncRef() {
+    return this.funcRef;
+  }
+  set stencilFuncRef(value) {
+    this.funcRef = value;
+  }
+  get stencilFuncMask() {
+    return this.funcMask;
+  }
+  set stencilFuncMask(value) {
+    this.funcMask = value;
+  }
+  get stencilOpStencilFail() {
+    return this.opStencilFail;
+  }
+  set stencilOpStencilFail(value) {
+    this.opStencilFail = value;
+  }
+  get stencilOpDepthFail() {
+    return this.opDepthFail;
+  }
+  set stencilOpDepthFail(value) {
+    this.opDepthFail = value;
+  }
+  get stencilOpStencilDepthPass() {
+    return this.opStencilDepthPass;
+  }
+  set stencilOpStencilDepthPass(value) {
+    this.opStencilDepthPass = value;
+  }
+  get stencilBackOpStencilFail() {
+    return this.backOpStencilFail;
+  }
+  set stencilBackOpStencilFail(value) {
+    this.backOpStencilFail = value;
+  }
+  get stencilBackOpDepthFail() {
+    return this.backOpDepthFail;
+  }
+  set stencilBackOpDepthFail(value) {
+    this.backOpDepthFail = value;
+  }
+  get stencilBackOpStencilDepthPass() {
+    return this.backOpStencilDepthPass;
+  }
+  set stencilBackOpStencilDepthPass(value) {
+    this.backOpStencilDepthPass = value;
+  }
+  get stencilMask() {
+    return this.mask;
+  }
+  set stencilMask(value) {
+    this.mask = value;
+  }
+  get stencilTest() {
+    return this.enabled;
+  }
+  set stencilTest(value) {
+    this.enabled = value;
+  }
+};
+StencilState.ALWAYS = 519;
+StencilState.KEEP = 7680;
+StencilState.REPLACE = 7681;
+var AlphaState = class {
+  constructor(_supportBlendParametersPerTarget) {
+    this._supportBlendParametersPerTarget = _supportBlendParametersPerTarget, this._blendFunctionParameters = new Array(32), this._blendEquationParameters = new Array(16), this._blendConstants = new Array(4), this._isBlendConstantsDirty = !1, this._alphaBlend = Array(8).fill(!1), this._numTargetEnabled = 0, this._isAlphaBlendDirty = !1, this._isBlendFunctionParametersDirty = !1, this._isBlendEquationParametersDirty = !1, this.reset();
+  }
+  get isDirty() {
+    return this._isAlphaBlendDirty || this._isBlendFunctionParametersDirty || this._isBlendEquationParametersDirty;
+  }
+  get alphaBlend() {
+    return this._numTargetEnabled > 0;
+  }
+  set alphaBlend(value) {
+    this.setAlphaBlend(value);
+  }
+  setAlphaBlend(value, targetIndex = 0) {
+    this._alphaBlend[targetIndex] !== value && (value ? this._numTargetEnabled++ : this._numTargetEnabled--, this._alphaBlend[targetIndex] = value, this._isAlphaBlendDirty = !0);
+  }
+  setAlphaBlendConstants(r, g, b, a) {
+    this._blendConstants[0] === r && this._blendConstants[1] === g && this._blendConstants[2] === b && this._blendConstants[3] === a || (this._blendConstants[0] = r, this._blendConstants[1] = g, this._blendConstants[2] = b, this._blendConstants[3] = a, this._isBlendConstantsDirty = !0);
+  }
+  setAlphaBlendFunctionParameters(srcRGBFactor, dstRGBFactor, srcAlphaFactor, dstAlphaFactor, targetIndex = 0) {
+    const offset = targetIndex * 4;
+    this._blendFunctionParameters[offset + 0] === srcRGBFactor && this._blendFunctionParameters[offset + 1] === dstRGBFactor && this._blendFunctionParameters[offset + 2] === srcAlphaFactor && this._blendFunctionParameters[offset + 3] === dstAlphaFactor || (this._blendFunctionParameters[offset + 0] = srcRGBFactor, this._blendFunctionParameters[offset + 1] = dstRGBFactor, this._blendFunctionParameters[offset + 2] = srcAlphaFactor, this._blendFunctionParameters[offset + 3] = dstAlphaFactor, this._isBlendFunctionParametersDirty = !0);
+  }
+  setAlphaEquationParameters(rgbEquation, alphaEquation, targetIndex = 0) {
+    const offset = targetIndex * 2;
+    this._blendEquationParameters[offset + 0] === rgbEquation && this._blendEquationParameters[offset + 1] === alphaEquation || (this._blendEquationParameters[offset + 0] = rgbEquation, this._blendEquationParameters[offset + 1] = alphaEquation, this._isBlendEquationParametersDirty = !0);
+  }
+  reset() {
+    this._alphaBlend.fill(!1), this._numTargetEnabled = 0, this._blendFunctionParameters.fill(null), this._blendEquationParameters.fill(null), this._blendConstants[0] = null, this._blendConstants[1] = null, this._blendConstants[2] = null, this._blendConstants[3] = null, this._isAlphaBlendDirty = !0, this._isBlendFunctionParametersDirty = !1, this._isBlendEquationParametersDirty = !1, this._isBlendConstantsDirty = !1;
+  }
+  apply(gl, numTargets = 1) {
+    if (!this.isDirty) return;
+    if (this._isBlendConstantsDirty && (gl.blendColor(this._blendConstants[0], this._blendConstants[1], this._blendConstants[2], this._blendConstants[3]), this._isBlendConstantsDirty = !1), numTargets === 1 || !this._supportBlendParametersPerTarget) {
+      this._isAlphaBlendDirty && (this._alphaBlend[0] ? gl.enable(gl.BLEND) : gl.disable(gl.BLEND), this._isAlphaBlendDirty = !1), this._isBlendFunctionParametersDirty && (gl.blendFuncSeparate(this._blendFunctionParameters[0], this._blendFunctionParameters[1], this._blendFunctionParameters[2], this._blendFunctionParameters[3]), this._isBlendFunctionParametersDirty = !1), this._isBlendEquationParametersDirty && (gl.blendEquationSeparate(this._blendEquationParameters[0], this._blendEquationParameters[1]), this._isBlendEquationParametersDirty = !1);
+      return;
+    }
+    const gl2 = gl;
+    if (this._isAlphaBlendDirty) {
+      for (let i = 0; i < numTargets; i++) {
+        const index = i < this._numTargetEnabled ? i : 0;
+        this._alphaBlend[index] ? gl2.enableIndexed(gl.BLEND, i) : gl2.disableIndexed(gl.BLEND, i);
+      }
+      this._isAlphaBlendDirty = !1;
+    }
+    if (this._isBlendFunctionParametersDirty) {
+      for (let i = 0; i < numTargets; i++) {
+        const offset = i < this._numTargetEnabled ? i * 4 : 0;
+        gl2.blendFuncSeparateIndexed(i, this._blendFunctionParameters[offset + 0], this._blendFunctionParameters[offset + 1], this._blendFunctionParameters[offset + 2], this._blendFunctionParameters[offset + 3]);
+      }
+      this._isBlendFunctionParametersDirty = !1;
+    }
+    if (this._isBlendEquationParametersDirty) {
+      for (let i = 0; i < numTargets; i++) {
+        const offset = i < this._numTargetEnabled ? i * 2 : 0;
+        gl2.blendEquationSeparateIndexed(i, this._blendEquationParameters[offset + 0], this._blendEquationParameters[offset + 1]);
+      }
+      this._isBlendEquationParametersDirty = !1;
+    }
+  }
+  setAlphaMode(mode, targetIndex) {
+    let equation = 32774;
+    switch (mode) {
+      case 0:
+        break;
+      case 7:
+        this.setAlphaBlendFunctionParameters(1, 771, 1, 1, targetIndex);
+        break;
+      case 8:
+        this.setAlphaBlendFunctionParameters(1, 771, 1, 771, targetIndex);
+        break;
+      case 2:
+        this.setAlphaBlendFunctionParameters(770, 771, 1, 1, targetIndex);
+        break;
+      case 6:
+        this.setAlphaBlendFunctionParameters(1, 1, 0, 1, targetIndex);
+        break;
+      case 1:
+        this.setAlphaBlendFunctionParameters(770, 1, 0, 1, targetIndex);
+        break;
+      case 3:
+        this.setAlphaBlendFunctionParameters(0, 769, 1, 1, targetIndex);
+        break;
+      case 4:
+        this.setAlphaBlendFunctionParameters(774, 0, 1, 1, targetIndex);
+        break;
+      case 5:
+        this.setAlphaBlendFunctionParameters(770, 769, 1, 1, targetIndex);
+        break;
+      case 9:
+        this.setAlphaBlendFunctionParameters(32769, 32770, 32771, 32772, targetIndex);
+        break;
+      case 10:
+        this.setAlphaBlendFunctionParameters(1, 769, 1, 771, targetIndex);
+        break;
+      case 11:
+        this.setAlphaBlendFunctionParameters(1, 1, 1, 1, targetIndex);
+        break;
+      case 12:
+        this.setAlphaBlendFunctionParameters(772, 1, 0, 0, targetIndex);
+        break;
+      case 13:
+        this.setAlphaBlendFunctionParameters(775, 769, 773, 771, targetIndex);
+        break;
+      case 14:
+        this.setAlphaBlendFunctionParameters(1, 771, 1, 771, targetIndex);
+        break;
+      case 15:
+        this.setAlphaBlendFunctionParameters(1, 1, 1, 0, targetIndex);
+        break;
+      case 16:
+        this.setAlphaBlendFunctionParameters(775, 769, 0, 1, targetIndex);
+        break;
+      case 17:
+        this.setAlphaBlendFunctionParameters(770, 771, 1, 771, targetIndex);
+        break;
+      case 18:
+        this.setAlphaBlendFunctionParameters(1, 1, 1, 1, targetIndex), equation = 32775;
+        break;
+      case 19:
+        this.setAlphaBlendFunctionParameters(1, 1, 1, 1, targetIndex), equation = 32776;
+        break;
+      case 20:
+        this.setAlphaBlendFunctionParameters(1, 35065, 0, 1, targetIndex);
+        break;
+    }
+    this.setAlphaEquationParameters(equation, equation, targetIndex);
+  }
+};
+function QueueNewFrame(func, requester) {
+  if (requester) {
+    const { requestAnimationFrame: requestAnimationFrame2 } = requester;
+    if (typeof requestAnimationFrame2 == "function") return requestAnimationFrame2(func);
+  }
+  if (IsWindowObjectExist()) {
+    const { requestAnimationFrame: requestAnimationFrame2 } = requester || window;
+    if (typeof requestAnimationFrame2 == "function") return requestAnimationFrame2(func);
+  } else if (typeof requestAnimationFrame == "function") return requestAnimationFrame(func);
+  return setTimeout(func, 16);
+}
+var AbstractEngine = class AbstractEngine2 {
+  get frameId() {
+    return this._frameId;
+  }
+  get isWebGPU() {
+    return this._isWebGPU;
+  }
+  _getShaderProcessor(_shaderLanguage) {
+    return this._shaderProcessor;
+  }
+  _resetAlphaMode() {
+    this._alphaMode.fill(-1), this._alphaEquation.fill(-1);
+  }
+  get shaderPlatformName() {
+    return this._shaderPlatformName;
+  }
+  _clearEmptyResources() {
+    this._emptyTexture = null, this._emptyCubeTexture = null, this._emptyTexture3D = null, this._emptyTexture2DArray = null;
+  }
+  get useReverseDepthBuffer() {
+    return this._useReverseDepthBuffer;
+  }
+  set useReverseDepthBuffer(useReverse) {
+    useReverse !== this._useReverseDepthBuffer && (this._useReverseDepthBuffer = useReverse, useReverse ? this._depthCullingState.depthFunc = 518 : this._depthCullingState.depthFunc = 515);
+  }
+  setColorWrite(enable) {
+    enable !== this._colorWrite && (this._colorWriteChanged = !0, this._colorWrite = enable);
+  }
+  getColorWrite() {
+    return this._colorWrite;
+  }
+  get depthCullingState() {
+    return this._depthCullingState;
+  }
+  get alphaState() {
+    return this._alphaState;
+  }
+  get stencilState() {
+    return this._stencilState;
+  }
+  get stencilStateComposer() {
+    return this._stencilStateComposer;
+  }
+  _getGlobalDefines(defines) {
+    if (defines) {
+      this.isNDCHalfZRange ? defines.IS_NDC_HALF_ZRANGE = "" : delete defines.IS_NDC_HALF_ZRANGE, this.useReverseDepthBuffer ? defines.USE_REVERSE_DEPTHBUFFER = "" : delete defines.USE_REVERSE_DEPTHBUFFER, this.useExactSrgbConversions ? defines.USE_EXACT_SRGB_CONVERSIONS = "" : delete defines.USE_EXACT_SRGB_CONVERSIONS;
+      return;
+    } else {
+      let s = "";
+      return this.isNDCHalfZRange && (s += "#define IS_NDC_HALF_ZRANGE"), this.useReverseDepthBuffer && (s && (s += `
+`), s += "#define USE_REVERSE_DEPTHBUFFER"), this.useExactSrgbConversions && (s && (s += `
+`), s += "#define USE_EXACT_SRGB_CONVERSIONS"), s;
+    }
+  }
+  _rebuildInternalTextures() {
+    const currentState = this._internalTexturesCache.slice();
+    for (const internalTexture of currentState) internalTexture._rebuild();
+  }
+  _rebuildRenderTargetWrappers() {
+    const currentState = this._renderTargetWrapperCache.slice();
+    for (const renderTargetWrapper of currentState)
+      renderTargetWrapper.textures?.some((t) => t.source === 15) || renderTargetWrapper._rebuild();
+  }
+  _rebuildEffects() {
+    for (const key in this._compiledEffects) {
+      const effect = this._compiledEffects[key];
+      effect._pipelineContext = null, effect._prepareEffect();
+    }
+    Effect.ResetCache();
+  }
+  _rebuildGraphicsResources() {
+    this.wipeCaches(!0), this._rebuildEffects(), this._rebuildComputeEffects?.(), this._rebuildBuffers(), this._rebuildInternalTextures(), this._rebuildTextures(), this._rebuildRenderTargetWrappers(), this.wipeCaches(!0);
+  }
+  _flagContextRestored() {
+    Logger.Warn(this.name + " context successfully restored."), this.onContextRestoredObservable.notifyObservers(this), this._contextWasLost = !1;
+  }
+  _restoreEngineAfterContextLost(initEngine) {
+    setTimeout(() => {
+      this._clearEmptyResources();
+      const depthTest = this._depthCullingState.depthTest, depthFunc = this._depthCullingState.depthFunc, depthMask = this._depthCullingState.depthMask, stencilTest = this._stencilState.stencilTest;
+      initEngine(), this._rebuildGraphicsResources(), this._depthCullingState.depthTest = depthTest, this._depthCullingState.depthFunc = depthFunc, this._depthCullingState.depthMask = depthMask, this._stencilState.stencilTest = stencilTest, this._flagContextRestored();
+    }, 0);
+  }
+  get isDisposed() {
+    return this._isDisposed;
+  }
+  get snapshotRendering() {
+    return !1;
+  }
+  set snapshotRendering(activate) {
+  }
+  get snapshotRenderingMode() {
+    return 0;
+  }
+  set snapshotRenderingMode(mode) {
+  }
+  getClassName() {
+    return "AbstractEngine";
+  }
+  get emptyTexture() {
+    return this._emptyTexture || (this._emptyTexture = this.createRawTexture(/* @__PURE__ */ new Uint8Array(4), 1, 1, 5, !1, !1, 1)), this._emptyTexture;
+  }
+  get emptyTexture3D() {
+    return this._emptyTexture3D || (this._emptyTexture3D = this.createRawTexture3D(/* @__PURE__ */ new Uint8Array(4), 1, 1, 1, 5, !1, !1, 1)), this._emptyTexture3D;
+  }
+  get emptyTexture2DArray() {
+    return this._emptyTexture2DArray || (this._emptyTexture2DArray = this.createRawTexture2DArray(/* @__PURE__ */ new Uint8Array(4), 1, 1, 1, 5, !1, !1, 1)), this._emptyTexture2DArray;
+  }
+  get emptyCubeTexture() {
+    if (!this._emptyCubeTexture) {
+      const faceData = /* @__PURE__ */ new Uint8Array(4), cubeData = [
+        faceData,
+        faceData,
+        faceData,
+        faceData,
+        faceData,
+        faceData
+      ];
+      this._emptyCubeTexture = this.createRawCubeTexture(cubeData, 1, 5, 0, !1, !1, 1);
+    }
+    return this._emptyCubeTexture;
+  }
+  set framebufferDimensionsObject(dimensions) {
+    this._framebufferDimensionsObject = dimensions;
+  }
+  get activeRenderLoops() {
+    return this._activeRenderLoops;
+  }
+  stopRenderLoop(renderFunction) {
+    if (!renderFunction) {
+      this._activeRenderLoops.length = 0, this._cancelFrame();
+      return;
+    }
+    const index = this._activeRenderLoops.indexOf(renderFunction);
+    index >= 0 && (this._activeRenderLoops.splice(index, 1), this._activeRenderLoops.length == 0 && this._cancelFrame());
+  }
+  _cancelFrame() {
+    if (this.customAnimationFrameRequester) {
+      if (this._frameHandler !== 0) {
+        this._frameHandler = 0;
+        const { cancelAnimationFrame: cancelAnimationFrame2 } = this.customAnimationFrameRequester;
+        cancelAnimationFrame2 && cancelAnimationFrame2(this.customAnimationFrameRequester.requestID), delete this.customAnimationFrameRequester.requestID;
+      }
+      return;
+    }
+    if (this._frameHandler !== 0) {
+      const handlerToCancel = this._frameHandler;
+      if (this._frameHandler = 0, IsWindowObjectExist()) {
+        const { cancelAnimationFrame: cancelAnimationFrame2 } = this.getHostWindow() || window;
+        if (typeof cancelAnimationFrame2 == "function") return cancelAnimationFrame2(handlerToCancel);
+      } else if (typeof cancelAnimationFrame == "function") return cancelAnimationFrame(handlerToCancel);
+      return clearTimeout(handlerToCancel);
+    }
+  }
+  beginFrame() {
+    this.onBeginFrameObservable.notifyObservers(this);
+  }
+  endFrame() {
+    this._frameId++, this.onEndFrameObservable.notifyObservers(this);
+  }
+  get maxFPS() {
+    return this._maxFPS;
+  }
+  set maxFPS(value) {
+    if (this._maxFPS = value, value !== void 0) {
+      if (value <= 0) {
+        this._minFrameTime = Number.MAX_VALUE;
+        return;
+      }
+      this._minFrameTime = 1e3 / value;
+    }
+  }
+  _isOverFrameTime(timestamp) {
+    if (!timestamp || this._maxFPS === void 0) return !1;
+    const elapsedTime = timestamp - this._lastFrameTime;
+    return this._lastFrameTime = timestamp, this._renderAccumulator += elapsedTime, this._renderAccumulator < this._minFrameTime ? !0 : (this._renderAccumulator -= this._minFrameTime, this._renderAccumulator > this._minFrameTime && (this._renderAccumulator = this._minFrameTime), !1);
+  }
+  _processFrame(timestamp) {
+    if (this._frameHandler = 0, !this._contextWasLost && !this._isOverFrameTime(timestamp)) {
+      let shouldRender = !0;
+      (this.isDisposed || !this.renderEvenInBackground && this._windowIsBackground) && (shouldRender = !1), shouldRender && (this.beginFrame(), !this.skipFrameRender && !this._renderViews() && this._renderFrame(), this.endFrame());
+    }
+  }
+  _renderLoop(timestamp) {
+    this._processFrame(timestamp), this._activeRenderLoops.length > 0 && this._frameHandler === 0 && this._queueNewFrameForRenderLoop();
+  }
+  _renderFrame() {
+    for (let index = 0; index < this._activeRenderLoops.length; index++) {
+      const renderFunction = this._activeRenderLoops[index];
+      renderFunction();
+    }
+  }
+  _renderViews() {
+    return !1;
+  }
+  _queueNewFrame(bindedRenderFunction, requester) {
+    return QueueNewFrame(bindedRenderFunction, requester);
+  }
+  _queueNewFrameForRenderLoop() {
+    this.customAnimationFrameRequester ? (this.customAnimationFrameRequester.requestID = this._queueNewFrame(this.customAnimationFrameRequester.renderFunction || this._boundRenderFunction, this.customAnimationFrameRequester), this._frameHandler = this.customAnimationFrameRequester.requestID) : this._frameHandler = this._queueNewFrame(this._boundRenderFunction, this.getHostWindow());
+  }
+  runRenderLoop(renderFunction) {
+    this._activeRenderLoops.indexOf(renderFunction) === -1 && (this._activeRenderLoops.push(renderFunction), this._activeRenderLoops.length === 1 && this._frameHandler === 0 && this._queueNewFrameForRenderLoop());
+  }
+  getDepthBuffer() {
+    return this._depthCullingState.depthTest;
+  }
+  setDepthBuffer(enable) {
+    this._depthCullingState.depthTest = enable;
+  }
+  setZOffset(value) {
+    this._depthCullingState.zOffset = this.useReverseDepthBuffer ? -value : value;
+  }
+  getZOffset() {
+    const zOffset = this._depthCullingState.zOffset;
+    return this.useReverseDepthBuffer ? -zOffset : zOffset;
+  }
+  setZOffsetUnits(value) {
+    this._depthCullingState.zOffsetUnits = this.useReverseDepthBuffer ? -value : value;
+  }
+  getZOffsetUnits() {
+    const zOffsetUnits = this._depthCullingState.zOffsetUnits;
+    return this.useReverseDepthBuffer ? -zOffsetUnits : zOffsetUnits;
+  }
+  getHostWindow() {
+    return IsWindowObjectExist() ? this._renderingCanvas && this._renderingCanvas.ownerDocument && this._renderingCanvas.ownerDocument.defaultView ? this._renderingCanvas.ownerDocument.defaultView : window : null;
+  }
+  get compatibilityMode() {
+    return this._compatibilityMode;
+  }
+  set compatibilityMode(mode) {
+    this._compatibilityMode = !0;
+  }
+  _rebuildTextures() {
+    for (const scene of this.scenes) scene._rebuildTextures();
+    for (const scene of this._virtualScenes) scene._rebuildTextures();
+  }
+  _releaseRenderTargetWrapper(rtWrapper) {
+    const index = this._renderTargetWrapperCache.indexOf(rtWrapper);
+    index !== -1 && this._renderTargetWrapperCache.splice(index, 1);
+  }
+  get currentViewport() {
+    return this._cachedViewport;
+  }
+  setViewport(viewport, requiredWidth, requiredHeight) {
+    const width = requiredWidth || this.getRenderWidth(), height = requiredHeight || this.getRenderHeight(), x = viewport.x || 0, y = viewport.y || 0;
+    this._cachedViewport = viewport, this._viewport(x * width, y * height, width * viewport.width, height * viewport.height);
+  }
+  createCanvasImage() {
+    return document.createElement("img");
+  }
+  createCanvasPath2D(d) {
+    return new Path2D(d);
+  }
+  get description() {
+    let description = this.name + this.version;
+    return this._caps.parallelShaderCompile && (description += " - Parallel shader compilation"), description;
+  }
+  _createTextureBase(url, noMipmap, invertY, scene, samplingMode = 3, onLoad = null, onError = null, prepareTexture, prepareTextureProcess, buffer = null, fallback = null, format = null, forcedExtension = null, mimeType, loaderOptions, useSRGBBuffer) {
+    url = url || "";
+    const fromData = url.substring(0, 5) === "data:", fromBlob = url.substring(0, 5) === "blob:", isBase64 = fromData && url.indexOf(";base64,") !== -1, texture = fallback || new InternalTexture(this, 1);
+    texture !== fallback && (texture.label = url.substring(0, 60));
+    const originalUrl = url;
+    this._transformTextureUrl && !isBase64 && !fallback && !buffer && (url = this._transformTextureUrl(url)), originalUrl !== url && (texture._originalUrl = originalUrl);
+    const lastDot = url.lastIndexOf(".");
+    let extension = forcedExtension || (lastDot > -1 ? url.substring(lastDot).toLowerCase() : "");
+    extension.indexOf("?") > -1 && (extension = extension.split("?")[0]);
+    const loaderPromise = AbstractEngine2.GetCompatibleTextureLoader(extension, mimeType);
+    scene && scene.addPendingData(texture), texture.url = url, texture.generateMipMaps = !noMipmap, texture.samplingMode = samplingMode, texture.invertY = invertY, texture._useSRGBBuffer = this._getUseSRGBBuffer(!!useSRGBBuffer, noMipmap), this._doNotHandleContextLost || (texture._buffer = buffer);
+    let onLoadObserver = null;
+    onLoad && !fallback && (onLoadObserver = texture.onLoadedObservable.add(onLoad)), fallback || this._internalTexturesCache.push(texture);
+    const onInternalError = (message, exception) => {
+      scene && scene.removePendingData(texture), url === originalUrl ? (onLoadObserver && texture.onLoadedObservable.remove(onLoadObserver), EngineStore.UseFallbackTexture && url !== EngineStore.FallbackTexture && this._createTextureBase(EngineStore.FallbackTexture, noMipmap, texture.invertY, scene, samplingMode, null, onError, prepareTexture, prepareTextureProcess, buffer, texture), message = (message || "Unknown error") + (EngineStore.UseFallbackTexture ? " - Fallback texture was used" : ""), texture.onErrorObservable.notifyObservers({
+        message,
+        exception
+      }), onError && onError(message, exception)) : (Logger.Warn(`Failed to load ${url}, falling back to ${originalUrl}`), this._createTextureBase(originalUrl, noMipmap, texture.invertY, scene, samplingMode, onLoad, onError, prepareTexture, prepareTextureProcess, buffer, texture, format, forcedExtension, mimeType, loaderOptions, useSRGBBuffer));
+    };
+    if (loaderPromise) {
+      const callbackAsync = async (data) => {
+        (await loaderPromise).loadData(data, texture, (width, height, loadMipmap, isCompressed, done, loadFailed) => {
+          loadFailed ? onInternalError("TextureLoader failed to load data") : prepareTexture(texture, extension, scene, {
+            width,
+            height
+          }, texture.invertY, !loadMipmap, isCompressed, () => (done(), !1), samplingMode);
+        }, loaderOptions);
+      };
+      if (!buffer) this._loadFile(url, async (data) => {
+        try {
+          await callbackAsync(new Uint8Array(data));
+        } catch (reason) {
+          onInternalError("Failed to parse texture data", reason);
+        }
+      }, void 0, scene ? scene.offlineProvider : void 0, !0, (request, exception) => {
+        onInternalError("Unable to load " + (request && request.responseURL, exception));
+      });
+      else {
+        const processBufferAsync = async (data) => {
+          try {
+            await callbackAsync(data);
+          } catch (reason) {
+            onInternalError("Failed to parse texture data", reason);
+          }
+        };
+        buffer instanceof ArrayBuffer ? processBufferAsync(new Uint8Array(buffer)) : ArrayBuffer.isView(buffer) ? processBufferAsync(buffer) : onError && onError("Unable to load: only ArrayBuffer or ArrayBufferView is supported", null);
+      }
+    } else {
+      const onload = (img) => {
+        fromBlob && !this._doNotHandleContextLost && (texture._buffer = img), prepareTexture(texture, extension, scene, img, texture.invertY, noMipmap, !1, prepareTextureProcess, samplingMode);
+      };
+      !fromData || isBase64 ? buffer && (typeof buffer.decoding == "string" || buffer.close) ? onload(buffer) : AbstractEngine2._FileToolsLoadImage(url || "", onload, onInternalError, scene ? scene.offlineProvider : null, mimeType, texture.invertY && this._features.needsInvertingBitmap ? { imageOrientation: "flipY" } : void 0, this) : typeof buffer == "string" || buffer instanceof ArrayBuffer || ArrayBuffer.isView(buffer) || buffer instanceof Blob ? AbstractEngine2._FileToolsLoadImage(buffer, onload, onInternalError, scene ? scene.offlineProvider : null, mimeType, texture.invertY && this._features.needsInvertingBitmap ? { imageOrientation: "flipY" } : void 0, this) : buffer && onload(buffer);
+    }
+    return texture;
+  }
+  _rebuildBuffers() {
+    for (const uniformBuffer of this._uniformBuffers) uniformBuffer._rebuildAfterContextLost();
+  }
+  get _shouldUseHighPrecisionShader() {
+    return !!(this._caps.highPrecisionShaderSupported && this._highPrecisionShadersAllowed);
+  }
+  getHostDocument() {
+    return this._renderingCanvas && this._renderingCanvas.ownerDocument ? this._renderingCanvas.ownerDocument : IsDocumentAvailable() ? document : null;
+  }
+  getLoadedTexturesCache() {
+    return this._internalTexturesCache;
+  }
+  clearInternalTexturesCache() {
+    this._internalTexturesCache.length = 0;
+  }
+  getCaps() {
+    return this._caps;
+  }
+  resetTextureCache() {
+    for (const key in this._boundTexturesCache)
+      Object.prototype.hasOwnProperty.call(this._boundTexturesCache, key) && (this._boundTexturesCache[key] = null);
+    this._currentTextureChannel = -1;
+  }
+  get name() {
+    return this._name;
+  }
+  set name(value) {
+    this._name = value;
+  }
+  static get NpmPackage() {
+    return "babylonjs@9.16.1";
+  }
+  static get Version() {
+    return "9.16.1";
+  }
+  getRenderingCanvas() {
+    return this._renderingCanvas;
+  }
+  getAudioContext() {
+    return this._audioContext;
+  }
+  getAudioDestination() {
+    return this._audioDestination;
+  }
+  setHardwareScalingLevel(level) {
+    this._hardwareScalingLevel = level, this.resize();
+  }
+  getHardwareScalingLevel() {
+    return this._hardwareScalingLevel;
+  }
+  get doNotHandleContextLost() {
+    return this._doNotHandleContextLost;
+  }
+  set doNotHandleContextLost(value) {
+    this._doNotHandleContextLost = value;
+  }
+  get isStencilEnable() {
+    return this._isStencilEnable;
+  }
+  getCreationOptions() {
+    return this._creationOptions;
+  }
+  constructor(antialias, options, adaptToDeviceRatio) {
+    this._colorWrite = !0, this._colorWriteChanged = !0, this._depthCullingState = new DepthCullingState(), this._stencilStateComposer = new StencilStateComposer(), this._stencilState = new StencilState(), this._alphaState = new AlphaState(!1), this._alphaMode = Array(8).fill(-1), this._alphaEquation = Array(8).fill(-1), this._activeRequests = [], this._badOS = !1, this._badDesktopOS = !1, this._compatibilityMode = !0, this._internalTexturesCache = new Array(), this._currentRenderTarget = null, this._boundTexturesCache = {}, this._activeChannel = 0, this._currentTextureChannel = -1, this._viewportCached = {
+      x: 0,
+      y: 0,
+      z: 0,
+      w: 0
+    }, this._isWebGPU = !1, this._enableGPUDebugMarkers = !1, this.onCanvasBlurObservable = new Observable(), this.onCanvasFocusObservable = new Observable(), this.onNewSceneAddedObservable = new Observable(), this.onResizeObservable = new Observable(), this.onCanvasPointerOutObservable = new Observable(), this.onEffectErrorObservable = new Observable(), this.disablePerformanceMonitorInBackground = !1, this.disableVertexArrayObjects = !1, this._frameId = 0, this.hostInformation = { isMobile: !1 }, this.isFullscreen = !1, this.enableOfflineSupport = !1, this.disableManifestCheck = !1, this.disableContextMenu = !0, this.currentRenderPassId = 0, this.isPointerLock = !1, this.postProcesses = [], this.canvasTabIndex = 1, this._contextWasLost = !1, this._useReverseDepthBuffer = !1, this.isNDCHalfZRange = !1, this.hasOriginBottomLeft = !0, this._renderTargetWrapperCache = new Array(), this._compiledEffects = {}, this._isDisposed = !1, this.scenes = [], this._virtualScenes = new Array(), this.onBeforeTextureInitObservable = new Observable(), this.renderEvenInBackground = !0, this.preventCacheWipeBetweenFrames = !1, this._frameHandler = 0, this._activeRenderLoops = new Array(), this.customAnimationFrameRequester = null, this._windowIsBackground = !1, this._boundRenderFunction = (timestamp) => this._renderLoop(timestamp), this._lastFrameTime = 0, this._renderAccumulator = 0, this.skipFrameRender = !1, this.onBeforeShaderCompilationObservable = new Observable(), this.onAfterShaderCompilationObservable = new Observable(), this.onBeginFrameObservable = new Observable(), this.onEndFrameObservable = new Observable(), this._transformTextureUrl = null, this._uniformBuffers = new Array(), this._storageBuffers = new Array(), this._highPrecisionShadersAllowed = !0, this.onContextLostObservable = new Observable(), this.onContextRestoredObservable = new Observable(), this._name = "", this.premultipliedAlpha = !0, this.adaptToDeviceRatio = !1, this._lastDevicePixelRatio = 1, this._doNotHandleContextLost = !1, this.cullBackFaces = null, this._renderPassNames = ["main"], this._fps = 60, this._deltaTime = 0, this._deterministicLockstep = !1, this._lockstepMaxSteps = 4, this._timeStep = 1 / 60, this.onDisposeObservable = new Observable(), this.onReleaseEffectsObservable = new Observable(), EngineStore.Instances.push(this), this.startTime = PrecisionDate.Now, this._stencilStateComposer.stencilGlobal = this._stencilState, PerformanceConfigurator.SetMatrixPrecision(!!options.useLargeWorldRendering || !!options.useHighPrecisionMatrix), IsNavigatorAvailable() && navigator.userAgent && (this._badOS = /iPad/i.test(navigator.userAgent) || /iPhone/i.test(navigator.userAgent), this._badDesktopOS = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)), options.antialias = antialias ?? options.antialias, options.deterministicLockstep = options.deterministicLockstep ?? !1, options.lockstepMaxSteps = options.lockstepMaxSteps ?? 4, options.timeStep = options.timeStep ?? 1 / 60, options.stencil = options.stencil ?? !0, this._audioContext = options.audioEngineOptions?.audioContext ?? null, this._audioDestination = options.audioEngineOptions?.audioDestination ?? null, this.premultipliedAlpha = options.premultipliedAlpha ?? !0, this._doNotHandleContextLost = !!options.doNotHandleContextLost, this._isStencilEnable = !!options.stencil, this.useExactSrgbConversions = options.useExactSrgbConversions ?? !1, this.canvasTabIndex = options.canvasTabIndex ?? this.canvasTabIndex;
+    const devicePixelRatio = IsWindowObjectExist() && window.devicePixelRatio || 1, limitDeviceRatio = options.limitDeviceRatio || devicePixelRatio;
+    adaptToDeviceRatio = adaptToDeviceRatio || options.adaptToDeviceRatio || !1, this.adaptToDeviceRatio = adaptToDeviceRatio, this._hardwareScalingLevel = adaptToDeviceRatio ? 1 / Math.min(limitDeviceRatio, devicePixelRatio) : 1, this._lastDevicePixelRatio = devicePixelRatio, this._creationOptions = options;
+  }
+  resize(forceSetSize = !1) {
+    let width, height;
+    if (this.adaptToDeviceRatio) {
+      const devicePixelRatio = IsWindowObjectExist() && window.devicePixelRatio || 1, changeRatio = this._lastDevicePixelRatio / devicePixelRatio;
+      this._lastDevicePixelRatio = devicePixelRatio, this._hardwareScalingLevel *= changeRatio;
+    }
+    if (IsWindowObjectExist() && IsDocumentAvailable()) if (this._renderingCanvas) {
+      const boundingRect = this._renderingCanvas.getBoundingClientRect?.();
+      width = this._renderingCanvas.clientWidth || boundingRect?.width || this._renderingCanvas.width * this._hardwareScalingLevel || 100, height = this._renderingCanvas.clientHeight || boundingRect?.height || this._renderingCanvas.height * this._hardwareScalingLevel || 100;
+    } else
+      width = window.innerWidth, height = window.innerHeight;
+    else
+      width = this._renderingCanvas ? this._renderingCanvas.width : 100, height = this._renderingCanvas ? this._renderingCanvas.height : 100;
+    this.setSize(width / this._hardwareScalingLevel, height / this._hardwareScalingLevel, forceSetSize);
+  }
+  setSize(width, height, forceSetSize = !1) {
+    if (!this._renderingCanvas || (width = width | 0, height = height | 0, !forceSetSize && this._renderingCanvas.width === width && this._renderingCanvas.height === height)) return !1;
+    if (this._renderingCanvas.width = width, this._renderingCanvas.height = height, this.scenes) {
+      for (let index = 0; index < this.scenes.length; index++) {
+        const scene = this.scenes[index];
+        for (let camIndex = 0; camIndex < scene.cameras.length; camIndex++) {
+          const cam = scene.cameras[camIndex];
+          cam._currentRenderId = 0;
+        }
+      }
+      this.onResizeObservable.hasObservers() && this.onResizeObservable.notifyObservers(this);
+    }
+    return !0;
+  }
+  createRawTexture(data, width, height, format, generateMipMaps, invertY, samplingMode, compression, type, creationFlags, useSRGBBuffer, mipLevelCount) {
+    throw _WarnImport("engine.rawTexture");
+  }
+  createRawCubeTexture(data, size, format, type, generateMipMaps, invertY, samplingMode, compression) {
+    throw _WarnImport("engine.rawTexture");
+  }
+  createRawTexture3D(data, width, height, depth, format, generateMipMaps, invertY, samplingMode, compression, textureType, creationFlags) {
+    throw _WarnImport("engine.rawTexture");
+  }
+  createRawTexture2DArray(data, width, height, depth, format, generateMipMaps, invertY, samplingMode, compression, textureType, creationFlags, mipLevelCount) {
+    throw _WarnImport("engine.rawTexture");
+  }
+  _sharedInit(canvas) {
+    this._renderingCanvas = canvas;
+  }
+  _setupMobileChecks() {
+    navigator && navigator.userAgent && (this._checkForMobile = () => {
+      const currentUa = navigator.userAgent;
+      this.hostInformation.isMobile = currentUa.indexOf("Mobile") !== -1 || currentUa.indexOf("Mac") !== -1 && IsDocumentAvailable() && "ontouchend" in document;
+    }, this._checkForMobile(), IsWindowObjectExist() && window.addEventListener("resize", this._checkForMobile));
+  }
+  createVideoElement(constraints) {
+    return document.createElement("video");
+  }
+  _reportDrawCall(numDrawCalls = 1) {
+    this._drawCalls?.addCount(numDrawCalls, !1);
+  }
+  getFps() {
+    return this._fps;
+  }
+  getDeltaTime() {
+    return this._deltaTime;
+  }
+  isDeterministicLockStep() {
+    return this._deterministicLockstep;
+  }
+  getLockstepMaxSteps() {
+    return this._lockstepMaxSteps;
+  }
+  getTimeStep() {
+    return this._timeStep * 1e3;
+  }
+  _createImageBitmapFromSource(imageSource, options) {
+    throw new Error("createImageBitmapFromSource is not implemented");
+  }
+  createImageBitmap(image, options) {
+    return createImageBitmap(image, options);
+  }
+  resizeImageBitmap(image, bufferWidth, bufferHeight) {
+    throw new Error("resizeImageBitmap is not implemented");
+  }
+  getFontOffset(font) {
+    throw new Error("getFontOffset is not implemented");
+  }
+  static _CreateCanvas(width, height) {
+    if (typeof document > "u") return new OffscreenCanvas(width, height);
+    const canvas = document.createElement("canvas");
+    return canvas.width = width, canvas.height = height, canvas;
+  }
+  createCanvas(width, height) {
+    return AbstractEngine2._CreateCanvas(width, height);
+  }
+  static _FileToolsLoadImage(input, onLoad, onError, offlineProvider, mimeType, imageBitmapOptions, engine) {
+    if (!EngineFunctionContext.loadImage) throw _WarnImport("FileTools");
+    return EngineFunctionContext.loadImage(input, onLoad, onError, offlineProvider, mimeType, imageBitmapOptions, engine);
+  }
+  _loadFile(url, onSuccess, onProgress, offlineProvider, useArrayBuffer, onError) {
+    const request = _LoadFile(url, onSuccess, onProgress, offlineProvider, useArrayBuffer, onError);
+    return this._activeRequests.push(request), request.onCompleteObservable.add(() => {
+      const index = this._activeRequests.indexOf(request);
+      index !== -1 && this._activeRequests.splice(index, 1);
+    }), request;
+  }
+  static _FileToolsLoadFile(url, onSuccess, onProgress, offlineProvider, useArrayBuffer, onError) {
+    if (EngineFunctionContext.loadFile) return EngineFunctionContext.loadFile(url, onSuccess, onProgress, offlineProvider, useArrayBuffer, onError);
+    throw _WarnImport("FileTools");
+  }
+  dispose() {
+    for (this.releaseEffects(), this._isDisposed = !0, this.stopRenderLoop(), this._emptyTexture && (this._releaseTexture(this._emptyTexture), this._emptyTexture = null), this._emptyCubeTexture && (this._releaseTexture(this._emptyCubeTexture), this._emptyCubeTexture = null), this._renderingCanvas = null, this.onBeforeTextureInitObservable && this.onBeforeTextureInitObservable.clear(); this.postProcesses.length; ) this.postProcesses[0].dispose();
+    for (; this.scenes.length; ) this.scenes[0].dispose();
+    for (; this._virtualScenes.length; ) this._virtualScenes[0].dispose();
+    this.releaseComputeEffects?.(), Effect.ResetCache();
+    for (const request of this._activeRequests) request.abort();
+    this._boundRenderFunction = null, this.onDisposeObservable.notifyObservers(this), this.onDisposeObservable.clear(), this.onResizeObservable.clear(), this.onCanvasBlurObservable.clear(), this.onCanvasFocusObservable.clear(), this.onCanvasPointerOutObservable.clear(), this.onNewSceneAddedObservable.clear(), this.onEffectErrorObservable.clear(), IsWindowObjectExist() && window.removeEventListener("resize", this._checkForMobile);
+    const index = EngineStore.Instances.indexOf(this);
+    index >= 0 && EngineStore.Instances.splice(index, 1), EngineStore.Instances.length || (EngineStore.OnEnginesDisposedObservable.notifyObservers(this), EngineStore.OnEnginesDisposedObservable.clear()), this.onBeginFrameObservable.clear(), this.onEndFrameObservable.clear();
+  }
+  static DefaultLoadingScreenFactory(canvas) {
+    throw _WarnImport("LoadingScreen");
+  }
+  static MarkAllMaterialsAsDirty(flag, predicate) {
+    for (let engineIndex = 0; engineIndex < EngineStore.Instances.length; engineIndex++) {
+      const engine = EngineStore.Instances[engineIndex];
+      for (let sceneIndex = 0; sceneIndex < engine.scenes.length; sceneIndex++) engine.scenes[sceneIndex].markAllMaterialsAsDirty(flag, predicate);
+    }
+  }
+  static GetCompatibleTextureLoader(_extension, _mimeType) {
+    return null;
+  }
+};
+AbstractEngine._RenderPassIdCounter = 0;
+AbstractEngine._RescalePostProcessFactory = null;
+AbstractEngine.CollisionsEpsilon = 1e-3;
+AbstractEngine.QueueNewFrame = QueueNewFrame;
+var scriptRel = "modulepreload", assetsURL = function(dep) {
+  return "/" + dep;
+}, seen = {}, __vitePreload = function(baseModule, deps, importerUrl) {
+  let promise = Promise.resolve();
+  if (deps && deps.length > 0) {
+    let allSettled = function(promises) {
+      return Promise.all(promises.map((p) => Promise.resolve(p).then((value) => ({
+        status: "fulfilled",
+        value
+      }), (reason) => ({
+        status: "rejected",
+        reason
+      }))));
+    }, importMetaResolve = function(specifier) {
+      return import.meta.resolve ? import.meta.resolve(specifier) : new URL(specifier, import.meta.url).href;
+    };
+    const links = document.getElementsByTagName("link"), cspNonceMeta = document.querySelector("meta[property=csp-nonce]"), cspNonce = cspNonceMeta?.nonce || cspNonceMeta?.getAttribute("nonce");
+    promise = allSettled(deps.map((dep) => {
+      if (dep = assetsURL(dep, importerUrl), dep = importMetaResolve(dep), dep in seen) return;
+      seen[dep] = !0;
+      const isCss = dep.endsWith(".css");
+      for (let i = links.length - 1; i >= 0; i--) {
+        const link2 = links[i];
+        if (link2.href === dep && (!isCss || link2.rel === "stylesheet")) return;
+      }
+      const link = document.createElement("link");
+      if (link.rel = isCss ? "stylesheet" : scriptRel, isCss || (link.as = "script"), link.crossOrigin = "", link.href = dep, cspNonce && link.setAttribute("nonce", cspNonce), document.head.appendChild(link), isCss) return new Promise((res, rej) => {
+        link.addEventListener("load", res), link.addEventListener("error", () => rej(/* @__PURE__ */ new Error(`Unable to preload CSS for ${dep}`)));
+      });
+    }));
+  }
+  function handlePreloadError(err) {
+    const e = new Event("vite:preloadError", { cancelable: !0 });
+    if (e.payload = err, window.dispatchEvent(e), !e.defaultPrevented) throw err;
+  }
+  return promise.then((res) => {
+    for (const item of res || [])
+      item.status === "rejected" && handlePreloadError(item.reason);
+    return baseModule().catch(handlePreloadError);
+  });
+};
+export {
+  resetCachedPipeline as a,
+  _finalizePipelineContext as c,
+  _setProgram as d,
+  createPipelineContext as f,
+  getStateObject as g,
+  deleteStateObject as h,
+  Effect as i,
+  _isRenderingStateCompiled as l,
+  createShaderProgram as m,
+  AbstractEngine as n,
+  _createShaderProgram as o,
+  createRawShaderProgram as p,
+  AlphaState as r,
+  _executeWhenRenderingStateIsCompiled as s,
+  __vitePreload as t,
+  _preparePipelineContext as u
+};

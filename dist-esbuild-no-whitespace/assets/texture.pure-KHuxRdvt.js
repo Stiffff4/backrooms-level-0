@@ -1,0 +1,523 @@
+import { n as RegisterClass, s as Observable, t as GetClass } from "./typeStore-BMcSg10V.js";
+import { C as _WarnImport, c as TimingTools } from "./guid-D83Ubj_G.js";
+import { r as InstantiationTools } from "./tools.pure-4Mwd1PWe.js";
+import { u as EncodeArrayBufferToBase64 } from "./fileTools.pure-ChVaRlUk.js";
+import { _ as __esDecorate, a as serialize, n as SerializationHelper, t as BaseTexture, v as __runInitializers } from "./baseTexture.pure-erPkk1Vv.js";
+import { a as Matrix, c as TmpVectors, u as Vector3 } from "./math.color.pure-DA4Mm_Z5.js";
+var Plane = class Plane2 {
+  constructor(a, b, c, d) {
+    this.normal = new Vector3(a, b, c), this.d = d;
+  }
+  asArray() {
+    return [
+      this.normal.x,
+      this.normal.y,
+      this.normal.z,
+      this.d
+    ];
+  }
+  clone() {
+    return new Plane2(this.normal.x, this.normal.y, this.normal.z, this.d);
+  }
+  getClassName() {
+    return "Plane";
+  }
+  getHashCode() {
+    let hash = this.normal.getHashCode();
+    return hash = hash * 397 ^ (this.d | 0), hash;
+  }
+  normalize() {
+    const norm = Math.sqrt(this.normal.x * this.normal.x + this.normal.y * this.normal.y + this.normal.z * this.normal.z);
+    let magnitude = 0;
+    return norm !== 0 && (magnitude = 1 / norm), this.normal.x *= magnitude, this.normal.y *= magnitude, this.normal.z *= magnitude, this.d *= magnitude, this;
+  }
+  transform(transformation) {
+    const invertedMatrix = Plane2._TmpMatrix;
+    transformation.invertToRef(invertedMatrix);
+    const m = invertedMatrix.m, x = this.normal.x, y = this.normal.y, z = this.normal.z, d = this.d, normalX = x * m[0] + y * m[1] + z * m[2] + d * m[3], normalY = x * m[4] + y * m[5] + z * m[6] + d * m[7], normalZ = x * m[8] + y * m[9] + z * m[10] + d * m[11], finalD = x * m[12] + y * m[13] + z * m[14] + d * m[15];
+    return new Plane2(normalX, normalY, normalZ, finalD);
+  }
+  dotCoordinate(point) {
+    return this.normal.x * point.x + this.normal.y * point.y + this.normal.z * point.z + this.d;
+  }
+  copyFromPoints(point1, point2, point3) {
+    const x1 = point2.x - point1.x, y1 = point2.y - point1.y, z1 = point2.z - point1.z, x2 = point3.x - point1.x, y2 = point3.y - point1.y, z2 = point3.z - point1.z, yz = y1 * z2 - z1 * y2, xz = z1 * x2 - x1 * z2, xy = x1 * y2 - y1 * x2, pyth = Math.sqrt(yz * yz + xz * xz + xy * xy);
+    let invPyth;
+    return pyth !== 0 ? invPyth = 1 / pyth : invPyth = 0, this.normal.x = yz * invPyth, this.normal.y = xz * invPyth, this.normal.z = xy * invPyth, this.d = -(this.normal.x * point1.x + this.normal.y * point1.y + this.normal.z * point1.z), this;
+  }
+  isFrontFacingTo(direction, epsilon) {
+    return Vector3.Dot(this.normal, direction) <= epsilon;
+  }
+  signedDistanceTo(point) {
+    return Vector3.Dot(point, this.normal) + this.d;
+  }
+  static FromArray(array) {
+    return new Plane2(array[0], array[1], array[2], array[3]);
+  }
+  static FromPoints(point1, point2, point3) {
+    const result = new Plane2(0, 0, 0, 0);
+    return result.copyFromPoints(point1, point2, point3), result;
+  }
+  static FromPositionAndNormal(origin, normal) {
+    const plane = new Plane2(0, 0, 0, 0);
+    return this.FromPositionAndNormalToRef(origin, normal, plane);
+  }
+  static FromPositionAndNormalToRef(origin, normal, result) {
+    return result.normal.copyFrom(normal), result.normal.normalize(), result.d = -origin.dot(result.normal), result;
+  }
+  static SignedDistanceToPlaneFromPositionAndNormal(origin, normal, point) {
+    const d = -(normal.x * origin.x + normal.y * origin.y + normal.z * origin.z);
+    return Vector3.Dot(point, normal) + d;
+  }
+};
+Plane._TmpMatrix = Matrix.Identity();
+var useOpenGLOrientationForUV = !1;
+function GenerateBase64StringFromPixelData(pixels, size, invertY = !1) {
+  const width = size.width, height = size.height;
+  if (pixels instanceof Float32Array) {
+    let len = pixels.byteLength / pixels.BYTES_PER_ELEMENT;
+    const npixels = new Uint8Array(len);
+    for (; --len >= 0; ) {
+      let val = pixels[len];
+      val < 0 ? val = 0 : val > 1 && (val = 1), npixels[len] = val * 255;
+    }
+    pixels = npixels;
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width, canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  const imageData = ctx.createImageData(width, height);
+  if (imageData.data.set(pixels), ctx.putImageData(imageData, 0, 0), invertY) {
+    const canvas2 = document.createElement("canvas");
+    canvas2.width = width, canvas2.height = height;
+    const ctx2 = canvas2.getContext("2d");
+    return ctx2 ? (ctx2.translate(0, height), ctx2.scale(1, -1), ctx2.drawImage(canvas, 0, 0), canvas2.toDataURL("image/png")) : null;
+  }
+  return canvas.toDataURL("image/png");
+}
+function GenerateBase64StringFromTexture(texture, faceIndex = 0, level = 0) {
+  const internalTexture = texture.getInternalTexture();
+  if (!internalTexture) return null;
+  const pixels = texture._readPixelsSync(faceIndex, level);
+  return pixels ? GenerateBase64StringFromPixelData(pixels, texture.getSize(), internalTexture.invertY) : null;
+}
+async function GenerateBase64StringFromTextureAsync(texture, faceIndex = 0, level = 0) {
+  const internalTexture = texture.getInternalTexture();
+  if (!internalTexture) return null;
+  const pixels = await texture.readPixels(faceIndex, level);
+  return pixels ? GenerateBase64StringFromPixelData(pixels, texture.getSize(), internalTexture.invertY) : null;
+}
+var Texture = (() => {
+  var _a;
+  let _classSuper = BaseTexture, _instanceExtraInitializers = [], _url_decorators, _url_initializers = [], _url_extraInitializers = [], _uOffset_decorators, _uOffset_initializers = [], _uOffset_extraInitializers = [], _vOffset_decorators, _vOffset_initializers = [], _vOffset_extraInitializers = [], _uScale_decorators, _uScale_initializers = [], _uScale_extraInitializers = [], _vScale_decorators, _vScale_initializers = [], _vScale_extraInitializers = [], _uAng_decorators, _uAng_initializers = [], _uAng_extraInitializers = [], _vAng_decorators, _vAng_initializers = [], _vAng_extraInitializers = [], _wAng_decorators, _wAng_initializers = [], _wAng_extraInitializers = [], _uRotationCenter_decorators, _uRotationCenter_initializers = [], _uRotationCenter_extraInitializers = [], _vRotationCenter_decorators, _vRotationCenter_initializers = [], _vRotationCenter_extraInitializers = [], _wRotationCenter_decorators, _wRotationCenter_initializers = [], _wRotationCenter_extraInitializers = [], _homogeneousRotationInUVTransform_decorators, _homogeneousRotationInUVTransform_initializers = [], _homogeneousRotationInUVTransform_extraInitializers = [], _get_isBlocking_decorators;
+  return _a = class extends _classSuper {
+    static _CreateVideoTexture(name, src, scene, generateMipMaps = !1, invertY = !1, samplingMode = _a.TRILINEAR_SAMPLINGMODE, settings = {}, onError, format = 5) {
+      throw _WarnImport("VideoTexture");
+    }
+    get noMipmap() {
+      return this._noMipmap;
+    }
+    get mimeType() {
+      return this._mimeType;
+    }
+    set isBlocking(value) {
+      this._isBlocking = value;
+    }
+    get isBlocking() {
+      return this._isBlocking;
+    }
+    get invertY() {
+      return this._invertY;
+    }
+    constructor(url, sceneOrEngine, noMipmapOrOptions, invertY, samplingMode = _a.TRILINEAR_SAMPLINGMODE, onLoad = null, onError = null, buffer = null, deleteBuffer = !1, format, mimeType, loaderOptions, creationFlags, forcedExtension) {
+      super(sceneOrEngine), this.url = (__runInitializers(this, _instanceExtraInitializers), __runInitializers(this, _url_initializers, null)), this.uOffset = (__runInitializers(this, _url_extraInitializers), __runInitializers(this, _uOffset_initializers, 0)), this.vOffset = (__runInitializers(this, _uOffset_extraInitializers), __runInitializers(this, _vOffset_initializers, 0)), this.uScale = (__runInitializers(this, _vOffset_extraInitializers), __runInitializers(this, _uScale_initializers, 1)), this.vScale = (__runInitializers(this, _uScale_extraInitializers), __runInitializers(this, _vScale_initializers, 1)), this.uAng = (__runInitializers(this, _vScale_extraInitializers), __runInitializers(this, _uAng_initializers, 0)), this.vAng = (__runInitializers(this, _uAng_extraInitializers), __runInitializers(this, _vAng_initializers, 0)), this.wAng = (__runInitializers(this, _vAng_extraInitializers), __runInitializers(this, _wAng_initializers, 0)), this.uRotationCenter = (__runInitializers(this, _wAng_extraInitializers), __runInitializers(this, _uRotationCenter_initializers, 0.5)), this.vRotationCenter = (__runInitializers(this, _uRotationCenter_extraInitializers), __runInitializers(this, _vRotationCenter_initializers, 0.5)), this.wRotationCenter = (__runInitializers(this, _vRotationCenter_extraInitializers), __runInitializers(this, _wRotationCenter_initializers, 0.5)), this.homogeneousRotationInUVTransform = (__runInitializers(this, _wRotationCenter_extraInitializers), __runInitializers(this, _homogeneousRotationInUVTransform_initializers, !1)), this.inspectableCustomProperties = (__runInitializers(this, _homogeneousRotationInUVTransform_extraInitializers), null), this._noMipmap = !1, this._invertY = !1, this._rowGenerationMatrix = null, this._cachedTextureMatrix = null, this._projectionModeMatrix = null, this._t0 = null, this._t1 = null, this._t2 = null, this._cachedUOffset = -1, this._cachedVOffset = -1, this._cachedUScale = 0, this._cachedVScale = 0, this._cachedUAng = -1, this._cachedVAng = -1, this._cachedWAng = -1, this._cachedReflectionProjectionMatrixId = -1, this._cachedURotationCenter = -1, this._cachedVRotationCenter = -1, this._cachedWRotationCenter = -1, this._cachedHomogeneousRotationInUVTransform = !1, this._cachedIdentity3x2 = !0, this._cachedReflectionTextureMatrix = null, this._cachedReflectionUOffset = -1, this._cachedReflectionVOffset = -1, this._cachedReflectionUScale = 0, this._cachedReflectionVScale = 0, this._cachedReflectionCoordinatesMode = -1, this._buffer = null, this._deleteBuffer = !1, this._format = null, this._delayedOnLoad = null, this._delayedOnError = null, this.onLoadObservable = new Observable(), this._isBlocking = !0, this.name = url || "", this.url = url;
+      let noMipmap, useSRGBBuffer = !1, internalTexture = null, gammaSpace = !0;
+      typeof noMipmapOrOptions == "object" && noMipmapOrOptions !== null ? (noMipmap = noMipmapOrOptions.noMipmap ?? !1, invertY = noMipmapOrOptions.invertY ?? !useOpenGLOrientationForUV, samplingMode = noMipmapOrOptions.samplingMode ?? _a.TRILINEAR_SAMPLINGMODE, onLoad = noMipmapOrOptions.onLoad ?? null, onError = noMipmapOrOptions.onError ?? null, buffer = noMipmapOrOptions.buffer ?? null, deleteBuffer = noMipmapOrOptions.deleteBuffer ?? !1, format = noMipmapOrOptions.format, mimeType = noMipmapOrOptions.mimeType, loaderOptions = noMipmapOrOptions.loaderOptions, creationFlags = noMipmapOrOptions.creationFlags, useSRGBBuffer = noMipmapOrOptions.useSRGBBuffer ?? !1, internalTexture = noMipmapOrOptions.internalTexture ?? null, gammaSpace = noMipmapOrOptions.gammaSpace ?? gammaSpace, forcedExtension = noMipmapOrOptions.forcedExtension ?? forcedExtension) : noMipmap = !!noMipmapOrOptions, this._gammaSpace = gammaSpace, this._noMipmap = noMipmap, this._invertY = invertY === void 0 ? !useOpenGLOrientationForUV : invertY, this._initialSamplingMode = samplingMode, this._buffer = buffer, this._deleteBuffer = deleteBuffer, this._mimeType = mimeType, this._loaderOptions = loaderOptions, this._creationFlags = creationFlags, this._useSRGBBuffer = useSRGBBuffer, this._forcedExtension = forcedExtension, format !== void 0 && (this._format = format);
+      const scene = this.getScene(), engine = this._getEngine();
+      if (!engine) return;
+      engine.onBeforeTextureInitObservable.notifyObservers(this);
+      const load = () => {
+        this._texture && (this._texture._invertVScale && (this.vScale *= -1, this.vOffset += 1), this._texture._cachedWrapU !== null && (this.wrapU = this._texture._cachedWrapU, this._texture._cachedWrapU = null), this._texture._cachedWrapV !== null && (this.wrapV = this._texture._cachedWrapV, this._texture._cachedWrapV = null), this._texture._cachedWrapR !== null && (this.wrapR = this._texture._cachedWrapR, this._texture._cachedWrapR = null)), this.onLoadObservable.hasObservers() && this.onLoadObservable.notifyObservers(this), onLoad && onLoad(), !this.isBlocking && scene && scene.resetCachedMaterial();
+      }, errorHandler = (message, exception) => {
+        this._loadingError = !0, this._errorObject = {
+          message,
+          exception
+        }, onError && onError(message, exception), _a.OnTextureLoadErrorObservable.notifyObservers(this);
+      };
+      if (!this.url && !internalTexture) {
+        this._delayedOnLoad = load, this._delayedOnError = errorHandler;
+        return;
+      }
+      if (this._texture = internalTexture ?? this._getFromCache(this.url, noMipmap, samplingMode, this._invertY, useSRGBBuffer, this.isCube), this._texture) if (this._texture.isReady) TimingTools.SetImmediate(() => load());
+      else {
+        const loadObserver = this._texture.onLoadedObservable.add(load);
+        this._texture.onErrorObservable.add((e) => {
+          errorHandler(e.message, e.exception), this._texture?.onLoadedObservable.remove(loadObserver);
+        });
+      }
+      else if (!scene || !scene.useDelayedTextureLoading) {
+        try {
+          this._texture = engine.createTexture(this.url, noMipmap, this._invertY, scene, samplingMode, load, errorHandler, this._buffer, void 0, this._format, this._forcedExtension, mimeType, loaderOptions, creationFlags, useSRGBBuffer);
+        } catch (e) {
+          throw errorHandler("error loading", e), e;
+        }
+        deleteBuffer && (this._buffer = null);
+      } else
+        this.delayLoadState = 4, this._delayedOnLoad = load, this._delayedOnError = errorHandler;
+    }
+    updateURL(url, buffer = null, onLoad, forcedExtension) {
+      this.url && (this.releaseInternalTexture(), this.getScene().markAllMaterialsAsDirty(1, (mat) => mat.hasTexture(this))), (!this.name || this.name.startsWith("data:")) && (this.name = url), this.url = url, this._buffer = buffer, this._forcedExtension = forcedExtension, this.delayLoadState = 4;
+      const existingOnLoad = this._delayedOnLoad, load = () => {
+        existingOnLoad ? existingOnLoad() : this.onLoadObservable.hasObservers() && this.onLoadObservable.notifyObservers(this), onLoad && onLoad();
+      };
+      this._delayedOnLoad = load, this.delayLoad();
+    }
+    delayLoad() {
+      if (this.delayLoadState !== 4) return;
+      const scene = this.getScene();
+      if (!scene) return;
+      let url = this.url;
+      !url && (this.name.indexOf("://") > 0 || this.name.startsWith("data:")) && (url = this.name), this.delayLoadState = 1, this._texture = this._getFromCache(url, this._noMipmap, this.samplingMode, this._invertY, this._useSRGBBuffer, this.isCube), this._texture ? this._delayedOnLoad && (this._texture.isReady ? TimingTools.SetImmediate(this._delayedOnLoad) : this._texture.onLoadedObservable.add(this._delayedOnLoad)) : (this._texture = scene.getEngine().createTexture(url, this._noMipmap, this._invertY, scene, this.samplingMode, this._delayedOnLoad, this._delayedOnError, this._buffer, null, this._format, this._forcedExtension, this._mimeType, this._loaderOptions, this._creationFlags, this._useSRGBBuffer), this._deleteBuffer && (this._buffer = null)), this._delayedOnLoad = null, this._delayedOnError = null;
+    }
+    _prepareRowForTextureGeneration(x, y, z, t) {
+      x *= this._cachedUScale, y *= this._cachedVScale, x -= this.uRotationCenter * this._cachedUScale, y -= this.vRotationCenter * this._cachedVScale, z -= this.wRotationCenter, Vector3.TransformCoordinatesFromFloatsToRef(x, y, z, this._rowGenerationMatrix, t), t.x += this.uRotationCenter * this._cachedUScale + this._cachedUOffset, t.y += this.vRotationCenter * this._cachedVScale + this._cachedVOffset, t.z += this.wRotationCenter;
+    }
+    getTextureMatrix(uBase = 1) {
+      if (this.uOffset === this._cachedUOffset && this.vOffset === this._cachedVOffset && this.uScale * uBase === this._cachedUScale && this.vScale === this._cachedVScale && this.uAng === this._cachedUAng && this.vAng === this._cachedVAng && this.wAng === this._cachedWAng && this.uRotationCenter === this._cachedURotationCenter && this.vRotationCenter === this._cachedVRotationCenter && this.wRotationCenter === this._cachedWRotationCenter && this.homogeneousRotationInUVTransform === this._cachedHomogeneousRotationInUVTransform) return this._cachedTextureMatrix;
+      this._cachedUOffset = this.uOffset, this._cachedVOffset = this.vOffset, this._cachedUScale = this.uScale * uBase, this._cachedVScale = this.vScale, this._cachedUAng = this.uAng, this._cachedVAng = this.vAng, this._cachedWAng = this.wAng, this._cachedURotationCenter = this.uRotationCenter, this._cachedVRotationCenter = this.vRotationCenter, this._cachedWRotationCenter = this.wRotationCenter, this._cachedHomogeneousRotationInUVTransform = this.homogeneousRotationInUVTransform, (!this._cachedTextureMatrix || !this._rowGenerationMatrix) && (this._cachedTextureMatrix = Matrix.Zero(), this._rowGenerationMatrix = new Matrix(), this._t0 = Vector3.Zero(), this._t1 = Vector3.Zero(), this._t2 = Vector3.Zero()), Matrix.RotationYawPitchRollToRef(this.vAng, this.uAng, this.wAng, this._rowGenerationMatrix), this.homogeneousRotationInUVTransform ? (Matrix.TranslationToRef(-this._cachedURotationCenter, -this._cachedVRotationCenter, -this._cachedWRotationCenter, TmpVectors.Matrix[0]), Matrix.TranslationToRef(this._cachedURotationCenter, this._cachedVRotationCenter, this._cachedWRotationCenter, TmpVectors.Matrix[1]), Matrix.ScalingToRef(this._cachedUScale, this._cachedVScale, 0, TmpVectors.Matrix[2]), Matrix.TranslationToRef(this._cachedUOffset, this._cachedVOffset, 0, TmpVectors.Matrix[3]), TmpVectors.Matrix[0].multiplyToRef(this._rowGenerationMatrix, this._cachedTextureMatrix), this._cachedTextureMatrix.multiplyToRef(TmpVectors.Matrix[1], this._cachedTextureMatrix), this._cachedTextureMatrix.multiplyToRef(TmpVectors.Matrix[2], this._cachedTextureMatrix), this._cachedTextureMatrix.multiplyToRef(TmpVectors.Matrix[3], this._cachedTextureMatrix), this._cachedTextureMatrix.setRowFromFloats(2, this._cachedTextureMatrix.m[12], this._cachedTextureMatrix.m[13], this._cachedTextureMatrix.m[14], 1)) : (this._prepareRowForTextureGeneration(0, 0, 0, this._t0), this._prepareRowForTextureGeneration(1, 0, 0, this._t1), this._prepareRowForTextureGeneration(0, 1, 0, this._t2), this._t1.subtractInPlace(this._t0), this._t2.subtractInPlace(this._t0), Matrix.FromValuesToRef(this._t1.x, this._t1.y, this._t1.z, 0, this._t2.x, this._t2.y, this._t2.z, 0, this._t0.x, this._t0.y, this._t0.z, 0, 0, 0, 0, 1, this._cachedTextureMatrix));
+      const scene = this.getScene();
+      if (!scene) return this._cachedTextureMatrix;
+      const previousIdentity3x2 = this._cachedIdentity3x2;
+      return this._cachedIdentity3x2 = this._cachedTextureMatrix.isIdentityAs3x2(), this.optimizeUVAllocation && previousIdentity3x2 !== this._cachedIdentity3x2 && scene.markAllMaterialsAsDirty(1, (mat) => mat.hasTexture(this)), this._cachedTextureMatrix;
+    }
+    getReflectionTextureMatrix() {
+      const scene = this.getScene();
+      if (!scene) return this._cachedReflectionTextureMatrix;
+      if (this.uOffset === this._cachedReflectionUOffset && this.vOffset === this._cachedReflectionVOffset && this.uScale === this._cachedReflectionUScale && this.vScale === this._cachedReflectionVScale && this.coordinatesMode === this._cachedReflectionCoordinatesMode) if (this.coordinatesMode === _a.PROJECTION_MODE) {
+        if (this._cachedReflectionProjectionMatrixId === scene.getProjectionMatrix().updateFlag) return this._cachedReflectionTextureMatrix;
+      } else return this._cachedReflectionTextureMatrix;
+      this._cachedReflectionTextureMatrix || (this._cachedReflectionTextureMatrix = Matrix.Zero()), this._projectionModeMatrix || (this._projectionModeMatrix = Matrix.Zero());
+      const flagMaterialsAsTextureDirty = this._cachedReflectionCoordinatesMode !== this.coordinatesMode;
+      switch (this._cachedReflectionUOffset = this.uOffset, this._cachedReflectionVOffset = this.vOffset, this._cachedReflectionUScale = this.uScale, this._cachedReflectionVScale = this.vScale, this._cachedReflectionCoordinatesMode = this.coordinatesMode, this.coordinatesMode) {
+        case _a.PLANAR_MODE:
+          Matrix.IdentityToRef(this._cachedReflectionTextureMatrix), this._cachedReflectionTextureMatrix[0] = this.uScale, this._cachedReflectionTextureMatrix[5] = this.vScale, this._cachedReflectionTextureMatrix[12] = this.uOffset, this._cachedReflectionTextureMatrix[13] = this.vOffset;
+          break;
+        case _a.PROJECTION_MODE: {
+          Matrix.FromValuesToRef(0.5, 0, 0, 0, 0, -0.5, 0, 0, 0, 0, 0, 0, 0.5, 0.5, 1, 1, this._projectionModeMatrix);
+          const projectionMatrix = scene.getProjectionMatrix();
+          this._cachedReflectionProjectionMatrixId = projectionMatrix.updateFlag, projectionMatrix.multiplyToRef(this._projectionModeMatrix, this._cachedReflectionTextureMatrix);
+          break;
+        }
+        default:
+          Matrix.IdentityToRef(this._cachedReflectionTextureMatrix);
+          break;
+      }
+      return flagMaterialsAsTextureDirty && scene.markAllMaterialsAsDirty(1, (mat) => mat.hasTexture(this)), this._cachedReflectionTextureMatrix;
+    }
+    clone() {
+      const options = {
+        noMipmap: this._noMipmap,
+        invertY: this._invertY,
+        samplingMode: this.samplingMode,
+        onLoad: void 0,
+        onError: void 0,
+        buffer: this._texture ? this._texture._buffer : void 0,
+        deleteBuffer: this._deleteBuffer,
+        format: this.textureFormat,
+        mimeType: this.mimeType,
+        loaderOptions: this._loaderOptions,
+        creationFlags: this._creationFlags,
+        useSRGBBuffer: this._useSRGBBuffer
+      };
+      return SerializationHelper.Clone(() => new _a(this._texture ? this._texture.url : null, this.getScene(), options), this);
+    }
+    serialize() {
+      const savedName = this.name;
+      _a.SerializeBuffers || this.name.startsWith("data:") && (this.name = ""), this.name.startsWith("data:") && this.url === this.name && (this.url = "");
+      const serializationObject = super.serialize(_a._SerializeInternalTextureUniqueId);
+      return serializationObject ? ((_a.SerializeBuffers || _a.ForceSerializeBuffers) && (typeof this._buffer == "string" && this._buffer.startsWith("data:") ? (serializationObject.base64String = this._buffer, serializationObject.name = serializationObject.name.replace("data:", "")) : this.url && this.url.startsWith("data:") && this._buffer instanceof Uint8Array ? serializationObject.base64String = `data:${this.mimeType || "image/png"};base64,${EncodeArrayBufferToBase64(this._buffer)}` : (_a.ForceSerializeBuffers || this.url && this.url.startsWith("blob:") || this._forceSerialize) && (serializationObject.base64String = !this._engine || this._engine._features.supportSyncTextureRead ? GenerateBase64StringFromTexture(this) : GenerateBase64StringFromTextureAsync(this))), serializationObject.invertY = this._invertY, serializationObject.samplingMode = this.samplingMode, serializationObject._creationFlags = this._creationFlags, serializationObject._useSRGBBuffer = this._useSRGBBuffer, _a._SerializeInternalTextureUniqueId && (serializationObject.internalTextureUniqueId = this._texture?.uniqueId), serializationObject.internalTextureLabel = this._texture?.label, serializationObject.noMipmap = this._noMipmap, this.name = savedName, serializationObject) : null;
+    }
+    getClassName() {
+      return "Texture";
+    }
+    dispose() {
+      super.dispose(), this.onLoadObservable.clear(), this._delayedOnLoad = null, this._delayedOnError = null, this._buffer = null;
+    }
+    static Parse(parsedTexture, scene, rootUrl) {
+      if (parsedTexture.customType) {
+        const parsedCustomTexture = InstantiationTools.Instantiate(parsedTexture.customType).Parse(parsedTexture, scene, rootUrl);
+        return parsedTexture.samplingMode && parsedCustomTexture.updateSamplingMode && parsedCustomTexture._samplingMode && parsedCustomTexture._samplingMode !== parsedTexture.samplingMode && parsedCustomTexture.updateSamplingMode(parsedTexture.samplingMode), parsedCustomTexture;
+      }
+      if (parsedTexture.isCube && !parsedTexture.isRenderTarget) return _a._CubeTextureParser(parsedTexture, scene, rootUrl);
+      const hasInternalTextureUniqueId = parsedTexture.internalTextureUniqueId !== void 0;
+      if (!parsedTexture.name && !parsedTexture.isRenderTarget && !hasInternalTextureUniqueId) return null;
+      let internalTexture;
+      if (hasInternalTextureUniqueId) {
+        const cache = scene.getEngine().getLoadedTexturesCache();
+        for (const texture of cache) if (texture.uniqueId === parsedTexture.internalTextureUniqueId) {
+          internalTexture = texture;
+          break;
+        }
+      }
+      const onLoaded = (texture) => {
+        if (texture && texture._texture && (texture._texture._cachedWrapU = null, texture._texture._cachedWrapV = null, texture._texture._cachedWrapR = null), parsedTexture.samplingMode) {
+          const sampling = parsedTexture.samplingMode;
+          texture && texture.samplingMode !== sampling && texture.updateSamplingMode(sampling);
+        }
+        if (texture && parsedTexture.animations) for (let animationIndex = 0; animationIndex < parsedTexture.animations.length; animationIndex++) {
+          const parsedAnimation = parsedTexture.animations[animationIndex], internalClass = GetClass("BABYLON.Animation");
+          internalClass && texture.animations.push(internalClass.Parse(parsedAnimation));
+        }
+        texture && texture._texture && (hasInternalTextureUniqueId && !internalTexture && texture._texture._setUniqueId(parsedTexture.internalTextureUniqueId), texture._texture.label = parsedTexture.internalTextureLabel);
+      };
+      return SerializationHelper.Parse(() => {
+        let generateMipMaps = !0;
+        if (parsedTexture.noMipmap && (generateMipMaps = !1), parsedTexture.mirrorPlane) {
+          const mirrorTexture = _a._CreateMirror(parsedTexture.name, parsedTexture.renderTargetSize, scene, generateMipMaps);
+          return mirrorTexture._waitingRenderList = parsedTexture.renderList, mirrorTexture.mirrorPlane = Plane.FromArray(parsedTexture.mirrorPlane), onLoaded(mirrorTexture), mirrorTexture;
+        } else if (parsedTexture.isRenderTarget && !parsedTexture.base64String) {
+          let renderTargetTexture = null;
+          if (parsedTexture.isCube) {
+            if (scene.reflectionProbes) for (let index = 0; index < scene.reflectionProbes.length; index++) {
+              const probe = scene.reflectionProbes[index];
+              if (probe.name === parsedTexture.name) return probe.cubeTexture;
+            }
+          } else
+            renderTargetTexture = _a._CreateRenderTargetTexture(parsedTexture.name, parsedTexture.renderTargetSize, scene, generateMipMaps, parsedTexture._creationFlags ?? 0), renderTargetTexture._waitingRenderList = parsedTexture.renderList;
+          return onLoaded(renderTargetTexture), renderTargetTexture;
+        } else if (parsedTexture.isVideo) {
+          const texture = _a._CreateVideoTexture(rootUrl + (parsedTexture.url || parsedTexture.name), rootUrl + (parsedTexture.src || parsedTexture.url), scene, generateMipMaps, parsedTexture.invertY, parsedTexture.samplingMode, parsedTexture.settings || {});
+          return onLoaded(texture), texture;
+        } else {
+          let texture;
+          if (typeof parsedTexture.base64String == "string" && parsedTexture.base64String && !internalTexture) {
+            const options = {
+              buffer: parsedTexture.base64String,
+              noMipmap: !generateMipMaps,
+              invertY: parsedTexture.invertY,
+              samplingMode: parsedTexture.samplingMode,
+              useSRGBBuffer: parsedTexture._useSRGBBuffer ?? !1,
+              creationFlags: parsedTexture._creationFlags ?? 0,
+              onLoad: () => {
+                onLoaded(texture);
+              }
+            }, base64String = parsedTexture.base64String, noPrefixBase64String = base64String.startsWith("data:") ? base64String.substring(5) : base64String;
+            texture = _a.CreateFromBase64String("", noPrefixBase64String, scene, options), texture.name = parsedTexture.name;
+          } else {
+            let url;
+            parsedTexture.name && (parsedTexture.name.indexOf("://") > 0 || parsedTexture.name.startsWith("data:")) ? url = parsedTexture.name : url = rootUrl + parsedTexture.name, parsedTexture.url && (parsedTexture.url.startsWith("data:") || _a.UseSerializedUrlIfAny) && (url = parsedTexture.url);
+            const options = {
+              noMipmap: !generateMipMaps,
+              invertY: parsedTexture.invertY,
+              samplingMode: parsedTexture.samplingMode,
+              useSRGBBuffer: parsedTexture._useSRGBBuffer ?? !1,
+              creationFlags: parsedTexture._creationFlags ?? 0,
+              onLoad: () => {
+                onLoaded(texture);
+              },
+              internalTexture
+            };
+            texture = new _a(url, scene, options);
+          }
+          return texture;
+        }
+      }, parsedTexture, scene);
+    }
+    static CreateFromBase64String(data, name, scene, noMipmapOrOptions, invertY, samplingMode = _a.TRILINEAR_SAMPLINGMODE, onLoad = null, onError = null, format = 5, creationFlags, forcedExtension) {
+      return new _a("data:" + name, scene, noMipmapOrOptions, invertY, samplingMode, onLoad, onError, data, !1, format, void 0, void 0, creationFlags, forcedExtension);
+    }
+    static LoadFromDataString(name, buffer, scene, deleteBuffer = !1, noMipmapOrOptions, invertY = !0, samplingMode = _a.TRILINEAR_SAMPLINGMODE, onLoad = null, onError = null, format = 5, creationFlags, forcedExtension) {
+      return name.substring(0, 5) !== "data:" && (name = "data:" + name), new _a(name, scene, noMipmapOrOptions, invertY, samplingMode, onLoad, onError, buffer, deleteBuffer, format, void 0, void 0, creationFlags, forcedExtension);
+    }
+  }, (() => {
+    const _metadata = typeof Symbol == "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+    _url_decorators = [serialize()], _uOffset_decorators = [serialize()], _vOffset_decorators = [serialize()], _uScale_decorators = [serialize()], _vScale_decorators = [serialize()], _uAng_decorators = [serialize()], _vAng_decorators = [serialize()], _wAng_decorators = [serialize()], _uRotationCenter_decorators = [serialize()], _vRotationCenter_decorators = [serialize()], _wRotationCenter_decorators = [serialize()], _homogeneousRotationInUVTransform_decorators = [serialize()], _get_isBlocking_decorators = [serialize()], __esDecorate(_a, null, _get_isBlocking_decorators, {
+      kind: "getter",
+      name: "isBlocking",
+      static: !1,
+      private: !1,
+      access: {
+        has: (obj) => "isBlocking" in obj,
+        get: (obj) => obj.isBlocking
+      },
+      metadata: _metadata
+    }, null, _instanceExtraInitializers), __esDecorate(null, null, _url_decorators, {
+      kind: "field",
+      name: "url",
+      static: !1,
+      private: !1,
+      access: {
+        has: (obj) => "url" in obj,
+        get: (obj) => obj.url,
+        set: (obj, value) => {
+          obj.url = value;
+        }
+      },
+      metadata: _metadata
+    }, _url_initializers, _url_extraInitializers), __esDecorate(null, null, _uOffset_decorators, {
+      kind: "field",
+      name: "uOffset",
+      static: !1,
+      private: !1,
+      access: {
+        has: (obj) => "uOffset" in obj,
+        get: (obj) => obj.uOffset,
+        set: (obj, value) => {
+          obj.uOffset = value;
+        }
+      },
+      metadata: _metadata
+    }, _uOffset_initializers, _uOffset_extraInitializers), __esDecorate(null, null, _vOffset_decorators, {
+      kind: "field",
+      name: "vOffset",
+      static: !1,
+      private: !1,
+      access: {
+        has: (obj) => "vOffset" in obj,
+        get: (obj) => obj.vOffset,
+        set: (obj, value) => {
+          obj.vOffset = value;
+        }
+      },
+      metadata: _metadata
+    }, _vOffset_initializers, _vOffset_extraInitializers), __esDecorate(null, null, _uScale_decorators, {
+      kind: "field",
+      name: "uScale",
+      static: !1,
+      private: !1,
+      access: {
+        has: (obj) => "uScale" in obj,
+        get: (obj) => obj.uScale,
+        set: (obj, value) => {
+          obj.uScale = value;
+        }
+      },
+      metadata: _metadata
+    }, _uScale_initializers, _uScale_extraInitializers), __esDecorate(null, null, _vScale_decorators, {
+      kind: "field",
+      name: "vScale",
+      static: !1,
+      private: !1,
+      access: {
+        has: (obj) => "vScale" in obj,
+        get: (obj) => obj.vScale,
+        set: (obj, value) => {
+          obj.vScale = value;
+        }
+      },
+      metadata: _metadata
+    }, _vScale_initializers, _vScale_extraInitializers), __esDecorate(null, null, _uAng_decorators, {
+      kind: "field",
+      name: "uAng",
+      static: !1,
+      private: !1,
+      access: {
+        has: (obj) => "uAng" in obj,
+        get: (obj) => obj.uAng,
+        set: (obj, value) => {
+          obj.uAng = value;
+        }
+      },
+      metadata: _metadata
+    }, _uAng_initializers, _uAng_extraInitializers), __esDecorate(null, null, _vAng_decorators, {
+      kind: "field",
+      name: "vAng",
+      static: !1,
+      private: !1,
+      access: {
+        has: (obj) => "vAng" in obj,
+        get: (obj) => obj.vAng,
+        set: (obj, value) => {
+          obj.vAng = value;
+        }
+      },
+      metadata: _metadata
+    }, _vAng_initializers, _vAng_extraInitializers), __esDecorate(null, null, _wAng_decorators, {
+      kind: "field",
+      name: "wAng",
+      static: !1,
+      private: !1,
+      access: {
+        has: (obj) => "wAng" in obj,
+        get: (obj) => obj.wAng,
+        set: (obj, value) => {
+          obj.wAng = value;
+        }
+      },
+      metadata: _metadata
+    }, _wAng_initializers, _wAng_extraInitializers), __esDecorate(null, null, _uRotationCenter_decorators, {
+      kind: "field",
+      name: "uRotationCenter",
+      static: !1,
+      private: !1,
+      access: {
+        has: (obj) => "uRotationCenter" in obj,
+        get: (obj) => obj.uRotationCenter,
+        set: (obj, value) => {
+          obj.uRotationCenter = value;
+        }
+      },
+      metadata: _metadata
+    }, _uRotationCenter_initializers, _uRotationCenter_extraInitializers), __esDecorate(null, null, _vRotationCenter_decorators, {
+      kind: "field",
+      name: "vRotationCenter",
+      static: !1,
+      private: !1,
+      access: {
+        has: (obj) => "vRotationCenter" in obj,
+        get: (obj) => obj.vRotationCenter,
+        set: (obj, value) => {
+          obj.vRotationCenter = value;
+        }
+      },
+      metadata: _metadata
+    }, _vRotationCenter_initializers, _vRotationCenter_extraInitializers), __esDecorate(null, null, _wRotationCenter_decorators, {
+      kind: "field",
+      name: "wRotationCenter",
+      static: !1,
+      private: !1,
+      access: {
+        has: (obj) => "wRotationCenter" in obj,
+        get: (obj) => obj.wRotationCenter,
+        set: (obj, value) => {
+          obj.wRotationCenter = value;
+        }
+      },
+      metadata: _metadata
+    }, _wRotationCenter_initializers, _wRotationCenter_extraInitializers), __esDecorate(null, null, _homogeneousRotationInUVTransform_decorators, {
+      kind: "field",
+      name: "homogeneousRotationInUVTransform",
+      static: !1,
+      private: !1,
+      access: {
+        has: (obj) => "homogeneousRotationInUVTransform" in obj,
+        get: (obj) => obj.homogeneousRotationInUVTransform,
+        set: (obj, value) => {
+          obj.homogeneousRotationInUVTransform = value;
+        }
+      },
+      metadata: _metadata
+    }, _homogeneousRotationInUVTransform_initializers, _homogeneousRotationInUVTransform_extraInitializers), _metadata && Object.defineProperty(_a, Symbol.metadata, {
+      enumerable: !0,
+      configurable: !0,
+      writable: !0,
+      value: _metadata
+    });
+  })(), _a.SerializeBuffers = !0, _a.ForceSerializeBuffers = !1, _a.OnTextureLoadErrorObservable = new Observable(), _a._SerializeInternalTextureUniqueId = !1, _a._CubeTextureParser = (jsonTexture, scene, rootUrl) => {
+    throw _WarnImport("CubeTexture");
+  }, _a._CreateMirror = (name, renderTargetSize, scene, generateMipMaps) => {
+    throw _WarnImport("MirrorTexture");
+  }, _a._CreateRenderTargetTexture = (name, renderTargetSize, scene, generateMipMaps, creationFlags) => {
+    throw _WarnImport("RenderTargetTexture");
+  }, _a.NEAREST_SAMPLINGMODE = 1, _a.NEAREST_NEAREST_MIPLINEAR = 8, _a.BILINEAR_SAMPLINGMODE = 2, _a.LINEAR_LINEAR_MIPNEAREST = 11, _a.TRILINEAR_SAMPLINGMODE = 3, _a.LINEAR_LINEAR_MIPLINEAR = 3, _a.NEAREST_NEAREST_MIPNEAREST = 4, _a.NEAREST_LINEAR_MIPNEAREST = 5, _a.NEAREST_LINEAR_MIPLINEAR = 6, _a.NEAREST_LINEAR = 7, _a.NEAREST_NEAREST = 1, _a.LINEAR_NEAREST_MIPNEAREST = 9, _a.LINEAR_NEAREST_MIPLINEAR = 10, _a.LINEAR_LINEAR = 2, _a.LINEAR_NEAREST = 12, _a.EXPLICIT_MODE = 0, _a.SPHERICAL_MODE = 1, _a.PLANAR_MODE = 2, _a.CUBIC_MODE = 3, _a.PROJECTION_MODE = 4, _a.SKYBOX_MODE = 5, _a.INVCUBIC_MODE = 6, _a.EQUIRECTANGULAR_MODE = 7, _a.FIXED_EQUIRECTANGULAR_MODE = 8, _a.FIXED_EQUIRECTANGULAR_MIRRORED_MODE = 9, _a.CLAMP_ADDRESSMODE = 0, _a.WRAP_ADDRESSMODE = 1, _a.MIRROR_ADDRESSMODE = 2, _a.UseSerializedUrlIfAny = !1, _a;
+})(), _Registered = !1;
+function RegisterTexture() {
+  _Registered || (_Registered = !0, RegisterClass("BABYLON.Texture", Texture), SerializationHelper._TextureParser = Texture.Parse);
+}
+export {
+  Plane as i,
+  Texture as n,
+  useOpenGLOrientationForUV as r,
+  RegisterTexture as t
+};

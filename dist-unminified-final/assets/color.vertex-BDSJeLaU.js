@@ -1,0 +1,65 @@
+import { t as ShaderStore } from "./shaderStore-CeBEoMrR.js";
+import { a as bonesVertex, c as fogVertexDeclaration, d as bonesDeclaration, i as bakedVertexAnimation, l as clipPlaneVertexDeclaration, n as fogVertex, o as instancesVertex, r as clipPlaneVertex, s as instancesDeclaration, t as vertexColorMixing, u as bakedVertexAnimationDeclaration } from "./vertexColorMixing-BQk8mgiA.js";
+//#region node_modules/@babylonjs/core/Shaders/color.vertex.js
+var name = "colorVertexShader";
+var shader = `attribute vec3 position;
+#ifdef VERTEXCOLOR
+attribute vec4 color;
+#endif
+#include<bonesDeclaration>
+#include<bakedVertexAnimationDeclaration>
+#include<clipPlaneVertexDeclaration>
+#include<fogVertexDeclaration>
+#ifdef FOG
+uniform mat4 view;
+#endif
+#include<instancesDeclaration>
+uniform mat4 viewProjection;
+#ifdef MULTIVIEW
+uniform mat4 viewProjectionR;
+#endif
+#if defined(VERTEXCOLOR) || defined(INSTANCESCOLOR) && defined(INSTANCES)
+varying vec4 vColor;
+#endif
+#define CUSTOM_VERTEX_DEFINITIONS
+void main(void) {
+#define CUSTOM_VERTEX_MAIN_BEGIN
+#ifdef VERTEXCOLOR
+vec4 colorUpdated=color;
+#endif
+#include<instancesVertex>
+#include<bonesVertex>
+#include<bakedVertexAnimation>
+vec4 worldPos=finalWorld*vec4(position,1.0);
+#ifdef MULTIVIEW
+if (gl_ViewID_OVR==0u) {gl_Position=viewProjection*worldPos;} else {gl_Position=viewProjectionR*worldPos;}
+#else
+gl_Position=viewProjection*worldPos;
+#endif
+#include<clipPlaneVertex>
+#include<fogVertex>
+#include<vertexColorMixing>
+#define CUSTOM_VERTEX_MAIN_END
+}`;
+if (!ShaderStore.ShadersStore[name]) ShaderStore.ShadersStore[name] = shader;
+var includes = [
+	bonesDeclaration,
+	bakedVertexAnimationDeclaration,
+	clipPlaneVertexDeclaration,
+	fogVertexDeclaration,
+	instancesDeclaration,
+	instancesVertex,
+	bonesVertex,
+	bakedVertexAnimation,
+	clipPlaneVertex,
+	fogVertex,
+	vertexColorMixing
+];
+for (const inc of includes) if (!ShaderStore.IncludesShadersStore[inc.name]) ShaderStore.IncludesShadersStore[inc.name] = inc.shader;
+/** @internal */
+var colorVertexShader = {
+	name,
+	shader
+};
+//#endregion
+export { colorVertexShader };
