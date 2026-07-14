@@ -4,10 +4,10 @@ import { AmbientDirector } from '../audio/AmbientDirector';
 import { FootstepSystem } from '../audio/FootstepSystem';
 import { GameAudioEngine } from '../audio/GameAudioEngine';
 import { LightingAudioBridge } from '../audio/LightingAudioBridge';
-import { loadFluorescentBuzzBuffer } from '../audio/loadFluorescentBuzzBuffer';
 import { ProceduralAudioBank, hashAudioSeed } from '../audio/ProceduralAudioBank';
 import { getRoomAudioProfile, toAmbientProfile } from '../audio/RoomAudioProfiles';
 import { gameConfig } from '../config/game.config';
+import { fastDebugExitConfig } from '../config/exit.config';
 import { lightingConfig } from '../config/lighting.config';
 import { tensionConfig } from '../config/tension.config';
 import { GameClock } from '../game/GameClock';
@@ -36,6 +36,7 @@ import { QualityManager } from '../rendering/QualityManager';
 import { LightingDirector, type LightingFrameSnapshot } from '../lighting/LightingDirector';
 import { FIXTURE_FLICKER_PROFILES, type FixtureFlickerProfile } from '../lighting/lighting.types';
 import { ModularWorld } from '../rooms/ModularWorld';
+import { MODULAR_WALL_THICKNESS } from '../rooms/builders/ModularRoomBuilder';
 import type { BuiltModularRoom } from '../rooms/rendering/rendering.types';
 import { ExitDirector } from '../exit/ExitDirector';
 import type { ExitCandidate, ExitReservation, ExitSnapshot } from '../exit/exit.types';
@@ -43,6 +44,7 @@ import type { ExitWallPlacement } from '../exit/exit.presentation.types';
 import { exitPresentationConfig } from '../exit/exit.presentation.config';
 import { ExitAudioBeacon } from '../exit/ExitAudioBeacon';
 import { ExitWallPresentation } from '../exit/ExitWallPresentation';
+import { insetExitWallPlacement } from '../exit/ExitPlacement';
 import { TensionDirector } from '../tension/TensionDirector';
 import {
   TENSION_EVENT_TYPES,
@@ -339,7 +341,10 @@ export class App {
         reducedFlashing: this.settings.value.reducedFlashing,
       });
       this.tensionDirector = new TensionDirector(this.debugOptions.seed);
-      this.exitDirector = new ExitDirector(this.debugOptions.seed);
+      this.exitDirector = new ExitDirector(
+        this.debugOptions.seed,
+        this.debugOptions.fastExit ? fastDebugExitConfig : undefined,
+      );
       if (this.debugOptions.exitNow) {
         this.exitDirector.forceNextCandidate('debug');
       }
@@ -748,14 +753,14 @@ export class App {
     this.recordRuntimePerformance(deltaSeconds * 1_000);
     this.debugHud?.update(performance.now(), [
       `AUDIO ${audioSnapshot.state} / ${this.getAudioNodeCount()} NODES`,
-      `STEPS ${this.footstepCount}`,
+      `FOOTSTEPS ${this.footstepCount}`,
       `ROOM ${this.modularWorld?.activeRoomId ?? 'none'} / ${this.stats.snapshot(this.clock.elapsedSeconds).roomsVisited} VISITED`,
       `STREAM ${this.chunkStreamer?.metrics.activeRoomCount ?? 0} ACTIVE / ${this.chunkStreamer?.metrics.preloadRoomCount ?? 0} PRELOAD / ${this.modularWorld?.pooledRoomCount ?? 0} POOLED`,
       `ORIGIN ${this.floatingOrigin.metrics.rebaseCount} REBASES`,
       `RENDER ${this.qualityManager.presetName.toUpperCase()} ${renderMetrics?.bufferWidth ?? 0}x${renderMetrics?.bufferHeight ?? 0}`,
       `LIGHTS ${this.lightingSnapshot?.metrics.pool.activeLightCount ?? 0}/${this.lightingSnapshot?.metrics.pool.activeBudget ?? 0} / ${this.lightingSnapshot?.metrics.animatedFixtureCount ?? 0} FLICKER`,
       `TENSION ${this.tensionSnapshot?.phase.toUpperCase() ?? 'OFF'} ${(this.tensionSnapshot?.intensity ?? 0).toFixed(2)} / ${this.tensionSnapshot?.activeEventType ?? 'QUIET'}`,
-      `EXIT ${this.exitSnapshot?.exitSpawned ? this.exitReservation?.roomId : this.exitSnapshot?.eligible ? `${(this.exitSnapshot.probability * 100).toFixed(1)}%` : 'LOCKED'}`,
+      `EXIT ${this.exitPresentation ? `ACTIVE ${this.exitReservation?.roomId ?? 'unknown'}` : this.exitSnapshot?.exitSpawned ? `RESERVED ${this.exitReservation?.roomId ?? 'unknown'}` : this.exitSnapshot?.eligible ? `ELIGIBLE ${(this.exitSnapshot.probability * 100).toFixed(1)}%` : 'LOCKED'}`,
       `SEED ${this.debugOptions.seed}`,
     ]);
   }
@@ -1392,7 +1397,7 @@ export class App {
       new Vector3(surface.localForward.x, surface.localForward.y, surface.localForward.z),
       matrix,
     ).normalize();
-    const placement: ExitWallPlacement = {
+    const nominalPlacement: ExitWallPlacement = {
       roomId: reservation.roomId,
       surfaceId: reservation.surfaceId,
       center,
@@ -1401,6 +1406,12 @@ export class App {
       height: surface.height,
       seed: reservation.seed,
     };
+    // Catalog surfaces are placed on the logical room boundary. The rendered
+    // wall occupies MODULAR_WALL_THICKNESS metres inside that boundary, so an
+    // uninset exit overlay is buried inside the normal wall and becomes
+    // invisible. Move the complete placement (visual, trigger and audio) onto
+    // the interior wall face before creating the presentation.
+    const placement = insetExitWallPlacement(nominalPlacement, MODULAR_WALL_THICKNESS);
     this.exitPresentation?.dispose();
     this.exitPresentation = new ExitWallPresentation(scene, placement, world.materialLibrary.wall, {
       reducedFlashing: this.settings.value.reducedFlashing,
@@ -1467,6 +1478,16 @@ export class App {
   private syncExitDebugSnapshot(): void {
     const snapshot = this.exitSnapshot;
     const reservation = this.exitReservation;
+    const state = this.exitPresentation
+      ? 'active'
+      : reservation
+        ? 'reserved'
+        : snapshot?.forcedPending
+          ? 'forced-pending'
+          : snapshot?.eligible
+            ? 'eligible'
+            : 'locked';
+    this.root.dataset.exitState = state;
     this.root.dataset.exitEligible = String(snapshot?.eligible ?? false);
     this.root.dataset.exitProbability = (snapshot?.probability ?? 0).toFixed(5);
     this.root.dataset.exitForcedPending = String(snapshot?.forcedPending ?? false);
@@ -1484,6 +1505,11 @@ export class App {
         this.modularWorld?.isRoomLoaded(reservation.roomId),
     );
     this.root.dataset.exitVisualMeshes = String(this.exitPresentation?.meshes.length ?? 0);
+    this.root.dataset.exitTriggerActive = String(this.exitPresentation !== null);
+    const placement = this.exitPresentation?.placement;
+    this.root.dataset.exitWorldPosition = placement
+      ? `${placement.center.x.toFixed(3)},${placement.center.y.toFixed(3)},${placement.center.z.toFixed(3)}`
+      : '';
     this.root.dataset.exitAudioNodes = String(this.exitAudioBeacon?.nodeCount ?? 0);
     this.root.dataset.exitAudioActive = String(this.exitAudioBeacon?.snapshot.active ?? false);
     this.root.dataset.exitAudioTransitionPlayed = String(
@@ -1602,7 +1628,10 @@ export class App {
       anchors: world.lightAnchors,
       anchorRevision: world.lightAnchorRevision,
       activeRoomId: world.activeRoomId,
-      visibleRoomIds: this.lastVisibility?.visibleRoomIds ?? [],
+      visibleRoomIds: [
+        ...(this.lastVisibility?.visibleRoomIds ?? []),
+        ...(this.lastVisibility?.visibleEntranceRoomIds ?? []),
+      ],
       playerPosition: player.position,
       absoluteTimeSeconds: this.clock.elapsedSeconds,
     });
@@ -1953,12 +1982,12 @@ export class App {
   private async activateAudioFromUserGesture(): Promise<void> {
     const activated = await this.audioEngine.activateFromUserGesture();
     if (activated) {
-      await this.initializeAudioSystems();
+      this.initializeAudioSystems();
     }
     this.syncAudioDebugSnapshot();
   }
 
-  private async initializeAudioSystems(): Promise<void> {
+  private initializeAudioSystems(): void {
     if (this.audioBank || this.ambientDirector || this.footsteps) {
       return;
     }
@@ -1977,13 +2006,7 @@ export class App {
           getRoomAudioProfile(getRoomDefinition(this.currentRoomDefinitionId).audioProfile),
         )
       : undefined;
-    const buzzNoiseOverride = await loadFluorescentBuzzBuffer(context);
-    const bank = new ProceduralAudioBank(
-      context,
-      buzzNoiseOverride === null
-        ? { seed: this.debugOptions.seed }
-        : { seed: this.debugOptions.seed, buzzNoiseOverride },
-    );
+    const bank = new ProceduralAudioBank(context, { seed: this.debugOptions.seed });
     const ambientDirector = new AmbientDirector(
       {
         context,

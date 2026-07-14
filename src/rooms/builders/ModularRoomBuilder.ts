@@ -55,7 +55,6 @@ interface FixtureRecipe {
 }
 
 export const MODULAR_WALL_THICKNESS = 0.2;
-const WALL_THICKNESS = MODULAR_WALL_THICKNESS;
 const FLOOR_THICKNESS = 0.16;
 const FLOOR_JOIN_OVERLAP = 0.12;
 const TRIM_HEIGHT = 0.14;
@@ -70,6 +69,7 @@ const CEILING_UV_METERS_PER_TILE = 2;
 const TRIM_UV_METERS_PER_TILE = 1;
 const FIXTURE_UV_METERS_PER_TILE = 0.5;
 const COLUMN_UV_METERS_PER_TILE = 1.2;
+const WALL_SURFACE_EPSILON = 0.002;
 
 /**
  * Builds one visual representation of a logical room. The room graph remains
@@ -166,9 +166,7 @@ export class ModularRoomBuilder {
         position: new Vector3(0, -FLOOR_THICKNESS / 2, 0),
         uvOffset: this.createUvOffset(instance.seed, 11),
       },
-      definition.tags.includes('damp') || this.isWet(instance.seed)
-        ? this.materials.carpetWet
-        : this.materials.carpet,
+      this.materials.carpet,
     );
     floor.parent = root;
     floor.checkCollisions = false;
@@ -205,8 +203,7 @@ export class ModularRoomBuilder {
     ceiling.checkCollisions = true;
 
     const wallBoxes: Mesh[] = [];
-    const rotatedWallBoxes: Mesh[] = [];
-    const lintelBoxes: Mesh[] = [];
+    const wallSurfacePlanes: Mesh[] = [];
     const trimBoxes: Mesh[] = [];
     for (const side of this.getWallSides(definition)) {
       const openings = this.getConnectedOpenings(instance, side);
@@ -216,52 +213,29 @@ export class ModularRoomBuilder {
         height,
         side,
         openings,
-        this.sideUsesRotatedWallpaper(side) ? rotatedWallBoxes : wallBoxes,
-        lintelBoxes,
+        wallBoxes,
+        wallSurfacePlanes,
         trimBoxes,
       );
     }
 
-    const wallMaterial = this.useStainedWalls(instance.seed)
-      ? this.materials.wallStained
-      : this.materials.wall;
-    const rotatedWallMaterial = this.useStainedWalls(instance.seed)
-      ? this.materials.wallStainedRotated
-      : this.materials.wallRotated;
-    for (const wall of wallBoxes) {
-      wall.material = wallMaterial;
-    }
-    for (const wall of rotatedWallBoxes) {
-      wall.material = rotatedWallMaterial;
-    }
-    for (const lintel of lintelBoxes) {
-      lintel.material = wallMaterial;
+    const wallMaterial = this.materials.wall;
+    for (const surface of wallSurfacePlanes) {
+      surface.material = wallMaterial;
     }
     for (const trim of trimBoxes) {
       trim.material = this.materials.trim;
     }
 
-    const wallMeshes: Mesh[] = [];
-    if (wallBoxes.length > 0) {
-      const walls = this.mergeMeshes(`${instance.id}.walls.primary`, wallBoxes, root);
-      walls.checkCollisions = true;
-      wallMeshes.push(walls);
-    }
-    if (rotatedWallBoxes.length > 0) {
-      const rotatedWalls = this.mergeMeshes(`${instance.id}.walls.rotated`, rotatedWallBoxes, root);
-      rotatedWalls.checkCollisions = true;
-      wallMeshes.push(rotatedWalls);
-    }
-    if (lintelBoxes.length > 0) {
-      const lintels = this.mergeMeshes(`${instance.id}.lintels`, lintelBoxes, root);
-      lintels.checkCollisions = true;
-      wallMeshes.push(lintels);
-    }
+    const walls = this.mergeMeshes(`${instance.id}.walls`, wallBoxes, root);
+    walls.isVisible = false;
+    walls.checkCollisions = true;
+    const wallSurfaces = this.mergeMeshes(`${instance.id}.wall-surfaces`, wallSurfacePlanes, root);
     const trim = this.mergeMeshes(`${instance.id}.trim`, trimBoxes, root);
 
     return {
-      meshes: Object.freeze([floor, ceiling, ...wallMeshes, trim]),
-      colliders: Object.freeze([floorCollider, ceiling, ...wallMeshes]),
+      meshes: Object.freeze([floor, ceiling, wallSurfaces, trim]),
+      colliders: Object.freeze([floorCollider, ceiling, walls]),
     };
   }
 
@@ -344,7 +318,7 @@ export class ModularRoomBuilder {
     side: WallSide,
     openings: readonly Opening[],
     wallBoxes: Mesh[],
-    lintelBoxes: Mesh[],
+    wallSurfacePlanes: Mesh[],
     trimBoxes: Mesh[],
   ): void {
     let cursor = -side.length / 2;
@@ -360,6 +334,7 @@ export class ModularRoomBuilder {
           opening.start,
           segmentIndex,
           wallBoxes,
+          wallSurfacePlanes,
           trimBoxes,
           uvOffset,
         );
@@ -368,7 +343,7 @@ export class ModularRoomBuilder {
 
       const lintelHeight = roomHeight - Math.min(opening.height, roomHeight);
       if (lintelHeight > 0.01) {
-        lintelBoxes.push(
+        wallBoxes.push(
           this.createSideBox(
             `${roomId}.${side.id}.lintel.${segmentIndex}`,
             side,
@@ -376,9 +351,19 @@ export class ModularRoomBuilder {
             opening.end,
             lintelHeight,
             roomHeight - lintelHeight / 2,
-            WALL_THICKNESS,
+            MODULAR_WALL_THICKNESS,
             uvOffset,
             WALL_UV_METERS_PER_TILE,
+          ),
+        );
+        wallSurfacePlanes.push(
+          this.createWallSurface(
+            `${roomId}.${side.id}.lintel-surface.${segmentIndex}`,
+            side,
+            opening.start,
+            opening.end,
+            lintelHeight,
+            roomHeight - lintelHeight / 2,
           ),
         );
       }
@@ -395,6 +380,7 @@ export class ModularRoomBuilder {
         side.length / 2,
         segmentIndex,
         wallBoxes,
+        wallSurfacePlanes,
         trimBoxes,
         uvOffset,
       );
@@ -409,6 +395,7 @@ export class ModularRoomBuilder {
     end: number,
     index: number,
     wallBoxes: Mesh[],
+    wallSurfacePlanes: Mesh[],
     trimBoxes: Mesh[],
     uvOffset: UvOffset,
   ): void {
@@ -424,9 +411,19 @@ export class ModularRoomBuilder {
         end,
         roomHeight,
         roomHeight / 2,
-        WALL_THICKNESS,
+        MODULAR_WALL_THICKNESS,
         uvOffset,
         WALL_UV_METERS_PER_TILE,
+      ),
+    );
+    wallSurfacePlanes.push(
+      this.createWallSurface(
+        `${roomId}.${side.id}.wall-surface.${index}`,
+        side,
+        start,
+        end,
+        roomHeight,
+        roomHeight / 2,
       ),
     );
     trimBoxes.push(
@@ -437,11 +434,70 @@ export class ModularRoomBuilder {
         end,
         TRIM_HEIGHT,
         TRIM_HEIGHT / 2,
-        WALL_THICKNESS + TRIM_DEPTH,
+        MODULAR_WALL_THICKNESS + TRIM_DEPTH,
         uvOffset,
         TRIM_UV_METERS_PER_TILE,
       ),
     );
+  }
+
+
+  private createWallSurface(
+    name: string,
+    side: WallSide,
+    start: number,
+    end: number,
+    height: number,
+    centerY: number,
+  ): Mesh {
+    const length = end - start;
+    const center = (start + end) / 2;
+    const insetCoordinate =
+      side.coordinate - Math.sign(side.coordinate) * (MODULAR_WALL_THICKNESS + WALL_SURFACE_EPSILON);
+    const mesh = MeshBuilder.CreatePlane(
+      name,
+      {
+        width: length,
+        height,
+        sideOrientation: Mesh.DOUBLESIDE,
+      },
+      this.scene,
+    );
+    mesh.position.copyFrom(
+      new Vector3(
+        side.horizontal ? center : insetCoordinate,
+        centerY,
+        side.horizontal ? insetCoordinate : center,
+      ),
+    );
+    switch (side.id) {
+      case 'north':
+        mesh.rotation.y = Math.PI;
+        break;
+      case 'east':
+        mesh.rotation.y = -Math.PI / 2;
+        break;
+      case 'south':
+        mesh.rotation.y = 0;
+        break;
+      case 'west':
+        mesh.rotation.y = Math.PI / 2;
+        break;
+    }
+    const baseUvs = mesh.getVerticesData(VertexBuffer.UVKind);
+    if (baseUvs !== null) {
+      const tiledUvs = new Float32Array(baseUvs.length);
+      const uTiles = length / WALL_UV_METERS_PER_TILE;
+      const vTiles = height / WALL_UV_METERS_PER_TILE;
+      for (let index = 0; index < baseUvs.length; index += 2) {
+        tiledUvs[index] = (baseUvs[index] ?? 0) * uTiles;
+        tiledUvs[index + 1] = (baseUvs[index + 1] ?? 0) * vTiles;
+      }
+      mesh.setVerticesData(VertexBuffer.UVKind, tiledUvs, true);
+    }
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+    return mesh;
   }
 
   private createSideBox(
@@ -799,8 +855,10 @@ export class ModularRoomBuilder {
     let index = 0;
     for (let row = 0; row < rows; row += 1) {
       for (let column = 0; column < columns; column += 1) {
-        const jitter = this.hash(instance.seed, index);
-        const enabled = fixtures.length === 0 || jitter % 9 !== 0;
+        // Every fluorescent fixture remains powered. Variation is expressed by
+        // brief deterministic flicker profiles rather than permanently dark
+        // tubes, matching the classic Level 0 reference.
+        const enabled = true;
         fixtures.push({
           id: `${instance.id}.fixture.${String(index)}`,
           position: new Vector3(
@@ -953,11 +1011,6 @@ export class ModularRoomBuilder {
     }
   }
 
-
-  private sideUsesRotatedWallpaper(_side: WallSide): boolean {
-    return false;
-  }
-
   private quarterTurnRadians(rotation: QuarterTurn): number {
     return rotation * (Math.PI / 2);
   }
@@ -982,14 +1035,6 @@ export class ModularRoomBuilder {
     value ^= value >>> 15;
     value = Math.imul(value, 0x846ca68b);
     return (value ^ (value >>> 16)) >>> 0;
-  }
-
-  private useStainedWalls(_seed: number): boolean {
-    return false;
-  }
-
-  private isWet(seed: number): boolean {
-    return this.hash(seed, 83) % 6 === 0;
   }
 }
 

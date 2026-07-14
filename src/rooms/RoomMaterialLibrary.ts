@@ -66,9 +66,7 @@ export interface RoomMaterialLibraryOptions {
 
 export interface RoomMaterialSet {
   readonly wall: StandardMaterial;
-  readonly wallRotated: StandardMaterial;
   readonly wallStained: StandardMaterial;
-  readonly wallStainedRotated: StandardMaterial;
   readonly carpet: StandardMaterial;
   readonly carpetWet: StandardMaterial;
   readonly ceiling: StandardMaterial;
@@ -151,9 +149,7 @@ function defaultTextureFactory(
  */
 export class RoomMaterialLibrary implements RoomMaterialSet {
   public readonly wall: StandardMaterial;
-  public readonly wallRotated: StandardMaterial;
   public readonly wallStained: StandardMaterial;
-  public readonly wallStainedRotated: StandardMaterial;
   public readonly carpet: StandardMaterial;
   public readonly carpetWet: StandardMaterial;
   public readonly ceiling: StandardMaterial;
@@ -167,7 +163,6 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
 
   private readonly owned: readonly StandardMaterial[];
   private readonly textures = new Map<RoomTextureId, Texture>();
-  private readonly clonedTextures: Texture[] = [];
   private readonly textureStatuses = new Map<RoomTextureId, MutableTextureStatus>();
   private readonly textureFactory: RoomTextureFactory;
   private readonly baseUrl: string;
@@ -203,52 +198,38 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
     }
     this.textureRegistrationComplete = true;
 
-    this.wall = this.create('wall', new Color3(1, 1, 1), new Color3(0, 0, 0));
-    this.wallRotated = this.create(
-      'wall-rotated',
-      new Color3(1, 1, 1),
-      new Color3(0, 0, 0),
-    );
+    this.wall = this.create('wall', new Color3(0.98, 0.97, 0.88), new Color3(0.025, 0.024, 0.018));
     this.wallStained = this.create(
       'wall-stained',
-      new Color3(1, 1, 1),
-      new Color3(0, 0, 0),
-    );
-    this.wallStainedRotated = this.create(
-      'wall-stained-rotated',
-      new Color3(1, 1, 1),
-      new Color3(0, 0, 0),
+      new Color3(0.96, 0.95, 0.86),
+      new Color3(0.024, 0.023, 0.017),
     );
     this.carpet = this.create(
       'carpet',
-      new Color3(0.79, 0.76, 0.69),
-      new Color3(0.01, 0.01, 0.01),
+      new Color3(0.96, 0.94, 0.86),
+      new Color3(0.018, 0.016, 0.011),
     );
     this.carpetWet = this.create(
       'carpet-wet',
-      new Color3(0.72, 0.69, 0.62),
-      new Color3(0.008, 0.008, 0.008),
+      new Color3(0.96, 0.94, 0.86),
+      new Color3(0.018, 0.016, 0.011),
     );
-    this.ceiling = this.create(
-      'ceiling',
-      new Color3(1, 1, 1),
-      new Color3(0.02, 0.02, 0.02),
-    );
-    this.trim = this.create('trim', new Color3(0.39, 0.34, 0.15), new Color3(0.01, 0.008, 0.003));
+    this.ceiling = this.create('ceiling', new Color3(1, 1, 0.97), new Color3(0.065, 0.064, 0.056));
+    this.trim = this.create('trim', new Color3(0.78, 0.72, 0.56), new Color3(0.015, 0.013, 0.009));
     this.ceilingGrid = this.create(
       'ceiling-grid',
-      new Color3(0.5, 0.49, 0.44),
-      new Color3(0.014, 0.014, 0.012),
+      new Color3(0.47, 0.47, 0.42),
+      new Color3(0.012, 0.012, 0.01),
     );
     this.fixtureHousing = this.create(
       'fixture-housing',
-      new Color3(0.92, 0.9, 0.86),
-      new Color3(0.025, 0.024, 0.02),
+      new Color3(0.7, 0.7, 0.64),
+      new Color3(0.02, 0.02, 0.017),
     );
     this.fixtureEmitter = this.create(
       'fixture-emitter',
-      new Color3(0.98, 0.96, 0.76),
-      new Color3(0.9, 0.82, 0.49),
+      new Color3(1, 1, 0.92),
+      new Color3(0.96, 0.95, 0.78),
     );
     this.fixtureEmitterOff = this.create(
       'fixture-emitter-off',
@@ -257,17 +238,15 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
     );
     this.column = this.create(
       'column',
-      new Color3(0.62, 0.56, 0.29),
-      new Color3(0.03, 0.025, 0.009),
+      new Color3(0.98, 0.97, 0.88),
+      new Color3(0.025, 0.024, 0.018),
     );
 
     this.wall.diffuseTexture = this.requireTexture('wallPaper');
-    this.wallRotated.diffuseTexture = this.requireTexture('wallPaper');
-    this.wallStained.diffuseTexture = this.requireTexture('wallPaper');
-    this.wallStainedRotated.diffuseTexture = this.requireTexture('wallPaper');
+    this.wallStained.diffuseTexture = this.requireTexture('wallStained');
     this.carpet.diffuseTexture = this.requireTexture('carpet');
-    this.carpetWet.diffuseTexture = this.requireTexture('carpetWet');
-    this.ceiling.diffuseTexture = null;
+    this.carpetWet.diffuseTexture = this.requireTexture('carpet');
+    this.ceiling.diffuseTexture = this.requireTexture('ceilingTile');
     this.trim.diffuseTexture = this.requireTexture('trim');
     this.ceilingGrid.diffuseTexture = this.requireTexture('trim');
     this.fixtureHousing.diffuseTexture = this.requireTexture('fixtureHousing');
@@ -276,16 +255,15 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
     this.fixtureEmitterOff.diffuseTexture = this.requireTexture('fixtureTubeOff');
     this.column.diffuseTexture = this.requireTexture('column');
 
-    this.carpetWet.specularColor.set(0.09, 0.085, 0.055);
-    this.carpetWet.specularPower = 18;
-    this.carpetWet.roughness = 0.72;
+    this.carpet.specularColor.set(0.015, 0.014, 0.011);
+    this.carpetWet.specularColor.copyFrom(this.carpet.specularColor);
+    this.carpetWet.specularPower = this.carpet.specularPower;
+    this.carpetWet.roughness = this.carpet.roughness;
     this.fixtureEmitter.disableLighting = true;
     this.fixtureEmitterOff.disableLighting = true;
     for (const illuminated of [
       this.wall,
-      this.wallRotated,
       this.wallStained,
-      this.wallStainedRotated,
       this.carpet,
       this.carpetWet,
       this.ceiling,
@@ -300,9 +278,7 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
     }
     this.owned = Object.freeze([
       this.wall,
-      this.wallRotated,
       this.wallStained,
-      this.wallStainedRotated,
       this.carpet,
       this.carpetWet,
       this.ceiling,
@@ -401,9 +377,7 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
       ? this.requireTexture('carpetNormal')
       : null;
     this.wall.bumpTexture = quality.normalMaps ? wallNormal : null;
-    this.wallRotated.bumpTexture = quality.normalMaps ? wallNormal : null;
     this.wallStained.bumpTexture = quality.normalMaps ? wallNormal : null;
-    this.wallStainedRotated.bumpTexture = quality.normalMaps ? wallNormal : null;
     this.carpet.bumpTexture = quality.normalMaps ? carpetNormal : null;
     this.carpetWet.bumpTexture = quality.normalMaps ? carpetNormal : null;
   }
@@ -427,9 +401,6 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
       material.dispose(false, false);
     }
     for (const texture of this.textures.values()) {
-      texture.dispose();
-    }
-    for (const texture of this.clonedTextures) {
       texture.dispose();
     }
     this.textures.clear();
@@ -506,17 +477,13 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
     switch (id) {
       case 'wallPaper':
         this.wall.diffuseTexture = null;
-        this.wallRotated.diffuseTexture = null;
         break;
       case 'wallStained':
         this.wallStained.diffuseTexture = null;
-        this.wallStainedRotated.diffuseTexture = null;
         break;
       case 'wallNormal':
         this.wall.bumpTexture = null;
-        this.wallRotated.bumpTexture = null;
         this.wallStained.bumpTexture = null;
-        this.wallStainedRotated.bumpTexture = null;
         break;
       case 'carpet':
         this.carpet.diffuseTexture = null;
@@ -573,8 +540,6 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
     material.backFaceCulling = true;
     return material;
   }
-
-
 
   private assertActive(): void {
     if (this.disposed) {

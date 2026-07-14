@@ -11,7 +11,6 @@ import type {
 const STANDARD_SOCKET_WIDTH = 2.2;
 const WIDE_SOCKET_WIDTH = 3.6;
 const SOCKET_HEIGHT = 2.3;
-const DEFAULT_ROOM_HEIGHT = 3.7;
 
 interface DefinitionOptions {
   id: string;
@@ -126,7 +125,7 @@ function definition(options: DefinitionOptions): RoomDefinition {
     footprint: {
       width: options.width,
       depth: options.depth,
-      height: options.height ?? DEFAULT_ROOM_HEIGHT,
+      height: options.height ?? 3.1,
     },
     sockets: options.sockets,
     weight: options.weight,
@@ -140,7 +139,7 @@ function definition(options: DefinitionOptions): RoomDefinition {
       {
         id: 'center-ceiling',
         kind: 'ceiling',
-        localPosition: { x: 0, y: (options.height ?? DEFAULT_ROOM_HEIGHT) - 0.08, z: 0 },
+        localPosition: { x: 0, y: (options.height ?? 3.1) - 0.08, z: 0 },
       },
     ],
     exitCompatibleSurfaces: options.exitSurfaces ?? [],
