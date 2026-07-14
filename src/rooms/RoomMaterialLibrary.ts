@@ -253,7 +253,7 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
     this.fixtureEmitter.diffuseTexture = this.requireTexture('fixtureTube');
     this.fixtureEmitter.emissiveTexture = this.requireTexture('fixtureTube');
     this.fixtureEmitterOff.diffuseTexture = this.requireTexture('fixtureTubeOff');
-    this.column.diffuseTexture = this.requireTexture('column');
+    this.column.diffuseTexture = this.requireTexture('wallPaper');
 
     this.carpet.specularColor.set(0.015, 0.014, 0.011);
     this.carpetWet.specularColor.copyFrom(this.carpet.specularColor);

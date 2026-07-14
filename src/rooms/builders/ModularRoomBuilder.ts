@@ -27,6 +27,7 @@ interface BoxRecipe {
   readonly position: Vector3;
   readonly uvOffset?: UvOffset;
   readonly uvMetersPerTile?: number;
+  readonly localUvProjection?: boolean;
 }
 
 interface UvOffset {
@@ -70,7 +71,7 @@ const TRIM_UV_METERS_PER_TILE = 1;
 const FIXTURE_UV_METERS_PER_TILE = 0.5;
 const COLUMN_UV_METERS_PER_TILE = 1.2;
 const WALL_SURFACE_EPSILON = 0.002;
-const VISUAL_CEILING_HEIGHT_BONUS = 0.45;
+const UNIFORM_VISUAL_ROOM_HEIGHT = 4.15;
 
 /**
  * Builds one visual representation of a logical room. The room graph remains
@@ -787,8 +788,9 @@ export class ModularRoomBuilder {
           depth: 0.5,
           position,
           uvOffset: this.createUvOffset(instance.seed, 101 + index),
+          localUvProjection: true,
         },
-        this.materials.wall,
+        this.materials.column,
       ),
     );
     const columns = this.mergeMeshes(`${instance.id}.columns`, boxes, root);
@@ -849,8 +851,9 @@ export class ModularRoomBuilder {
                 z,
               ),
               uvOffset: this.createUvOffset(instance.seed, uvSalt + segment),
+              localUvProjection: true,
             },
-            this.materials.wall,
+            this.materials.column,
           ),
         );
       }
@@ -864,8 +867,9 @@ export class ModularRoomBuilder {
               depth: 0.42,
               position: new Vector3(side * (width / 2 - 0.2), 1.21, z),
               uvOffset: this.createUvOffset(instance.seed, uvSalt + 11 + side),
+              localUvProjection: true,
             },
-            this.materials.wall,
+            this.materials.column,
           ),
         );
       }
@@ -1044,8 +1048,8 @@ export class ModularRoomBuilder {
     return fixtures;
   }
 
-  private getVisualRoomHeight(definition: RoomDefinition): number {
-    return definition.footprint.height + VISUAL_CEILING_HEIGHT_BONUS;
+  private getVisualRoomHeight(_definition: RoomDefinition): number {
+    return UNIFORM_VISUAL_ROOM_HEIGHT;
   }
 
   private createTrigger(instance: RoomInstance, definition: RoomDefinition): RoomEntryTrigger {
@@ -1084,7 +1088,9 @@ export class ModularRoomBuilder {
     const faceUV =
       uvMetersPerTile === undefined
         ? undefined
-        : this.createPhysicalBoxUvs(recipe, uvMetersPerTile);
+        : recipe.localUvProjection
+          ? this.createLocalBoxUvs(recipe, uvMetersPerTile)
+          : this.createPhysicalBoxUvs(recipe, uvMetersPerTile);
     const dimensions = { width: recipe.width, height: recipe.height, depth: recipe.depth };
     const mesh = MeshBuilder.CreateBox(
       recipe.name,
@@ -1139,6 +1145,26 @@ export class ModularRoomBuilder {
       rect(zStart, yStart, recipe.depth, recipe.height),
       rect(xStart, zStart, recipe.width, recipe.depth),
       rect(xStart, zStart, recipe.width, recipe.depth),
+    ];
+  }
+
+  private createLocalBoxUvs(recipe: BoxRecipe, metersPerTile: number): Vector4[] {
+    const offset = recipe.uvOffset ?? { u: 0, v: 0 };
+    const rect = (uLength: number, vLength: number): Vector4 =>
+      new Vector4(
+        offset.u,
+        offset.v,
+        offset.u + uLength / metersPerTile,
+        offset.v + vLength / metersPerTile,
+      );
+
+    return [
+      rect(recipe.width, recipe.height),
+      rect(recipe.width, recipe.height),
+      rect(recipe.depth, recipe.height),
+      rect(recipe.depth, recipe.height),
+      rect(recipe.width, recipe.depth),
+      rect(recipe.width, recipe.depth),
     ];
   }
 
