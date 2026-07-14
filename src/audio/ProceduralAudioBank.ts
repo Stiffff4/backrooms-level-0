@@ -209,23 +209,25 @@ function synthesizeFluorescentPop(
   for (let index = 0; index < length; index += 1) {
     const time = index / sampleRate;
     const progress = index / Math.max(1, length - 1);
-    const attack = smootherStep(time / 0.0045);
-    const release = smootherStep((durationSeconds - time) / 0.035);
-    const decay = Math.exp(-time * 13.5);
+    const attack = smootherStep(time / 0.009);
+    const release = smootherStep((durationSeconds - time) / 0.055);
+    const decay = Math.exp(-time * 17.5);
     const envelope = attack * release * decay;
     const currentNoise = sequence.next() * 2 - 1;
     const highPassedNoise = currentNoise - previousNoise * 0.91;
     previousNoise = currentNoise;
 
-    const frequency = 2_350 - progress * 1_420;
+    // Keep the event in the dull ballast-click range. The previous 2.35 kHz
+    // snap read as a firecracker in headphones.
+    const frequency = 1_280 - progress * 690;
     phase += (Math.PI * 2 * frequency) / sampleRate;
-    const electricalSnap = Math.sin(phase) * 0.36 + Math.sin(phase * 0.503) * 0.17;
-    const ballastThump = Math.sin(Math.PI * 2 * 118 * time) * Math.exp(-time * 22) * 0.22;
+    const electricalSnap = Math.sin(phase) * 0.22 + Math.sin(phase * 0.503) * 0.11;
+    const ballastThump = Math.sin(Math.PI * 2 * 104 * time) * Math.exp(-time * 24) * 0.3;
 
-    samples[index] = (highPassedNoise * 0.5 + electricalSnap + ballastThump) * envelope;
+    samples[index] = (highPassedNoise * 0.27 + electricalSnap + ballastThump) * envelope;
   }
 
-  removeDcAndNormalize(samples, 0.88);
+  removeDcAndNormalize(samples, 0.7);
   samples[0] = 0;
   samples[length - 1] = 0;
   return samples;

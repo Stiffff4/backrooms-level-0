@@ -412,3 +412,59 @@ normal. La colocación nominal se desplaza ahora exactamente `MODULAR_WALL_THICK
 normal interior y luego la presentación añade solo una separación visual pequeña. Visual, trigger y
 beacon comparten la misma colocación y reciben juntos los rebases, evitando constantes duplicadas y
 deriva entre sistemas.
+
+## D-048 — Una sola fase de marcha gobierna pisadas y head bob
+
+**Estado:** aceptada — pulido posterior a QA humano.
+
+La locomoción acumula distancia horizontal real y la normaliza por una distancia de paso distinta para
+caminar y correr. Esa fase alimenta tanto los eventos alternados de pisada como la oscilación de cámara,
+por lo que framerate, floating-origin rebases y fluctuaciones puntuales del telemetry `grounded` no
+pueden desincronizarlos. El origen flotante no representa movimiento físico del jugador y, por tanto,
+no reinicia la fase.
+
+## D-049 — El pool de luces prioriza continuidad visible, no solo habitación actual
+
+**Estado:** aceptada — pulido posterior a QA humano.
+
+El budget continúa limitado a ocho proxies dinámicos. Solo una fracción se reserva a fixtures de la
+habitación activa; fixtures de habitaciones vecinas visibles reciben prioridad y toda reasignación
+interpola intensidad desde un nivel bajo. Una contribución hemisférica ligeramente mayor evita que una
+habitación sin proxy se vea completamente apagada aunque sus paneles emissive sean visibles.
+
+## D-050 — Humedad procedural con jerarquía espacial y contraste contenido
+
+**Estado:** aceptada — pulido posterior a QA humano.
+
+Las manchas grandes y circulares se sustituyen por campos irregulares de menor escala, con mayor
+probabilidad cerca de suelo, zócalos, esquinas y juntas. La máscara mantiene seed y reproducción exacta,
+pero reduce densidad, opacidad y frecuencia de uso del material manchado para que la humedad sea detalle
+y no la lectura dominante de una habitación.
+
+## D-051 — Los pops eléctricos deben comunicar fluorescentes, no amenaza externa
+
+**Estado:** aceptada — pulido posterior a QA humano.
+
+El one-shot sigue ligado a fallos reales de luminarias y no se elimina, pero baja su espectro, suaviza
+el ataque, alarga el decay, reduce ganancia y usa filtrado band-pass. Así conserva variedad ambiental y
+sincronía visual sin parecer un disparo, petardo, entidad o evento sin contexto.
+
+## D-052 — La pared de salida debe ser inequívoca sin convertirse en portal
+
+**Estado:** aceptada — pulido posterior a QA humano.
+
+Sobre la colocación alcanzable del hotfix se aumenta contraste temporal, emissive y número de
+fragmentos visuales, con un pulso geométrico mínimo y determinista. La pared conserva papel tapiz y
+volumen de Level 0; `reducedFlashing` limita amplitud, pero no borra la señal necesaria para completar
+la partida.
+
+## D-053 — Budgets raw alineados con la build de producción segura
+
+**Estado:** aceptada — pulido posterior a QA humano.
+
+La configuración que conserva bindings y evita la regresión de “solo niebla” produce un entry de
+aproximadamente 2.09 MiB raw y 3.07 MiB de JavaScript total, aunque la transferencia gzip permanece
+alrededor de 377 KiB para el entry y 578 KiB total. Los ceilings raw se ajustan de 2.00/3.00 MiB a
+2.25/3.25 MiB: margen pequeño, warning todavía visible por encima de 85 % y sin relajar los límites de
+transferencia, gzip, assets o runtime. Se prefiere un artefacto jugable con presupuesto honesto a
+reactivar minificación que ya destruyó el render.

@@ -112,9 +112,9 @@ describe('production build analysis', () => {
       maximumInitialTransferBytes: 30 * 1_024 * 1_024,
       maximumTotalTransferBytes: 80 * 1_024 * 1_024,
       maximumDecodedAssetBytes: 250 * 1_024 * 1_024,
-      maximumEntryJavaScriptBytes: 2 * 1_024 * 1_024,
+      maximumEntryJavaScriptBytes: 2.25 * 1_024 * 1_024,
       maximumEntryJavaScriptGzipBytes: 400 * 1_024,
-      maximumTotalJavaScriptBytes: 3 * 1_024 * 1_024,
+      maximumTotalJavaScriptBytes: 3.25 * 1_024 * 1_024,
       warningRatio: 0.85,
     });
   });

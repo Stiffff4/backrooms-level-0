@@ -202,23 +202,23 @@ describe('FootstepSystem', () => {
     ]);
   });
 
-  it('ignora distancia durante pausa, airborne y rebase', () => {
+  it('ignora pausa, tolera telemetría grounded intermitente y conserva fase al rebasar', () => {
     const runtime = new MockAudioRuntime();
     const system = createSystem(runtime, { walkStrideLength: 1 });
 
     expect(system.update(moving(0.75))).toBe(0);
     expect(system.update(moving(20), { paused: true })).toBe(0);
     expect(system.pendingDistance).toBeCloseTo(0.75);
-    expect(system.update({ ...moving(20), grounded: false })).toBe(0);
-    expect(system.pendingDistance).toBeCloseTo(0.75);
+    expect(system.update({ ...moving(0.25), grounded: false })).toBe(1);
+    expect(system.pendingDistance).toBeCloseTo(0);
     expect(system.update(moving(50), { rebased: true })).toBe(0);
-    expect(system.pendingDistance).toBe(0);
+    expect(system.pendingDistance).toBeCloseTo(0);
 
     system.setPaused(true);
     expect(system.update(moving(2))).toBe(0);
     system.setPaused(false);
     expect(system.update(moving(1))).toBe(1);
-    expect(runtime.sources).toHaveLength(1);
+    expect(runtime.sources).toHaveLength(2);
   });
 
   it('cambia de perfil wet_carpet mediante condición o mojado continuo', () => {

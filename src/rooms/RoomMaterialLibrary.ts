@@ -201,8 +201,8 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
     this.wall = this.create('wall', new Color3(0.72, 0.65, 0.34), new Color3(0.035, 0.03, 0.01));
     this.wallStained = this.create(
       'wall-stained',
-      new Color3(0.58, 0.52, 0.27),
-      new Color3(0.026, 0.022, 0.008),
+      new Color3(0.68, 0.61, 0.32),
+      new Color3(0.033, 0.028, 0.01),
     );
     this.carpet = this.create(
       'carpet',

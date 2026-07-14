@@ -95,9 +95,10 @@ export class PlayerController {
   private verticalVelocity = 0;
   private yaw = 0;
   private pitch = 0;
-  private headBobPhase = 0;
+  private gaitProgress = 0;
   private headBobX = 0;
   private headBobY = 0;
+  private groundContactGrace = 0;
   private enabled = true;
   private grounded = false;
   private disposed = false;
@@ -269,16 +270,22 @@ export class PlayerController {
     const actualY = this.collider.position.y - previousPosition.y;
     const actualZ = this.collider.position.z - previousPosition.z;
     const distance = Math.hypot(actualX, actualZ);
-    this.grounded =
+    const collisionGrounded =
       requestedVerticalDisplacement < 0 &&
       actualY > requestedVerticalDisplacement + GROUND_COLLISION_EPSILON;
-    if (this.grounded) {
+    if (collisionGrounded) {
+      this.groundContactGrace = gameConfig.movement.groundContactGraceSeconds;
+    } else {
+      this.groundContactGrace = Math.max(0, this.groundContactGrace - safeDelta);
+    }
+    this.grounded = collisionGrounded || this.groundContactGrace > 0;
+    if (collisionGrounded) {
       this.verticalVelocity = 0;
     }
 
     const moving = distance > MOVEMENT_EPSILON;
     const sprinting = moving && inputFrame.sprint;
-    this.updateHeadBob(safeDelta, moving, sprinting);
+    this.updateHeadBob(safeDelta, distance, moving, sprinting);
 
     return this.publishMovementFrame(safeDelta, distance, sprinting);
   }
@@ -317,20 +324,28 @@ export class PlayerController {
     this.camera.fov = degreesToRadians(this.settings.fov);
   }
 
-  private updateHeadBob(deltaSeconds: number, moving: boolean, sprinting: boolean): void {
+  private updateHeadBob(
+    deltaSeconds: number,
+    distance: number,
+    moving: boolean,
+    sprinting: boolean,
+  ): void {
     let targetX = 0;
     let targetY = 0;
 
-    if (this.settings.headBob && moving && this.grounded) {
-      const frequency = sprinting
-        ? gameConfig.movement.headBobSprintFrequency
-        : gameConfig.movement.headBobWalkFrequency;
+    if (this.settings.headBob && moving) {
+      const stepDistance = sprinting
+        ? gameConfig.movement.sprintStepDistance
+        : gameConfig.movement.walkStepDistance;
       const amplitude = sprinting
         ? gameConfig.movement.headBobSprintAmplitude
         : gameConfig.movement.headBobWalkAmplitude;
-      this.headBobPhase = (this.headBobPhase + frequency * deltaSeconds) % (Math.PI * 4);
-      targetX = Math.cos(this.headBobPhase * 0.5) * amplitude * 0.22;
-      targetY = Math.sin(this.headBobPhase) * amplitude;
+      // A normalized step cycle driven by actual travelled distance keeps the
+      // camera motion synchronized with the distance-driven footstep system.
+      this.gaitProgress = (this.gaitProgress + distance / stepDistance) % 2;
+      const phase = this.gaitProgress * Math.PI * 2;
+      targetX = Math.sin(phase * 0.5) * amplitude * 0.3;
+      targetY = -Math.cos(phase) * amplitude * 0.72 + amplitude * 0.12;
     }
 
     const response = 1 - Math.exp(-HEAD_BOB_RESPONSE * deltaSeconds);
@@ -340,7 +355,7 @@ export class PlayerController {
   }
 
   private resetHeadBob(): void {
-    this.headBobPhase = 0;
+    this.gaitProgress = 0;
     this.headBobX = 0;
     this.headBobY = 0;
     this.camera.position.set(0, gameConfig.movement.eyeHeight, 0);

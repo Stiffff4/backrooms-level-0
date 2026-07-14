@@ -178,11 +178,11 @@ export class ExitWallPresentation {
     const slowWave = Math.sin(elapsedSeconds * 2.387 + this.seedPhaseA);
     const driftWave = Math.sin(elapsedSeconds * 0.619 + this.seedPhaseB);
     const irregularWave = Math.sin(elapsedSeconds * 5.713 + this.seedPhaseA * 0.41);
-    const rawDepth = 0.055 + proximity * 0.035 + this.transitionProgressValue * 0.055;
+    const rawDepth = 0.145 + proximity * 0.045 + this.transitionProgressValue * 0.07;
     const depth = this.reducedFlashingValue
       ? rawDepth * exitPresentationConfig.visual.reducedGlitchScale
       : rawDepth;
-    const responseCenter = 0.945 + driftWave * 0.012;
+    const responseCenter = 0.89 + driftWave * 0.035;
     const minimumResponse = this.reducedFlashingValue
       ? exitPresentationConfig.visual.reducedMinimumLightResponse
       : exitPresentationConfig.visual.minimumLightResponse;
@@ -192,14 +192,14 @@ export class ExitWallPresentation {
     );
     const glitchStrength = clampUnit(
       Math.abs(irregularWave) *
-        (0.026 + proximity * 0.038 + this.transitionProgressValue * 0.13) *
+        (0.06 + proximity * 0.055 + this.transitionProgressValue * 0.16) *
         (this.reducedFlashingValue ? exitPresentationConfig.visual.reducedGlitchScale : 1),
     );
     const emissiveStrength = Math.min(
       exitPresentationConfig.visual.maximumEmissiveStrength,
       exitPresentationConfig.visual.baseEmissiveStrength +
-        (1 - lightResponse) * 0.22 +
-        proximity * 0.014,
+        Math.max(0, 1 - lightResponse) * 0.42 +
+        proximity * 0.024,
     );
 
     this.sampleValue.elapsedSeconds = elapsedSeconds;
@@ -237,7 +237,7 @@ export class ExitWallPresentation {
 
   private createGlitchStrip(scene: Scene, rng: SeededRandom, index: number): ExitGlitchStrip {
     const width = this.placementValue.width * (0.3 + rng.next() * 0.5);
-    const height = 0.018 + rng.next() * 0.034;
+    const height = 0.028 + rng.next() * 0.07;
     const availableX = Math.max(0, (this.placementValue.width - width) / 2);
     const baseX = (rng.next() * 2 - 1) * availableX;
     const availableY = Math.max(0, (this.placementValue.height - height) / 2 - 0.08);
@@ -267,18 +267,18 @@ export class ExitWallPresentation {
   }
 
   private applySample(sample: ExitWallVisualSample): void {
-    const diffuseScale = 0.88 + sample.lightResponse * 0.12;
+    const diffuseScale = 0.58 + sample.lightResponse * 0.5;
     this.wallMaterial.diffuseColor.copyFrom(this.baseDiffuse).scaleInPlace(diffuseScale);
     this.wallMaterial.emissiveColor.copyFrom(this.baseEmissive);
-    this.wallMaterial.emissiveColor.r += sample.emissiveStrength * 0.72;
-    this.wallMaterial.emissiveColor.g += sample.emissiveStrength * 0.78;
-    this.wallMaterial.emissiveColor.b += sample.emissiveStrength * 0.48;
+    this.wallMaterial.emissiveColor.r += sample.emissiveStrength * 0.86;
+    this.wallMaterial.emissiveColor.g += sample.emissiveStrength * 0.94;
+    this.wallMaterial.emissiveColor.b += sample.emissiveStrength * 0.54;
 
     this.glitchMaterial.diffuseColor.copyFrom(this.baseDiffuse).scaleInPlace(diffuseScale * 0.97);
     this.glitchMaterial.emissiveColor.copyFrom(this.baseEmissive);
-    this.glitchMaterial.emissiveColor.r += sample.emissiveStrength * 0.82;
-    this.glitchMaterial.emissiveColor.g += sample.emissiveStrength * 0.9;
-    this.glitchMaterial.emissiveColor.b += sample.emissiveStrength * 0.54;
+    this.glitchMaterial.emissiveColor.r += sample.emissiveStrength * 1.05;
+    this.glitchMaterial.emissiveColor.g += sample.emissiveStrength * 1.12;
+    this.glitchMaterial.emissiveColor.b += sample.emissiveStrength * 0.62;
 
     const transitionWave = Math.sin(sample.elapsedSeconds * 18.1 + this.seedPhaseB);
     this.root.scaling.x =
@@ -286,6 +286,7 @@ export class ExitWallPresentation {
       transitionWave * sample.transitionProgress * exitPresentationConfig.visual.transitionScaleX;
     this.root.scaling.y =
       1 - sample.transitionProgress * exitPresentationConfig.visual.transitionScaleY;
+    this.wallMesh.scaling.x = 1 + Math.sin(sample.elapsedSeconds * 3.31 + this.seedPhaseA) * 0.006;
     const maximumOffset = exitPresentationConfig.visual.maximumGlitchOffset;
     for (const strip of this.glitchStrips) {
       const wave = Math.sin(sample.elapsedSeconds * 7.17 + strip.phase);

@@ -3,15 +3,18 @@ export const gameConfig = {
     walkSpeed: 2.65,
     sprintSpeed: 4.55,
     acceleration: 11,
-    braking: 15,
+    // Stops in roughly 95 ms from a walk and 160 ms from a sprint. This keeps
+    // the controller smooth without making wet carpet feel like ice.
+    braking: 28,
     gravity: 18,
     eyeHeight: 1.7,
     colliderRadius: 0.36,
     colliderHeight: 1.72,
-    headBobWalkFrequency: 8.2,
-    headBobSprintFrequency: 10.6,
-    headBobWalkAmplitude: 0.018,
-    headBobSprintAmplitude: 0.032,
+    groundContactGraceSeconds: 0.12,
+    walkStepDistance: 1.2,
+    sprintStepDistance: 1.42,
+    headBobWalkAmplitude: 0.031,
+    headBobSprintAmplitude: 0.048,
   },
   camera: {
     defaultFov: 80,

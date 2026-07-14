@@ -944,7 +944,7 @@ export class ModularRoomBuilder {
   }
 
   private useStainedWalls(seed: number): boolean {
-    return this.hash(seed, 51) % 5 === 0;
+    return this.hash(seed, 51) % 7 === 0;
   }
 
   private isWet(seed: number): boolean {

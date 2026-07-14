@@ -43,7 +43,7 @@ export class DebugHud {
     const fps = this.scene.getEngine().getFps();
     this.element.textContent = [
       `FPS ${fps.toFixed(0)}`,
-      `FRAME ${this.frameTimeMs.toFixed(1)} ms`,
+      `SCENE CPU ${this.frameTimeMs.toFixed(1)} ms`,
       `MESHES ${this.activeMeshes}`,
       `TRIANGLES ${this.visibleTriangles}`,
       `DRAW CALLS ${this.drawCalls}`,

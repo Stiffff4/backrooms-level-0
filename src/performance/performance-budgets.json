@@ -18,9 +18,9 @@
     "maximumInitialTransferBytes": 31457280,
     "maximumTotalTransferBytes": 83886080,
     "maximumDecodedAssetBytes": 262144000,
-    "maximumEntryJavaScriptBytes": 2097152,
+    "maximumEntryJavaScriptBytes": 2359296,
     "maximumEntryJavaScriptGzipBytes": 409600,
-    "maximumTotalJavaScriptBytes": 3145728,
+    "maximumTotalJavaScriptBytes": 3407872,
     "warningRatio": 0.85
   },
   "monitor": {

@@ -749,7 +749,7 @@ export class App {
     this.recordRuntimePerformance(deltaSeconds * 1_000);
     this.debugHud?.update(performance.now(), [
       `AUDIO ${audioSnapshot.state} / ${this.getAudioNodeCount()} NODES`,
-      `STEPS ${this.footstepCount}`,
+      `FOOTSTEPS ${this.footstepCount}`,
       `ROOM ${this.modularWorld?.activeRoomId ?? 'none'} / ${this.stats.snapshot(this.clock.elapsedSeconds).roomsVisited} VISITED`,
       `STREAM ${this.chunkStreamer?.metrics.activeRoomCount ?? 0} ACTIVE / ${this.chunkStreamer?.metrics.preloadRoomCount ?? 0} PRELOAD / ${this.modularWorld?.pooledRoomCount ?? 0} POOLED`,
       `ORIGIN ${this.floatingOrigin.metrics.rebaseCount} REBASES`,
@@ -1624,7 +1624,10 @@ export class App {
       anchors: world.lightAnchors,
       anchorRevision: world.lightAnchorRevision,
       activeRoomId: world.activeRoomId,
-      visibleRoomIds: this.lastVisibility?.visibleRoomIds ?? [],
+      visibleRoomIds: [
+        ...(this.lastVisibility?.visibleRoomIds ?? []),
+        ...(this.lastVisibility?.visibleEntranceRoomIds ?? []),
+      ],
       playerPosition: player.position,
       absoluteTimeSeconds: this.clock.elapsedSeconds,
     });

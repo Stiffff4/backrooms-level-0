@@ -17,7 +17,9 @@ export function createGameplayScene(engine: Engine): Scene {
   scene.fogColor = new Color3(0.215, 0.205, 0.125);
 
   const ambient = new HemisphericLight('level-zero-ambient-fill', new Vector3(0, 1, 0), scene);
-  ambient.intensity = 0.56;
+  // A slightly stronger static fill prevents rooms without a proxy light from
+  // becoming pitch-black while the bounded light pool serves nearer fixtures.
+  ambient.intensity = 0.62;
   ambient.diffuse = new Color3(0.84, 0.79, 0.52);
   ambient.groundColor = new Color3(0.25, 0.235, 0.145);
 

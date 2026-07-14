@@ -408,3 +408,43 @@ del alcance autorizado; el mismo artefacto fue validado mediante URL HTTP local 
 - ESLint y Prettier de los archivos modificados: correctos.
 - El navegador E2E no pudo ejecutarse en el entorno de reparación porque el acceso automatizado a
   localhost está bloqueado por política; queda pendiente el QA humano final de la build aplicada.
+
+## Pulido posterior al QA humano — locomoción, iluminación, audio y arte
+
+- La pared de salida conserva el hotfix de alcanzabilidad y ahora presenta un flicker mucho más
+  reconocible: mayor contraste de respuesta, más discontinuidades pixeladas, profundidad visual
+  reforzada y pulso horizontal mínimo. `reducedFlashing` mantiene una señal estable y legible sin
+  destellos agresivos.
+- Las pisadas usan una fase de marcha normalizada por distancia horizontal real. Caminar y correr
+  comparten las distancias de paso configuradas con el head bob, no dependen de timers, habitaciones,
+  frames ni del estado de grounded que podía fluctuar sobre el collider. Los rebases de origen ya no
+  reinician la cadencia.
+- El head bob deriva de la misma fase de marcha: es perceptible al alternar el ajuste, aumenta al
+  correr y vuelve suavemente al centro. Se añadió una pequeña tolerancia de contacto con el suelo para
+  que el telemetry de colisión no corte el movimiento visual o sonoro entre frames.
+- La desaceleración cinemática se hizo más firme para eliminar la sensación de patinaje sin convertir
+  la parada en un cambio instantáneo.
+- El pool de ocho luces sigue siendo fijo, pero deja de ser monopolizado por la habitación activa:
+  reserva prioridad para fixtures visibles en habitaciones vecinas y aplica transiciones de intensidad
+  al reasignar proxies. La luz hemisférica base aumenta ligeramente para que una sala visible no parezca
+  apagada antes de cruzar el umbral.
+- La textura de pared húmeda se regeneró con manchas más pequeñas, irregulares, menos contrastadas y
+  sesgadas hacia zócalos, juntas y parte baja. También se redujo la frecuencia de habitaciones que usan
+  el material más manchado.
+- El evento eléctrico fluorescente conserva su función atmosférica, pero ahora tiene menos energía
+  aguda, ataque más suave, filtro band-pass, menor volumen y decay más natural para dejar de sonar como
+  un petardo o fuego artificial.
+- El HUD debug renombra `STEPS` a `FOOTSTEPS` y `FRAME` a `SCENE CPU`, evitando presentar como frame
+  completo una medición parcial de CPU de escena.
+
+### Validación del pulido
+
+- TypeScript strict, ESLint y Prettier: correctos.
+- Suite focal de locomoción, iluminación, salida, assets y materiales: 7 archivos / 33 tests correctos.
+- Suite completa: 45 archivos / 184 tests correctos con timeout ampliado para la simulación larga de
+  streaming.
+- Build de producción: correcta, 557 módulos; entry 2,195.48 kB raw / 388.58 kB gzip.
+- Analyzer: correcto con warnings de margen raw; ceilings alineados a 2.25 MiB entry / 3.25 MiB total sin cambiar límites de transferencia o gzip.
+- La automatización visual en navegador no pudo ejecutarse en el entorno de reparación por bloqueo de
+  acceso local; el QA perceptivo final de flicker, cadencia, luz y manchas queda para ejecución humana
+  en la PC objetivo.

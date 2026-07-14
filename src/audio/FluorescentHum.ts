@@ -274,13 +274,13 @@ export class FluorescentHum {
       this.popVoices.add(voice);
 
       source.buffer = this.bank.fluorescentPop;
-      filter.type = 'highpass';
-      filter.frequency.value = 480;
-      filter.Q.value = 0.65;
+      filter.type = 'bandpass';
+      filter.frequency.value = 920;
+      filter.Q.value = 0.72;
       const duration = this.bank.fluorescentPop.duration;
-      const level = clamp(gain, 0, 1.5) * 0.42;
+      const level = clamp(gain, 0, 1.5) * 0.24;
       voiceGain.gain.setValueAtTime(0, startTime);
-      voiceGain.gain.linearRampToValueAtTime(level, startTime + 0.004);
+      voiceGain.gain.linearRampToValueAtTime(level, startTime + 0.012);
       voiceGain.gain.linearRampToValueAtTime(0, startTime + duration);
 
       source.connect(filter);

@@ -11,7 +11,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { constants as zlibConstants, deflateSync } from 'node:zlib';
 
-export const ASSET_GENERATOR_VERSION = '1.0.0';
+export const ASSET_GENERATOR_VERSION = '1.1.0';
 export const ASSET_MANIFEST_VERSION = 1;
 export const ASSET_SEED = 'level-zero-threshold-textures-v1';
 export const ASSET_LICENSE = 'CC0-1.0';
@@ -211,6 +211,39 @@ function stainField(
   return field;
 }
 
+/**
+ * Smaller, irregular wall damp patches biased toward skirting boards and
+ * corners. This avoids the large circular "spray paint" blobs produced by the
+ * generic stain field while keeping the texture deterministic and tileable.
+ */
+function wallStainField(x: number, y: number, width: number, height: number, seed: number): number {
+  let field = 0;
+  const blobs = 5;
+  for (let index = 0; index < blobs; index += 1) {
+    const edgeBias = hashUnit(seed, index, 89);
+    const centerX = hashUnit(seed, index, 11) * width;
+    const centerY =
+      index < 4
+        ? height * (0.62 + hashUnit(seed, index, 29) * 0.32)
+        : hashUnit(seed, index, 29) * height;
+    const radiusX = width * (0.025 + hashUnit(seed, index, 47) * 0.065);
+    const radiusY = height * (0.035 + hashUnit(seed, index, 71) * 0.095);
+    const dx = torusDistance(x, centerX, width) / radiusX;
+    const dy = torusDistance(y, centerY, height) / radiusY;
+    const warpedDistance =
+      dx * dx * (0.82 + edgeBias * 0.36) +
+      dy * dy +
+      Math.sin((x + index * 17) * 0.19) * 0.08 +
+      Math.sin((y - index * 13) * 0.23) * 0.07;
+    if (warpedDistance < 1) {
+      const irregularity =
+        0.55 + fractalNoise(x, y, width, height, seed ^ (index * 0x45d9f3b)) * 0.55;
+      field = Math.max(field, smoothStep(1 - warpedDistance) * irregularity);
+    }
+  }
+  return Math.min(1, field);
+}
+
 function createImage(
   width: number,
   height: number,
@@ -312,9 +345,9 @@ function buildWall(seed: number, stained: boolean): PixelImage {
         color = mixColor(color, PALETTE.dampBrown, 0.16);
       }
       if (stained) {
-        const stain = stainField(x, y, width, height, seed ^ 0x43a9f12b, 6);
-        color = mixColor(color, PALETTE.dampBrown, stain * 0.58);
-        color = mixColor(color, PALETTE.greenGray, Math.max(0, stain - 0.62) * 0.2);
+        const stain = wallStainField(x, y, width, height, seed ^ 0x43a9f12b);
+        color = mixColor(color, PALETTE.dampBrown, stain * 0.34);
+        color = mixColor(color, PALETTE.greenGray, Math.max(0, stain - 0.74) * 0.12);
       }
       return color;
     }),

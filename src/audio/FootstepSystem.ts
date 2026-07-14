@@ -1,4 +1,5 @@
 import type { PlayerMovementFrame } from '../player/player.types';
+import { gameConfig } from '../config/game.config';
 
 export const WET_CARPET_CONDITIONS = ['normal', 'damp', 'saturated', 'puddle'] as const;
 
@@ -56,8 +57,8 @@ interface ActiveVoice {
 }
 
 const DEFAULT_SEED = 0x6c65_7665;
-const DEFAULT_WALK_STRIDE = 1.45;
-const DEFAULT_SPRINT_STRIDE = 1.85;
+const DEFAULT_WALK_STRIDE = gameConfig.movement.walkStepDistance;
+const DEFAULT_SPRINT_STRIDE = gameConfig.movement.sprintStepDistance;
 const DEFAULT_MAX_STEPS_PER_UPDATE = 4;
 const DEFAULT_MAX_ACTIVE_VOICES = 8;
 const BUFFER_VARIANTS = 3;
@@ -111,7 +112,8 @@ export class FootstepSystem {
   private readonly listeners = new Set<FootstepListener>();
   private readonly activeVoices = new Set<ActiveVoice>();
   private condition: WetCarpetCondition;
-  private distanceAccumulator = 0;
+  private stepProgress = 0;
+  private lastStrideLength: number = DEFAULT_WALK_STRIDE;
   private nextSide: FootSide = 'left';
   private paused = false;
   private disposed = false;
@@ -136,7 +138,7 @@ export class FootstepSystem {
   }
 
   public get pendingDistance(): number {
-    return this.distanceAccumulator;
+    return this.stepProgress * this.lastStrideLength;
   }
 
   public get footSide(): FootSide {
@@ -178,7 +180,9 @@ export class FootstepSystem {
 
   /** Clears teleport/rebase displacement without changing foot alternation. */
   public resetAfterRebase(): void {
-    this.distanceAccumulator = 0;
+    // A floating-origin rebase happens after the movement frame was measured,
+    // so it contributes no artificial distance. Preserve the gait phase to
+    // keep footsteps and head bob synchronized across long sessions.
   }
 
   /**
@@ -200,13 +204,7 @@ export class FootstepSystem {
       return 0;
     }
 
-    if (
-      this.disposed ||
-      this.paused ||
-      options.paused === true ||
-      !frame.grounded ||
-      !frame.moving
-    ) {
+    if (this.disposed || this.paused || options.paused === true || !frame.moving) {
       return 0;
     }
 
@@ -216,22 +214,19 @@ export class FootstepSystem {
     }
 
     const strideLength = frame.sprinting ? this.sprintStrideLength : this.walkStrideLength;
-    this.distanceAccumulator += distance;
+    this.lastStrideLength = strideLength;
+    this.stepProgress += distance / strideLength;
 
     let played = 0;
-    while (
-      this.distanceAccumulator >= strideLength &&
-      played < this.maxStepsPerUpdate &&
-      !this.disposed
-    ) {
-      this.distanceAccumulator -= strideLength;
+    while (this.stepProgress >= 1 && played < this.maxStepsPerUpdate && !this.disposed) {
+      this.stepProgress -= 1;
       this.play(frame.sprinting);
       played += 1;
     }
 
     // A corrupted/teleport-like frame must never create a backlog of steps.
-    if (this.distanceAccumulator >= strideLength) {
-      this.distanceAccumulator %= strideLength;
+    if (this.stepProgress >= 1) {
+      this.stepProgress %= 1;
     }
 
     return played;
@@ -255,7 +250,7 @@ export class FootstepSystem {
       this.cleanupVoice(voice);
     }
 
-    this.distanceAccumulator = 0;
+    this.stepProgress = 0;
   }
 
   private play(sprinting: boolean): void {

@@ -279,6 +279,28 @@ export class LightingDirector {
 
   private updateProxiesAndSnapshot(input: LightingUpdateInput): LightingFrameSnapshot {
     const visibleRooms = new Set(input.visibleRoomIds);
+    const activePriorityLimit = Math.max(2, Math.floor(this.pool.activeBudget / 2));
+    const importantFixtureIds = new Set(
+      [...this.anchorsById.values()]
+        .filter((anchor) => anchor.roomId === input.activeRoomId)
+        .filter((anchor) => this.samplesById.get(anchor.id)?.enabled === true)
+        .map((anchor) => {
+          anchor.node.computeWorldMatrix(true);
+          return {
+            id: anchor.id,
+            distanceSquared: Vector3.DistanceSquared(
+              anchor.node.getAbsolutePosition(),
+              input.playerPosition,
+            ),
+          };
+        })
+        .sort(
+          (left, right) =>
+            left.distanceSquared - right.distanceSquared || left.id.localeCompare(right.id),
+        )
+        .slice(0, activePriorityLimit)
+        .map((entry) => entry.id),
+    );
     const candidates: LightPoolCandidate[] = [];
     const candidateSamples = new Map<string, FixtureFlickerSample>();
     for (const [fixtureId, anchor] of this.anchorsById) {
@@ -294,7 +316,12 @@ export class LightingDirector {
         position,
         enabled: sample.visualIntensity > 0,
         visible: visibleRooms.has(anchor.roomId) || anchor.roomId === input.activeRoomId,
-        important: anchor.roomId === input.activeRoomId,
+        // Reserve only half of the pool for the nearest fixtures in the active
+        // room. The remaining proxies can illuminate visible adjacent rooms
+        // before the player crosses their threshold, avoiding sensor-like pop-in.
+        important:
+          importantFixtureIds.has(fixtureId) ||
+          (visibleRooms.has(anchor.roomId) && anchor.roomId !== input.activeRoomId),
         flickering: sample.effectiveProfile !== 'stable',
         exitRelated: sample.effectiveProfile === 'exit',
         intensity: roomProfile.proxyIntensity * sample.visualIntensity,

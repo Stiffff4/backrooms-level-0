@@ -10,6 +10,9 @@ export const LIGHT_POOL_MAX_BUDGET = LIGHT_POOL_CAPACITY;
 export const LIGHT_POOL_RANGE = 12;
 export const LIGHT_POOL_MIN_INTENSITY = 0;
 export const LIGHT_POOL_MAX_INTENSITY = 1.25;
+const REASSIGNMENT_START_SCALE = 0.12;
+const RETAINED_INTENSITY_RESPONSE = 0.42;
+const REASSIGNED_INTENSITY_RESPONSE = 0.24;
 
 const PROXY_DIFFUSE = Object.freeze({ r: 0.88, g: 0.94, b: 0.58 });
 const PROXY_SPECULAR = Object.freeze({ r: 0.18, g: 0.2, b: 0.1 });
@@ -65,6 +68,7 @@ interface LightPoolSlot {
   candidateId: string | null;
   priority: number;
   distanceSquared: number;
+  displayedIntensity: number;
 }
 
 interface RankedCandidates {
@@ -195,6 +199,7 @@ export class LightPool {
       candidateId: null,
       priority: 0,
       distanceSquared: Number.POSITIVE_INFINITY,
+      displayedIntensity: 0,
     }));
     this.metricsSnapshot = this.createMetrics();
   }
@@ -320,10 +325,11 @@ export class LightPool {
         continue;
       }
 
-      if (slot.candidateId !== null && slot.candidateId !== desired.candidate.id) {
+      const reassigned = slot.candidateId !== null && slot.candidateId !== desired.candidate.id;
+      if (reassigned) {
         updateReassignments += 1;
       }
-      this.applyCandidate(slot, desired);
+      this.applyCandidate(slot, desired, reassigned);
     }
 
     this.lastUpdateReassignments = updateReassignments;
@@ -381,12 +387,27 @@ export class LightPool {
     };
   }
 
-  private applyCandidate(slot: LightPoolSlot, ranked: RankedCandidate): void {
+  private applyCandidate(slot: LightPoolSlot, ranked: RankedCandidate, reassigned: boolean): void {
+    const targetIntensity = clampIntensity(ranked.candidate.intensity);
+    const initialAssignment = slot.candidateId === null;
+    if (initialAssignment) {
+      slot.displayedIntensity = targetIntensity;
+    } else if (reassigned) {
+      slot.displayedIntensity = Math.min(
+        slot.displayedIntensity,
+        targetIntensity * REASSIGNMENT_START_SCALE,
+      );
+      slot.displayedIntensity +=
+        (targetIntensity - slot.displayedIntensity) * REASSIGNED_INTENSITY_RESPONSE;
+    } else {
+      slot.displayedIntensity +=
+        (targetIntensity - slot.displayedIntensity) * RETAINED_INTENSITY_RESPONSE;
+    }
     slot.candidateId = ranked.candidate.id;
     slot.priority = ranked.priority;
     slot.distanceSquared = ranked.distanceSquared;
     slot.light.position.copyFrom(ranked.candidate.position);
-    slot.light.intensity = clampIntensity(ranked.candidate.intensity);
+    slot.light.intensity = clampIntensity(slot.displayedIntensity);
     slot.light.range = LIGHT_POOL_RANGE;
     slot.light.shadowEnabled = false;
     slot.light.setEnabled(true);
@@ -396,6 +417,7 @@ export class LightPool {
     slot.candidateId = null;
     slot.priority = 0;
     slot.distanceSquared = Number.POSITIVE_INFINITY;
+    slot.displayedIntensity = 0;
     slot.light.position.set(0, 0, 0);
     slot.light.intensity = LIGHT_POOL_MIN_INTENSITY;
     slot.light.range = LIGHT_POOL_RANGE;
