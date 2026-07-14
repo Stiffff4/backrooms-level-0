@@ -4,6 +4,7 @@ import { AmbientDirector } from '../audio/AmbientDirector';
 import { FootstepSystem } from '../audio/FootstepSystem';
 import { GameAudioEngine } from '../audio/GameAudioEngine';
 import { LightingAudioBridge } from '../audio/LightingAudioBridge';
+import { loadFluorescentBuzzBuffer } from '../audio/loadFluorescentBuzzBuffer';
 import { ProceduralAudioBank, hashAudioSeed } from '../audio/ProceduralAudioBank';
 import { getRoomAudioProfile, toAmbientProfile } from '../audio/RoomAudioProfiles';
 import { gameConfig } from '../config/game.config';
@@ -1957,6 +1958,8 @@ export class App {
       case 'default':
         return 3;
       case 'high':
+      case 'hd720':
+      case 'hd1080':
         return 4;
     }
   }
@@ -1982,12 +1985,12 @@ export class App {
   private async activateAudioFromUserGesture(): Promise<void> {
     const activated = await this.audioEngine.activateFromUserGesture();
     if (activated) {
-      this.initializeAudioSystems();
+      await this.initializeAudioSystems();
     }
     this.syncAudioDebugSnapshot();
   }
 
-  private initializeAudioSystems(): void {
+  private async initializeAudioSystems(): Promise<void> {
     if (this.audioBank || this.ambientDirector || this.footsteps) {
       return;
     }
@@ -2006,7 +2009,13 @@ export class App {
           getRoomAudioProfile(getRoomDefinition(this.currentRoomDefinitionId).audioProfile),
         )
       : undefined;
-    const bank = new ProceduralAudioBank(context, { seed: this.debugOptions.seed });
+    const buzzNoiseOverride = await loadFluorescentBuzzBuffer(context);
+    const bank = new ProceduralAudioBank(
+      context,
+      buzzNoiseOverride === null
+        ? { seed: this.debugOptions.seed }
+        : { seed: this.debugOptions.seed, buzzNoiseOverride },
+    );
     const ambientDirector = new AmbientDirector(
       {
         context,

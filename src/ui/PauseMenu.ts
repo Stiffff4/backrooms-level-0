@@ -31,6 +31,8 @@ const QUALITY_OPTIONS: readonly Readonly<{ value: QualityPreset; label: string }
   { value: 'low', label: 'Baja — 240p' },
   { value: 'default', label: 'Detallada — 360p' },
   { value: 'high', label: 'Alta — 480p' },
+  { value: 'hd720', label: 'Muy alta — 720p' },
+  { value: 'hd1080', label: 'Ultra — 1080p' },
 ];
 
 function createRangeControl(
@@ -108,7 +110,13 @@ function createQualityControl(id: string): SelectControl {
 }
 
 function isQualityPreset(value: string): value is QualityPreset {
-  return value === 'low' || value === 'default' || value === 'high';
+  return (
+    value === 'low' ||
+    value === 'default' ||
+    value === 'high' ||
+    value === 'hd720' ||
+    value === 'hd1080'
+  );
 }
 
 function formatPercent(value: number): string {

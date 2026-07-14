@@ -11,6 +11,7 @@ export interface ProceduralAudioBankOptions {
   readonly ballastLoopSeconds?: number;
   readonly buzzLoopSeconds?: number;
   readonly popDurationSeconds?: number;
+  readonly buzzNoiseOverride?: AudioBuffer;
 }
 
 export type ProceduralAudioBufferName =
@@ -271,15 +272,17 @@ export class ProceduralAudioBank {
           BALLAST_BANDS,
         ),
       ),
-      buzzNoise: createBufferFromData(
-        context,
-        synthesizeNoiseLoop(
-          context.sampleRate,
-          buzzDuration,
-          this.deriveSeed('buzz-noise'),
-          BUZZ_BANDS,
+      buzzNoise:
+        options.buzzNoiseOverride ??
+        createBufferFromData(
+          context,
+          synthesizeNoiseLoop(
+            context.sampleRate,
+            buzzDuration,
+            this.deriveSeed('buzz-noise'),
+            BUZZ_BANDS,
+          ),
         ),
-      ),
       fluorescentPop: createBufferFromData(
         context,
         synthesizeFluorescentPop(

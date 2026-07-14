@@ -6,7 +6,13 @@ import {
 } from '../config/rendering.config';
 
 export function isQualityPresetName(value: unknown): value is QualityPresetName {
-  return value === 'low' || value === 'default' || value === 'high';
+  return (
+    value === 'low' ||
+    value === 'default' ||
+    value === 'high' ||
+    value === 'hd720' ||
+    value === 'hd1080'
+  );
 }
 
 export function getQualityPreset(name: QualityPresetName): RenderQualityPreset {

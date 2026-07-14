@@ -1,7 +1,7 @@
 export interface DebugOptions {
   seed: string;
   debug: boolean;
-  quality: 'low' | 'default' | 'high' | null;
+  quality: 'low' | 'default' | 'high' | 'hd720' | 'hd1080' | null;
   exitNow: boolean;
   fastExit: boolean;
   noAudio: boolean;
@@ -23,7 +23,11 @@ export function parseDebugOptions(
   const debug = params.get('debug') === '1';
   const requestedQuality = params.get('quality');
   const quality =
-    requestedQuality === 'low' || requestedQuality === 'default' || requestedQuality === 'high'
+    requestedQuality === 'low' ||
+    requestedQuality === 'default' ||
+    requestedQuality === 'high' ||
+    requestedQuality === 'hd720' ||
+    requestedQuality === 'hd1080'
       ? requestedQuality
       : null;
 

@@ -1,4 +1,4 @@
-export type QualityPreset = 'low' | 'default' | 'high';
+export type QualityPreset = 'low' | 'default' | 'high' | 'hd720' | 'hd1080';
 
 export interface GameSettings {
   sensitivity: number;
@@ -95,7 +95,13 @@ function readBoolean(value: unknown, fallback: boolean): boolean {
 }
 
 function readQuality(value: unknown, fallback: QualityPreset): QualityPreset {
-  return value === 'low' || value === 'default' || value === 'high' ? value : fallback;
+  return value === 'low' ||
+    value === 'default' ||
+    value === 'high' ||
+    value === 'hd720' ||
+    value === 'hd1080'
+    ? value
+    : fallback;
 }
 
 function sanitizeSettings(value: unknown, fallback: Readonly<GameSettings>): GameSettings {
