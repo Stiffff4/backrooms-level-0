@@ -148,12 +148,12 @@ describe('LightPool', () => {
     }
   });
 
-  it('changes its live budget from four through eight and clears every excess slot', () => {
+  it('changes its live budget from four through capacity and clears every excess slot', () => {
     const engine = new NullEngine();
     const scene = new Scene(engine);
     const baselineLights = scene.lights.length;
     const pool = new LightPool(scene);
-    const candidates = Array.from({ length: 8 }, (_, index) =>
+    const candidates = Array.from({ length: LIGHT_POOL_CAPACITY }, (_, index) =>
       candidate(`fixture-${String(index)}`, index + 1, { visible: true }),
     );
 
@@ -168,14 +168,17 @@ describe('LightPool', () => {
         pool.lights.slice(4).every((light) => !light.isEnabled() && light.intensity === 0),
       ).toBe(true);
 
-      pool.setActiveBudget(8);
-      expect(pool.activeBudget).toBe(8);
-      expect(pool.assignments).toHaveLength(8);
+      pool.setActiveBudget(LIGHT_POOL_CAPACITY);
+      expect(pool.activeBudget).toBe(LIGHT_POOL_CAPACITY);
+      expect(pool.assignments).toHaveLength(LIGHT_POOL_CAPACITY);
       expect(pool.lights.every((light) => light.isEnabled())).toBe(true);
       expect(scene.lights).toHaveLength(baselineLights + LIGHT_POOL_CAPACITY);
-      expect(pool.metrics).toMatchObject({ activeBudget: 8, activeLightCount: 8 });
+      expect(pool.metrics).toMatchObject({
+        activeBudget: LIGHT_POOL_CAPACITY,
+        activeLightCount: LIGHT_POOL_CAPACITY,
+      });
       expect(() => pool.setActiveBudget(3)).toThrow(RangeError);
-      expect(() => pool.setActiveBudget(9)).toThrow(RangeError);
+      expect(() => pool.setActiveBudget(LIGHT_POOL_CAPACITY + 1)).toThrow(RangeError);
       expect(() => pool.setActiveBudget(4.5)).toThrow(RangeError);
     } finally {
       pool.dispose();

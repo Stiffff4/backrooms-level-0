@@ -58,7 +58,7 @@ export interface LightingFrameSnapshot {
 }
 
 export interface LightingDirectorOptions {
-  readonly lightBudget?: 4 | 6 | 8;
+  readonly lightBudget?: 4 | 6 | 8 | 10 | 12;
   readonly reducedFlashing?: boolean;
 }
 
@@ -103,7 +103,7 @@ export class LightingDirector {
     return this.snapshot;
   }
 
-  public setLightBudget(lightBudget: 4 | 6 | 8): void {
+  public setLightBudget(lightBudget: 4 | 6 | 8 | 10 | 12): void {
     this.assertActive();
     this.pool.setActiveBudget(lightBudget);
     this.snapshot = this.createSnapshot(this.snapshot.spatialSources, this.snapshot.events);

@@ -3,7 +3,7 @@ import { Color3 } from '@babylonjs/core/Maths/math.color';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import type { Scene } from '@babylonjs/core/scene';
 
-export const LIGHT_POOL_CAPACITY = 8;
+export const LIGHT_POOL_CAPACITY = 12;
 export const LIGHT_POOL_MIN_BUDGET = 4;
 export const LIGHT_POOL_DEFAULT_BUDGET = 6;
 export const LIGHT_POOL_MAX_BUDGET = LIGHT_POOL_CAPACITY;

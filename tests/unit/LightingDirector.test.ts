@@ -7,6 +7,7 @@ import { Scene } from '@babylonjs/core/scene';
 import { describe, expect, it } from 'vitest';
 
 import { LightingDirector } from '../../src/lighting/LightingDirector';
+import { LIGHT_POOL_CAPACITY } from '../../src/lighting/LightPool';
 import { getRoomDefinition } from '../../src/procedural/RoomCatalog';
 import { generateRoomGraph } from '../../src/procedural/RoomGraphGenerator';
 import { ModularRoomBuilder } from '../../src/rooms/builders/ModularRoomBuilder';
@@ -54,8 +55,8 @@ describe('LightingDirector', () => {
         playerPosition: Vector3.Zero(),
         absoluteTimeSeconds: 0,
       });
-      expect(scene.lights).toHaveLength(8);
-      expect(initial.metrics.pool.capacity).toBe(8);
+      expect(scene.lights).toHaveLength(LIGHT_POOL_CAPACITY);
+      expect(initial.metrics.pool.capacity).toBe(LIGHT_POOL_CAPACITY);
       expect(initial.metrics.pool.activeBudget).toBe(4);
       expect(initial.metrics.pool.activeLightCount).toBeLessThanOrEqual(4);
       expect(initial.metrics.fixtureCount).toBe(room.lightAnchors.length);
@@ -156,7 +157,7 @@ describe('LightingDirector', () => {
       expect(empty.metrics.pool.activeLightCount).toBe(0);
       director.reset();
       expect(director.metrics.fixtureCount).toBe(0);
-      expect(director.metrics.pool.pooledLightCount).toBe(8);
+      expect(director.metrics.pool.pooledLightCount).toBe(LIGHT_POOL_CAPACITY);
     } finally {
       director.dispose();
       expect(scene.lights).toHaveLength(0);

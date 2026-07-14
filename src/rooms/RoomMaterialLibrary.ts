@@ -272,9 +272,9 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
       this.fixtureHousing,
       this.column,
     ]) {
-      // The pool owns the live 4/6/8 budget. Keeping the shader ceiling fixed
-      // prevents material recompiles when the quality preset changes.
-      illuminated.maxSimultaneousLights = 8;
+      // The pool owns the live 4/6/8/10/12 budget. Keeping the shader ceiling
+      // fixed prevents material recompiles when the quality preset changes.
+      illuminated.maxSimultaneousLights = 12;
     }
     this.owned = Object.freeze([
       this.wall,

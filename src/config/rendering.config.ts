@@ -10,7 +10,7 @@ export interface RenderQualityPreset {
   readonly grainStrength: number;
   readonly anisotropy: 1 | 2 | 4 | 8 | 16;
   readonly normalMaps: boolean;
-  readonly lightBudget: 4 | 6 | 8;
+  readonly lightBudget: 4 | 6 | 8 | 10 | 12;
 }
 
 const low = Object.freeze({
@@ -54,7 +54,7 @@ const hd720 = Object.freeze({
   grainStrength: 0.005,
   anisotropy: 8,
   normalMaps: true,
-  lightBudget: 8,
+  lightBudget: 10,
 } satisfies RenderQualityPreset);
 
 const hd1080 = Object.freeze({
@@ -65,7 +65,7 @@ const hd1080 = Object.freeze({
   grainStrength: 0.004,
   anisotropy: 16,
   normalMaps: true,
-  lightBudget: 8,
+  lightBudget: 12,
 } satisfies RenderQualityPreset);
 
 export const renderQualityPresets: Readonly<Record<QualityPresetName, RenderQualityPreset>> =
