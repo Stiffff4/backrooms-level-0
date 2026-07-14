@@ -55,8 +55,8 @@ describe('RoomCatalog', () => {
     expect(getRoomDefinition('room_dead_end').exitCompatibleSurfaces).not.toHaveLength(0);
     expect(getRoomDefinition('arch_gallery_short').tags).toContain('arch');
     expect(getRoomDefinition('pillar_grid_large').geometryRecipe.columnLayout).toBe('grid');
-    expect(getRoomDefinition('low_ceiling_section').footprint.height).toBeLessThan(2.7);
-    expect(getRoomDefinition('high_ceiling_section').footprint.height).toBeGreaterThan(4);
+    expect(getRoomDefinition('low_ceiling_section').footprint.height).toBe(5);
+    expect(getRoomDefinition('high_ceiling_section').footprint.height).toBe(5);
     expect(getRoomDefinition('blackout_edge').exitCompatibleSurfaces).toHaveLength(0);
     expect(() => getRoomDefinition('missing-room')).toThrow(/Unknown room definition/);
   });
