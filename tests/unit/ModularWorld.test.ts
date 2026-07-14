@@ -62,8 +62,18 @@ describe('ModularWorld incremental streaming', () => {
       const secondView = world.getLoadedRoom(secondRoomId);
       expect(secondView).not.toBeNull();
       expect(world.unloadRoom(secondRoomId)).toBe(true);
+      expect(world.setRoomSpatialAnomaly(secondRoomId, true)).toBe(true);
+      expect(world.setRoomSpatialAnomaly(secondRoomId, true)).toBe(false);
+      expect(world.spatialAnomalyRoomIds).toEqual([secondRoomId]);
+      expect(world.metrics.spatialAnomalyCount).toBe(1);
       expect(world.unloadRoom(secondRoomId)).toBe(false);
-      expect(world.loadRoom(secondRoomId)).toBe(secondView);
+      const shiftedSecondView = world.loadRoom(secondRoomId);
+      expect(shiftedSecondView).toBe(secondView);
+      expect(shiftedSecondView.spatialAnomaly.mesh.isEnabled()).toBe(true);
+      world.clearSpatialAnomalies();
+      expect(shiftedSecondView.spatialAnomaly.mesh.isEnabled()).toBe(false);
+      expect(world.metrics.spatialAnomalyCount).toBe(0);
+      expect(() => world.setRoomSpatialAnomaly('missing-room', true)).toThrow(/Unknown room/);
 
       const offset = new Vector3(128, 0, -96);
       world.translate(offset);

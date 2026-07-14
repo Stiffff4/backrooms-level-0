@@ -100,15 +100,23 @@ export class ModularRoomBuilder {
       const architecture = this.createArchitecture(instance, definition, root);
       const ceilingDetails = this.createCeilingGrid(instance, definition, root);
       const columns = this.createColumns(instance, definition, root);
+      const architecturalDetails = this.createArchitecturalDetails(instance, definition, root);
+      const spatialAnomaly = this.createSpatialAnomaly(instance, definition, root);
       const fixtureBuild = this.createFixtures(instance, definition, root);
 
       const meshes = Object.freeze([
         ...architecture.meshes,
         ...ceilingDetails,
         ...columns.meshes,
+        ...architecturalDetails.meshes,
+        spatialAnomaly.mesh,
         ...fixtureBuild.meshes,
       ]);
-      const colliders = Object.freeze([...architecture.colliders, ...columns.colliders]);
+      const colliders = Object.freeze([
+        ...architecture.colliders,
+        ...columns.colliders,
+        ...architecturalDetails.colliders,
+      ]);
       const trigger = this.createTrigger(instance, definition);
       const triangleCount = meshes.reduce(
         (total, mesh) => total + Math.floor(mesh.getTotalIndices() / 3),
@@ -128,6 +136,7 @@ export class ModularRoomBuilder {
         colliders,
         trigger,
         lightAnchors: fixtureBuild.anchors,
+        spatialAnomaly,
         triangleCount,
         dispose: (): void => {
           if (!disposed) {
@@ -156,7 +165,9 @@ export class ModularRoomBuilder {
         position: new Vector3(0, -FLOOR_THICKNESS / 2, 0),
         uvOffset: this.createUvOffset(instance.seed, 11),
       },
-      this.isWet(instance.seed) ? this.materials.carpetWet : this.materials.carpet,
+      definition.tags.includes('damp') || this.isWet(instance.seed)
+        ? this.materials.carpetWet
+        : this.materials.carpet,
     );
     floor.parent = root;
     floor.checkCollisions = false;
@@ -498,8 +509,9 @@ export class ModularRoomBuilder {
     const { width, depth, height } = definition.footprint;
     const insetX = Math.max(1.5, width * 0.22);
     const insetZ = Math.max(1.5, depth * 0.22);
-    const positions =
-      definition.geometryRecipe.columnLayout === 'sparse'
+    const positions = definition.tags.includes('pillar-grid')
+      ? this.createPillarGridPositions(definition)
+      : definition.geometryRecipe.columnLayout === 'sparse'
         ? [new Vector3(-insetX, height / 2, 0), new Vector3(insetX, height / 2, 0)]
         : [
             new Vector3(-insetX, height / 2, -insetZ),
@@ -526,6 +538,109 @@ export class ModularRoomBuilder {
       meshes: Object.freeze([columns]),
       colliders: Object.freeze([columns]),
     };
+  }
+
+  private createPillarGridPositions(definition: RoomDefinition): readonly Vector3[] {
+    const { width, depth, height } = definition.footprint;
+    const xPositions = [-width * 0.22, width * 0.22];
+    const zPositions = definition.tags.includes('large')
+      ? [-depth * 0.27, 0, depth * 0.27]
+      : [-depth * 0.23, depth * 0.23];
+    return Object.freeze(
+      xPositions.flatMap((x) => zPositions.map((z) => new Vector3(x, height / 2, z))),
+    );
+  }
+
+  private createArchitecturalDetails(
+    instance: RoomInstance,
+    definition: RoomDefinition,
+    root: TransformNode,
+  ): { readonly meshes: readonly AbstractMesh[]; readonly colliders: readonly AbstractMesh[] } {
+    if (!definition.tags.includes('arch')) {
+      return { meshes: Object.freeze([]), colliders: Object.freeze([]) };
+    }
+
+    const { width, depth, height } = definition.footprint;
+    const boxes: Mesh[] = [];
+    const frameSpacing = 3.6;
+    const frameCount = Math.max(2, Math.floor((depth - 2) / frameSpacing));
+    const firstZ = -((frameCount - 1) * frameSpacing) / 2;
+    const openingWidth = width - 0.72;
+    const archSegments = 7;
+    const segmentWidth = openingWidth / archSegments;
+    for (let frame = 0; frame < frameCount; frame += 1) {
+      const z = firstZ + frame * frameSpacing;
+      const uvSalt = 350 + frame * 17;
+      for (let segment = 0; segment < archSegments; segment += 1) {
+        const normalized = Math.abs((segment + 0.5) / archSegments - 0.5) * 2;
+        const underside = 2.38 + (1 - normalized * normalized) * 0.46;
+        const blockHeight = Math.max(0.18, height - underside);
+        boxes.push(
+          this.createBox(
+            {
+              name: `${instance.id}.arch.${frame}.voussoir.${segment}`,
+              width: segmentWidth + 0.015,
+              height: blockHeight,
+              depth: 0.34,
+              position: new Vector3(
+                -openingWidth / 2 + segmentWidth * (segment + 0.5),
+                underside + blockHeight / 2,
+                z,
+              ),
+              uvOffset: this.createUvOffset(instance.seed, uvSalt + segment),
+            },
+            this.materials.column,
+          ),
+        );
+      }
+      for (const side of [-1, 1] as const) {
+        boxes.push(
+          this.createBox(
+            {
+              name: `${instance.id}.arch.${frame}.pier.${side}`,
+              width: 0.36,
+              height: 2.42,
+              depth: 0.42,
+              position: new Vector3(side * (width / 2 - 0.2), 1.21, z),
+              uvOffset: this.createUvOffset(instance.seed, uvSalt + 11 + side),
+            },
+            this.materials.column,
+          ),
+        );
+      }
+    }
+    const arches = this.mergeMeshes(`${instance.id}.arches`, boxes, root);
+    arches.checkCollisions = true;
+    return {
+      meshes: Object.freeze([arches]),
+      colliders: Object.freeze([arches]),
+    };
+  }
+
+  private createSpatialAnomaly(
+    instance: RoomInstance,
+    definition: RoomDefinition,
+    root: TransformNode,
+  ): BuiltModularRoom['spatialAnomaly'] {
+    const { width, depth, height } = definition.footprint;
+    const lateralOffset = ((this.hash(instance.seed, 907) % 3) - 1) * Math.min(1.1, width * 0.12);
+    const mesh = this.createBox(
+      {
+        name: `${instance.id}.anomaly.ceiling-shift`,
+        width: Math.min(5.2, Math.max(2.2, width * 0.62)),
+        height: 0.22,
+        depth: Math.min(1.8, Math.max(0.75, depth * 0.16)),
+        position: new Vector3(lateralOffset, height - 0.13, 0),
+        uvOffset: this.createUvOffset(instance.seed, 907),
+      },
+      this.materials.ceiling,
+    );
+    mesh.parent = root;
+    mesh.checkCollisions = false;
+    mesh.isPickable = false;
+    mesh.isVisible = false;
+    mesh.setEnabled(false);
+    return Object.freeze({ kind: 'ceiling-shift', mesh });
   }
 
   private createFixtures(

@@ -166,12 +166,16 @@ describe('PixelRenderPipeline', () => {
       reducedFlashing: false,
       ditherStrength: 0.35,
       grainStrength: 0.008,
+      anomalyStrength: 0,
+      anomalyPhase: 0,
     });
     expect(pipeline.setUserEffects({ dithering: true, reducedFlashing: true })).toEqual({
       dithering: true,
       reducedFlashing: true,
       ditherStrength: 0.35,
       grainStrength: 0,
+      anomalyStrength: 0,
+      anomalyPhase: 0,
     });
 
     pipeline.setQuality(renderQualityPresets.low);
@@ -180,7 +184,21 @@ describe('PixelRenderPipeline', () => {
       reducedFlashing: true,
       ditherStrength: 0.35,
       grainStrength: 0,
+      anomalyStrength: 0,
+      anomalyPhase: 0,
     });
+
+    expect(pipeline.setContextEffects({ anomalyStrength: 0.16, anomalyPhase: 12.5 })).toEqual({
+      dithering: false,
+      reducedFlashing: true,
+      ditherStrength: 0.35,
+      grainStrength: 0,
+      anomalyStrength: 0.16,
+      anomalyPhase: 12.5,
+    });
+    expect(
+      pipeline.setContextEffects({ anomalyStrength: 99, anomalyPhase: Number.NaN }),
+    ).toMatchObject({ anomalyStrength: 0.3, anomalyPhase: 0 });
   });
 
   it('adjunta, dimensiona, coalesce ResizeObserver en rAF y cambia preset sin recrear adapter', () => {
@@ -192,13 +210,21 @@ describe('PixelRenderPipeline', () => {
     const pipeline = new PixelRenderPipeline({ canvas, adapter, runtime });
 
     expect(adapter.settings).toEqual([
-      { dithering: true, ditherStrength: 0.35, grainStrength: 0.008 },
+      {
+        dithering: true,
+        ditherStrength: 0.35,
+        grainStrength: 0.008,
+        anomalyStrength: 0,
+        anomalyPhase: 0,
+      },
     ]);
     expect(pipeline.effects).toEqual({
       dithering: true,
       reducedFlashing: false,
       ditherStrength: 0.35,
       grainStrength: 0.008,
+      anomalyStrength: 0,
+      anomalyPhase: 0,
     });
     pipeline.attach(firstCamera);
     expect(pipeline.isAttached).toBe(true);
@@ -225,6 +251,8 @@ describe('PixelRenderPipeline', () => {
       dithering: true,
       ditherStrength: 0.35,
       grainStrength: 0.006,
+      anomalyStrength: 0,
+      anomalyPhase: 0,
     });
     expect(adapter.sizes.at(-1)).toMatchObject({
       preset: 'high',
@@ -237,11 +265,15 @@ describe('PixelRenderPipeline', () => {
       reducedFlashing: true,
       ditherStrength: 0.35,
       grainStrength: 0,
+      anomalyStrength: 0,
+      anomalyPhase: 0,
     });
     expect(adapter.settings.at(-1)).toEqual({
       dithering: false,
       ditherStrength: 0.35,
       grainStrength: 0,
+      anomalyStrength: 0,
+      anomalyPhase: 0,
     });
 
     pipeline.attach(firstCamera);
@@ -295,6 +327,7 @@ describe('BabylonPixelRenderAdapter', () => {
       expect(engine.postProcesses).toHaveLength(1);
       expect(PIXEL_GRADE_FRAGMENT_SHADER).toContain('bayer4');
       expect(PIXEL_GRADE_FRAGMENT_SHADER).toContain('spatialNoise');
+      expect(PIXEL_GRADE_FRAGMENT_SHADER).toContain('anomalyStrength');
       expect(PIXEL_GRADE_FRAGMENT_SHADER).not.toMatch(/\btime\b/i);
       expect(PIXEL_GRADE_FRAGMENT_SHADER).not.toMatch(/vhs|bloom|scanline/i);
 

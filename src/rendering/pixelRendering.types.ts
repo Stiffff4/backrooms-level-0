@@ -12,6 +12,8 @@ export interface PixelPostProcessSettings {
   readonly dithering: boolean;
   readonly ditherStrength: number;
   readonly grainStrength: number;
+  readonly anomalyStrength: number;
+  readonly anomalyPhase: number;
 }
 
 export interface PixelUserEffects {
@@ -19,7 +21,13 @@ export interface PixelUserEffects {
   readonly reducedFlashing: boolean;
 }
 
-export interface EffectivePixelEffects extends PixelPostProcessSettings, PixelUserEffects {}
+export interface PixelContextEffects {
+  readonly anomalyStrength: number;
+  readonly anomalyPhase: number;
+}
+
+export interface EffectivePixelEffects
+  extends PixelPostProcessSettings, PixelUserEffects, PixelContextEffects {}
 
 export interface PixelRenderAdapter {
   setBufferSize(metrics: PixelBufferMetrics): void;

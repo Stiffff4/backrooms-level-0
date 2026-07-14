@@ -365,6 +365,169 @@ const roomDoubleOffset = definition({
   exitSurfaces: [exitSurface('west-wall', 'west', 11, 9)],
 });
 
+const archGalleryShort = definition({
+  id: 'arch_gallery_short',
+  category: 'corridor',
+  width: 7,
+  depth: 10,
+  height: 3.35,
+  sockets: [socket('north', 'north', 7, 10), socket('south', 'south', 7, 10)],
+  weight: 0.2,
+  minDepth: 18,
+  maxConsecutive: 1,
+  tags: ['advanced', 'uncommon', 'arch', 'special'],
+  geometryRecipe: { kind: 'straight-corridor', wallStyle: 'pillared', columnLayout: 'none' },
+  lightingProfile: 'arch-gallery',
+  audioProfile: 'large-open-office',
+});
+
+const archGalleryLong = definition({
+  id: 'arch_gallery_long',
+  category: 'corridor',
+  width: 7.4,
+  depth: 17,
+  height: 3.5,
+  sockets: [socket('north', 'north', 7.4, 17), socket('south', 'south', 7.4, 17)],
+  weight: 0.12,
+  minDepth: 28,
+  maxConsecutive: 1,
+  tags: ['advanced', 'uncommon', 'arch', 'long', 'special'],
+  geometryRecipe: { kind: 'straight-corridor', wallStyle: 'pillared', columnLayout: 'none' },
+  lightingProfile: 'arch-gallery',
+  audioProfile: 'large-open-office',
+});
+
+const pillarGridSmall = definition({
+  id: 'pillar_grid_small',
+  category: 'room',
+  width: 12,
+  depth: 10,
+  height: 3.45,
+  sockets: [socket('north', 'north', 12, 10), socket('south', 'south', 12, 10)],
+  weight: 0.18,
+  minDepth: 22,
+  maxConsecutive: 1,
+  tags: ['advanced', 'uncommon', 'pillar-grid', 'special'],
+  geometryRecipe: { kind: 'open-room', wallStyle: 'pillared', columnLayout: 'grid' },
+  lightingProfile: 'pillar-hall',
+  audioProfile: 'large-open-office',
+  exitSurfaces: [exitSurface('west-wall', 'west', 12, 10, 2.8, 2.8)],
+});
+
+const pillarGridLarge = definition({
+  id: 'pillar_grid_large',
+  category: 'room',
+  width: 18,
+  depth: 16,
+  height: 3.7,
+  sockets: [
+    socket('north-wide', 'north', 18, 16, WIDE_SOCKET_WIDTH),
+    socket('south-wide', 'south', 18, 16, WIDE_SOCKET_WIDTH),
+  ],
+  weight: 0.1,
+  minDepth: 38,
+  maxConsecutive: 1,
+  tags: ['advanced', 'uncommon', 'pillar-grid', 'large', 'special'],
+  geometryRecipe: { kind: 'open-room', wallStyle: 'pillared', columnLayout: 'grid' },
+  lightingProfile: 'pillar-hall',
+  audioProfile: 'large-open-office',
+  exitSurfaces: [exitSurface('far-wall', 'north', 18, 16, 3.2, 5.2)],
+});
+
+const lowCeilingSection = definition({
+  id: 'low_ceiling_section',
+  category: 'corridor',
+  width: 4.6,
+  depth: 9,
+  height: 2.62,
+  sockets: [socket('north', 'north', 4.6, 9), socket('south', 'south', 4.6, 9)],
+  weight: 0.19,
+  minDepth: 20,
+  maxConsecutive: 1,
+  tags: ['advanced', 'uncommon', 'low-ceiling', 'special'],
+  geometryRecipe: { kind: 'straight-corridor', wallStyle: 'continuous', columnLayout: 'none' },
+  lightingProfile: 'low-ceiling',
+  audioProfile: 'narrow-office',
+});
+
+const highCeilingSection = definition({
+  id: 'high_ceiling_section',
+  category: 'room',
+  width: 10,
+  depth: 12,
+  height: 4.4,
+  sockets: [socket('north', 'north', 10, 12), socket('south', 'south', 10, 12)],
+  weight: 0.14,
+  minDepth: 26,
+  maxConsecutive: 1,
+  tags: ['advanced', 'uncommon', 'high-ceiling', 'special', 'exit-candidate'],
+  geometryRecipe: { kind: 'open-room', wallStyle: 'segmented', columnLayout: 'sparse' },
+  lightingProfile: 'high-ceiling',
+  audioProfile: 'large-open-office',
+  exitSurfaces: [exitSurface('west-wall', 'west', 10, 12, 3, -3.5)],
+});
+
+const dampDepression = definition({
+  id: 'damp_depression',
+  category: 'room',
+  width: 10,
+  depth: 9,
+  sockets: [socket('north', 'north', 10, 9), socket('south', 'south', 10, 9)],
+  weight: 0.17,
+  minDepth: 24,
+  maxConsecutive: 1,
+  tags: ['advanced', 'uncommon', 'damp', 'special'],
+  geometryRecipe: { kind: 'rectangular-room', wallStyle: 'offset', columnLayout: 'none' },
+  lightingProfile: 'damp-room',
+  audioProfile: 'dead-end-office',
+});
+
+const lightFailureCorridor = definition({
+  id: 'light_failure_corridor',
+  category: 'corridor',
+  width: 4.4,
+  depth: 13,
+  sockets: [socket('north', 'north', 4.4, 13), socket('south', 'south', 4.4, 13)],
+  weight: 0.13,
+  minDepth: 34,
+  maxConsecutive: 1,
+  tags: ['advanced', 'uncommon', 'light-failure', 'special'],
+  geometryRecipe: { kind: 'straight-corridor', wallStyle: 'segmented', columnLayout: 'none' },
+  lightingProfile: 'light-failure',
+  audioProfile: 'long-office',
+});
+
+const blackoutEdge = definition({
+  id: 'blackout_edge',
+  category: 'corridor',
+  width: 7,
+  depth: 9,
+  sockets: [socket('north', 'north', 7, 9), socket('south', 'south', 7, 9)],
+  weight: 0.08,
+  minDepth: 52,
+  maxConsecutive: 1,
+  tags: ['advanced', 'uncommon', 'blackout', 'dangerous', 'special'],
+  geometryRecipe: { kind: 'junction', wallStyle: 'offset', columnLayout: 'none' },
+  lightingProfile: 'blackout-edge',
+  audioProfile: 'dead-end-office',
+});
+
+const repetitionRoom = definition({
+  id: 'repetition_room',
+  category: 'room',
+  width: 12,
+  depth: 10,
+  sockets: [socket('north', 'north', 12, 10), socket('south', 'south', 12, 10)],
+  weight: 0.14,
+  minDepth: 30,
+  maxConsecutive: 1,
+  tags: ['advanced', 'uncommon', 'repetition', 'special', 'exit-candidate'],
+  geometryRecipe: { kind: 'rectangular-room', wallStyle: 'segmented', columnLayout: 'none' },
+  lightingProfile: 'repetition-room',
+  audioProfile: 'medium-office',
+  exitSurfaces: [exitSurface('north-wall-left', 'north', 12, 10, 2.6, -3.6)],
+});
+
 export const CORE_ROOM_DEFINITION_IDS = [
   'corridor_straight_narrow',
   'corridor_straight_wide',
@@ -382,6 +545,21 @@ export const CORE_ROOM_DEFINITION_IDS = [
 
 export type CoreRoomDefinitionId = (typeof CORE_ROOM_DEFINITION_IDS)[number];
 
+export const ADVANCED_ROOM_DEFINITION_IDS = [
+  'arch_gallery_short',
+  'arch_gallery_long',
+  'pillar_grid_small',
+  'pillar_grid_large',
+  'low_ceiling_section',
+  'high_ceiling_section',
+  'damp_depression',
+  'light_failure_corridor',
+  'blackout_edge',
+  'repetition_room',
+] as const;
+
+export type AdvancedRoomDefinitionId = (typeof ADVANCED_ROOM_DEFINITION_IDS)[number];
+
 export const ROOM_DEFINITIONS: readonly RoomDefinition[] = [
   corridorStraightNarrow,
   corridorStraightWide,
@@ -395,6 +573,16 @@ export const ROOM_DEFINITIONS: readonly RoomDefinition[] = [
   roomLargeOpen,
   roomDeadEnd,
   roomDoubleOffset,
+  archGalleryShort,
+  archGalleryLong,
+  pillarGridSmall,
+  pillarGridLarge,
+  lowCeilingSection,
+  highCeilingSection,
+  dampDepression,
+  lightFailureCorridor,
+  blackoutEdge,
+  repetitionRoom,
 ];
 
 const DEFINITIONS_BY_ID = new Map(ROOM_DEFINITIONS.map((item) => [item.id, item]));

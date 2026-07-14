@@ -1,5 +1,6 @@
 import type { GameState } from './GameStateMachine';
 import type { Vector3Like } from '../procedural/procedural.types';
+import type { TensionEventType, TensionPhase } from '../tension/tension.types';
 
 export interface GameEvents {
   stateChanged: { next: GameState; previous: GameState };
@@ -11,6 +12,11 @@ export interface GameEvents {
     originOffset: Vector3Like;
   };
   settingsChanged: { key: string };
+  tensionChanged: {
+    phase: TensionPhase;
+    intensity: number;
+    activeEventType: TensionEventType | null;
+  };
   fatalError: { error: unknown };
 }
 

@@ -34,6 +34,9 @@ export interface AmbientDebugSnapshot {
   readonly paused: boolean;
   readonly nextPopInSeconds: number | null;
   readonly lightingModulation: number;
+  readonly tension: number;
+  readonly silenceFactor: number;
+  readonly ambienceGain: number;
 }
 
 const DEFAULT_PROFILE: AmbientProfile = {
@@ -160,6 +163,9 @@ export class AmbientDirector {
       nextPopInSeconds:
         this.autoPops && Number.isFinite(this.nextPopAt) ? Math.max(0, this.nextPopAt - now) : null,
       lightingModulation: this.hum.lightingModulation,
+      tension: this.tension,
+      silenceFactor: this.profile.silenceFactor,
+      ambienceGain: this.profile.ambienceGain,
     };
   }
 

@@ -17,6 +17,8 @@ uniform sampler2D textureSampler;
 uniform vec2 internalSize;
 uniform float ditherStrength;
 uniform float grainStrength;
+uniform float anomalyStrength;
+uniform float anomalyPhase;
 
 float bayer4(vec2 pixel) {
   vec2 cell = mod(floor(pixel), 4.0);
@@ -52,13 +54,21 @@ float spatialNoise(vec2 pixel) {
 }
 
 void main(void) {
-  vec4 source = texture2D(textureSampler, vUV);
+  vec2 internalPixel = floor(vUV * max(internalSize, vec2(1.0)));
+  float anomalyBand = step(0.82, fract((internalPixel.y + floor(anomalyPhase * 3.0)) * 0.071));
+  float anomalyDirection = sin(floor(internalPixel.y * 0.17) + anomalyPhase * 1.7);
+  vec2 anomalyUv = vUV + vec2(
+    anomalyDirection * anomalyBand * anomalyStrength * 2.4 / max(internalSize.x, 1.0),
+    0.0
+  );
+  vec4 source = texture2D(textureSampler, clamp(anomalyUv, vec2(0.0), vec2(1.0)));
   vec3 color = source.rgb;
 
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
   color = mix(vec3(luminance), color, 0.94);
   color = color * vec3(1.025, 1.018, 0.955) + vec3(0.022, 0.023, 0.016);
   color = (color - 0.5) * 1.025 + 0.5;
+  color *= mix(vec3(1.0), vec3(0.94, 1.035, 0.9), anomalyStrength);
 
   vec2 stablePixel = floor(vUV * max(internalSize, vec2(1.0)));
   float threshold = bayer4(stablePixel);
@@ -86,6 +96,8 @@ export class BabylonPixelRenderAdapter implements PixelRenderAdapter {
     dithering: true,
     ditherStrength: 0.35,
     grainStrength: 0.008,
+    anomalyStrength: 0,
+    anomalyPhase: 0,
   });
   private disposed = false;
 
@@ -93,7 +105,13 @@ export class BabylonPixelRenderAdapter implements PixelRenderAdapter {
     registerShader();
     this.engine.setHardwareScalingLevel(1);
     this.postProcess = new PostProcess('threshold-pixel-grade', SHADER_NAME, {
-      uniforms: ['internalSize', 'ditherStrength', 'grainStrength'],
+      uniforms: [
+        'internalSize',
+        'ditherStrength',
+        'grainStrength',
+        'anomalyStrength',
+        'anomalyPhase',
+      ],
       size: 1,
       camera: null,
       samplingMode: Constants.TEXTURE_NEAREST_SAMPLINGMODE,
@@ -111,6 +129,8 @@ export class BabylonPixelRenderAdapter implements PixelRenderAdapter {
       );
       effect.setFloat('ditherStrength', this.settings.dithering ? this.settings.ditherStrength : 0);
       effect.setFloat('grainStrength', this.settings.grainStrength);
+      effect.setFloat('anomalyStrength', this.settings.anomalyStrength);
+      effect.setFloat('anomalyPhase', this.settings.anomalyPhase);
     };
   }
 

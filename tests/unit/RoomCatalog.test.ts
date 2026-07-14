@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ADVANCED_ROOM_DEFINITION_IDS,
   CORE_ROOM_DEFINITION_IDS,
   getRoomDefinition,
   getRoomDefinitions,
@@ -9,11 +10,12 @@ import { SeedBank } from '../../src/procedural/SeedBank';
 import { areSocketsCompatible } from '../../src/procedural/SocketMath';
 
 describe('RoomCatalog', () => {
-  it('contiene exactamente los doce módulos núcleo obligatorios', () => {
-    expect(getRoomDefinitions().map((definition) => definition.id)).toEqual(
-      CORE_ROOM_DEFINITION_IDS,
-    );
-    expect(getRoomDefinitions()).toHaveLength(12);
+  it('contiene los doce módulos núcleo y diez variaciones avanzadas', () => {
+    expect(getRoomDefinitions().map((definition) => definition.id)).toEqual([
+      ...CORE_ROOM_DEFINITION_IDS,
+      ...ADVANCED_ROOM_DEFINITION_IDS,
+    ]);
+    expect(getRoomDefinitions()).toHaveLength(22);
     expect(validateRoomCatalog()).toEqual([]);
   });
 
@@ -51,6 +53,11 @@ describe('RoomCatalog', () => {
     }
 
     expect(getRoomDefinition('room_dead_end').exitCompatibleSurfaces).not.toHaveLength(0);
+    expect(getRoomDefinition('arch_gallery_short').tags).toContain('arch');
+    expect(getRoomDefinition('pillar_grid_large').geometryRecipe.columnLayout).toBe('grid');
+    expect(getRoomDefinition('low_ceiling_section').footprint.height).toBeLessThan(2.7);
+    expect(getRoomDefinition('high_ceiling_section').footprint.height).toBeGreaterThan(4);
+    expect(getRoomDefinition('blackout_edge').exitCompatibleSurfaces).toHaveLength(0);
     expect(() => getRoomDefinition('missing-room')).toThrow(/Unknown room definition/);
   });
 });

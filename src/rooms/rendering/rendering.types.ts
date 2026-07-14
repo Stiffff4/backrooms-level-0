@@ -29,6 +29,11 @@ export interface RoomLightAnchor {
   readonly lightingProfile: string;
 }
 
+export interface RoomSpatialAnomalyBinding {
+  readonly kind: 'ceiling-shift';
+  readonly mesh: AbstractMesh;
+}
+
 export interface RoomEntryTrigger {
   readonly roomId: string;
   readonly center: Vector3;
@@ -47,6 +52,7 @@ export interface BuiltModularRoom {
   readonly colliders: readonly AbstractMesh[];
   readonly trigger: RoomEntryTrigger;
   readonly lightAnchors: readonly RoomLightAnchor[];
+  readonly spatialAnomaly: RoomSpatialAnomalyBinding;
   readonly triangleCount: number;
   dispose(): void;
 }
@@ -60,6 +66,7 @@ export interface ModularWorldMetrics {
   readonly colliderCount: number;
   readonly triggerCount: number;
   readonly lightAnchorCount: number;
+  readonly spatialAnomalyCount: number;
   readonly materialCount: number;
   readonly triangleCount: number;
 }

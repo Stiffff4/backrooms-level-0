@@ -270,8 +270,19 @@ describe('RoomGraphGenerator property sweep', () => {
       expect(JSON.stringify(repeated), `seed=${String(seed)}`).toBe(JSON.stringify(graph));
     }
 
+    for (let index = 0; index < 24; index += 1) {
+      const graph = generateRoomGraph({
+        seed: `advanced-content-coverage-${index}`,
+        targetRooms: 128,
+        frontierStrategy: 'deep',
+      });
+      for (const room of graph.rooms) {
+        observedDefinitions.add(room.definitionId);
+      }
+    }
+
     const catalogIds = ROOM_DEFINITIONS.map((definition) => definition.id);
-    expect(catalogIds).toHaveLength(12);
+    expect(catalogIds).toHaveLength(22);
     expect([...observedDefinitions].sort()).toEqual([...catalogIds].sort());
   }, 120_000);
 });

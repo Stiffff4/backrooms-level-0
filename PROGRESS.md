@@ -15,7 +15,7 @@ Implementación activa. La fuente de verdad es `MASTER_PLAN.md`.
 | 4 — Streaming               | Completada | `feat: add streamed infinite world`         |
 | 5 — Visual pixelado         | Completada | `feat: implement pixel rendering pipeline`  |
 | 6 — Iluminación             | Completada | `feat: add fluorescent lighting system`     |
-| 7 — Tensión                 | Pendiente  | —                                           |
+| 7 — Tensión                 | Completada | `feat: implement tension and anomalies`     |
 | 8 — Salida y final          | Pendiente  | —                                           |
 | 9 — Optimización y QA       | Pendiente  | —                                           |
 
@@ -245,3 +245,46 @@ en 1,100 kB, después de medir el bundle y sin modificar los presupuestos de pro
   presupuesto y mantiene sombras desactivadas; las cuatro voces de audio también se crean una vez.
 - Bundle principal: 1,117.13 kB JS sin comprimir y 270.96 kB gzip; continúa muy por debajo del budget
   de descarga, aunque el umbral informativo de chunk se revisará en la optimización final.
+
+## Fase 7 — Tension Director y anomalías
+
+- `TensionDirector` lógico, determinista y separado de Babylon, con cinco fases entre orientación y
+  resolución, intensidad monotónica, agenda por seed, cooldowns globales/por tipo y un solo evento
+  transitorio simultáneo.
+- Los primeros dos minutos permanecen estables; después aparecen de forma dirigida `light-dip`,
+  silencios, cambios de paleta, ecos de repetición, un blackout máximo y hasta tres layout shifts.
+- Cada decisión consume tiempo, habitaciones únicas, velocidad, tiempo sin moverse, calidad,
+  `reducedFlashing`, tags del módulo y candidatos realmente cargados; no existe RNG por frame.
+- Veintidós módulos totales, diez avanzados y poco frecuentes: galerías cortas/largas con arcos
+  escalonados reales, grids de cuatro/seis pilares, techos bajos/altos, depresión húmeda, corredor con
+  fallo, borde de blackout y sala de repetición.
+- Los módulos avanzados atraviesan en línea y dejan la ramificación a las junctions del catálogo base,
+  conservando una espina de más de 500 salas en las seeds de escala sin sacrificar variación local.
+- Los layout shifts solo habilitan geometría preconstruida, no colisionable y fuera de vista; el estado
+  sobrevive descarga/LRU/rebase y nunca modifica sockets, transforms lógicos ni conectividad.
+- Iluminación, emisión, buzzing, silencio y postproceso comparten el mismo snapshot contextual. El
+  blackout conserva una única luminaria lejana sin audio y restaura todos los overrides al terminar.
+- El efecto de anomalía añade desplazamiento por bandas y tinte verdoso discretos sobre el pipeline
+  pixel estable; a fuerza cero reproduce exactamente la regresión anterior y respeta reduced flashing.
+- HUD y datasets exponen fase, intensidad, agenda, evento, recuentos, silencio, efecto visual, módulos
+  visitados y habitaciones alteradas para reproducir y auditar partidas sin editar código.
+
+### Validación
+
+- `npm run validate`: correcto; assets reproducibles, TypeScript strict, ESLint, 30 archivos/125 tests
+  y build de producción (542 módulos).
+- Soak lógico determinista de 20 minutos: apertura estable, fases crecientes, cero solapamiento de
+  eventos, cooldowns respetados, máximo un blackout/tres shifts y reset idéntico para la misma seed.
+- Tests de catálogo/propiedad/renderer verifican los 22 módulos, cobertura avanzada, arcos, pilares,
+  humedad, persistencia del shift, visibilidad doblemente deshabilitada y conectividad intacta.
+- Seis grafos de 1,024 salas vuelven a superar profundidad 500; la propiedad multiseed no detectó
+  sockets inválidos, solapes ni repeticiones por encima de los límites configurados.
+- `npm run test:e2e`: 16/16 en Chromium serial; cubre curva completa, silencio, paleta, blackout y
+  restauración, recorrido de 180 salas con contenido avanzado, shift fuera de vista y toda la suite
+  acumulada de movimiento, audio, procedural, streaming, iluminación y regresión visual.
+- Capturas inspeccionadas a 1280×720: lectura arquitectónica normal, blackout oscuro pero navegable y
+  paleta contextual sutil; no se aceptó la regresión que hacía visible una geometría deshabilitada.
+- Headless Chromium usa explícitamente su fallback WebGL confiable y espera el handoff inicial antes
+  de cronometrar movimiento; el test mantiene más de 50 FPS sin falsos context-loss.
+- Bundle principal: 1,144.82 kB JS sin comprimir, 278.95 kB gzip y build en 423 ms; continúa muy por
+  debajo del budget de producto y queda para inspección/división segura en Fase 9.

@@ -8,9 +8,9 @@
 
 ## Activos
 
-- Ningún defecto bloqueante conocido tras la Fase 6.
-- **No bloqueante:** el chunk principal alcanzó 1,117.13 kB sin comprimir y activa el aviso informativo
-  configurado en 1,100 kB. Su tamaño gzip es 270.96 kB y está muy por debajo del budget de 30 MB; la
+- Ningún defecto bloqueante conocido tras la Fase 7.
+- **No bloqueante:** el chunk principal alcanzó 1,144.82 kB sin comprimir y activa el aviso informativo
+  configurado en 1,100 kB. Su tamaño gzip es 278.95 kB y está muy por debajo del budget de 30 MB; la
   inspección y posible división segura quedan registradas para la Fase 9.
 
 ## Pendientes de QA manual acumulativos
@@ -30,6 +30,9 @@
 - Curvas, sincronización visual/sonora, budgets y `reducedFlashing` están cubiertos automáticamente;
   la comodidad subjetiva del microflicker y la localización de cuatro voces con audífonos permanece en
   la escucha humana acumulativa de Fase 9.
+- La curva de tensión se simuló durante 20 minutos y se recorrieron 180 módulos en navegador; el ritmo
+  subjetivo de silencios, repetición, blackout y desorientación durante una sesión real de 10–20
+  minutos, especialmente en monitores con gamma distinta, queda para la pasada humana de Fase 9.
 - Aunque las capturas E2E verifican ambos lados de una conexión, la percepción subjetiva de bumps,
   seams o z-fighting en todas las combinaciones de módulos queda en la pasada manual acumulativa de
   Fase 9.

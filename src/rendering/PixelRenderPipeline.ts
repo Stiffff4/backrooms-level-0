@@ -14,6 +14,7 @@ import {
 } from './pixelRenderSizing';
 import type {
   PixelCanvasTarget,
+  PixelContextEffects,
   EffectivePixelEffects,
   PixelRenderPipelineOptions,
   PixelRenderRuntime,
@@ -47,6 +48,10 @@ export class PixelRenderPipeline {
   private userEffects: PixelUserEffects = Object.freeze({
     dithering: true,
     reducedFlashing: false,
+  });
+  private contextEffects: PixelContextEffects = Object.freeze({
+    anomalyStrength: 0,
+    anomalyPhase: 0,
   });
   private effectiveEffectsSnapshot: EffectivePixelEffects;
   private disposed = false;
@@ -126,6 +131,18 @@ export class PixelRenderPipeline {
     return this.effectiveEffectsSnapshot;
   }
 
+  public setContextEffects(effects: PixelContextEffects): EffectivePixelEffects {
+    this.assertActive();
+    this.contextEffects = Object.freeze({
+      anomalyStrength: Number.isFinite(effects.anomalyStrength)
+        ? Math.min(0.3, Math.max(0, effects.anomalyStrength))
+        : 0,
+      anomalyPhase: Number.isFinite(effects.anomalyPhase) ? effects.anomalyPhase : 0,
+    });
+    this.effectiveEffectsSnapshot = this.syncPostProcessSettings();
+    return this.effectiveEffectsSnapshot;
+  }
+
   /** Requests one coalesced size refresh on the next animation frame. */
   public refresh(): void {
     this.assertActive();
@@ -188,11 +205,15 @@ export class PixelRenderPipeline {
       reducedFlashing: this.userEffects.reducedFlashing,
       ditherStrength: renderingConfig.ditherStrength,
       grainStrength: this.userEffects.reducedFlashing ? 0 : this.qualityValue.grainStrength,
+      anomalyStrength: this.contextEffects.anomalyStrength,
+      anomalyPhase: this.contextEffects.anomalyPhase,
     });
     this.adapter.setPostProcessSettings({
       dithering: effective.dithering,
       ditherStrength: effective.ditherStrength,
       grainStrength: effective.grainStrength,
+      anomalyStrength: effective.anomalyStrength,
+      anomalyPhase: effective.anomalyPhase,
     });
     return effective;
   }

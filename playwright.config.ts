@@ -11,6 +11,10 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:4173',
+    // Headless Chromium no longer opts into its trusted software WebGL fallback
+    // automatically. The explicit flag prevents context-loss flakes on CI and
+    // local machines without a browser-visible GPU.
+    launchOptions: { args: ['--enable-unsafe-swiftshader'] },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getRoomDefinition } from '../../src/procedural/RoomCatalog';
 import { generateRoomGraph } from '../../src/procedural/RoomGraphGenerator';
-import type { RoomInstance } from '../../src/procedural/procedural.types';
+import type { RoomDefinition, RoomInstance } from '../../src/procedural/procedural.types';
 import { RoomMaterialLibrary, type RoomTextureFactory } from '../../src/rooms/RoomMaterialLibrary';
 import { ModularRoomBuilder } from '../../src/rooms/builders/ModularRoomBuilder';
 
@@ -47,6 +47,21 @@ function faceUvRange(uvs: readonly number[], face: number): { u: number; v: numb
   return {
     u: Math.max(...u) - Math.min(...u),
     v: Math.max(...v) - Math.min(...v),
+  };
+}
+
+function createAdvancedInstance(definition: RoomDefinition, index: number): RoomInstance {
+  return {
+    id: `advanced-${String(index).padStart(2, '0')}`,
+    definitionId: definition.id,
+    seed: 8_100 + index,
+    depth: definition.minDepth,
+    worldTransform: { position: { x: index * 30, y: 0, z: 0 }, rotationQuarterTurns: 0 },
+    socketStates: Object.fromEntries(
+      definition.sockets.map((socket) => [socket.id, { status: 'sealed', connection: null }]),
+    ),
+    visitState: 'unvisited',
+    spawnedAt: index,
   };
 }
 
@@ -156,6 +171,58 @@ describe('ModularRoomBuilder visual UVs', () => {
       materials.dispose();
       expect(scene.meshes).toHaveLength(0);
       expect(scene.transformNodes).toHaveLength(0);
+      scene.dispose();
+      engine.dispose();
+    }
+  });
+
+  it('construye arcos escalonados, grids de pilares, humedad y shifts fuera de vista', () => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const materials = new RoomMaterialLibrary(scene, {
+      baseUrl: '/advanced-test-assets/',
+      textureFactory,
+    });
+    const builder = new ModularRoomBuilder(scene, materials);
+    const definitions = [
+      getRoomDefinition('arch_gallery_long'),
+      getRoomDefinition('pillar_grid_large'),
+      getRoomDefinition('damp_depression'),
+    ];
+    const rooms = definitions.map((definition, index) =>
+      builder.build(createAdvancedInstance(definition, index), definition),
+    );
+    try {
+      const arch = rooms[0];
+      const pillar = rooms[1];
+      const damp = rooms[2];
+      if (!arch || !pillar || !damp) {
+        throw new Error('Advanced visual test did not build every room.');
+      }
+      const archMesh = arch.meshes.find((mesh) => mesh.name.endsWith('.arches'));
+      expect(archMesh).toBeDefined();
+      expect(archMesh?.getTotalVertices()).toBeGreaterThan(200);
+      expect(arch.colliders).toContain(archMesh);
+
+      const pillarMesh = pillar.meshes.find((mesh) => mesh.name.endsWith('.columns'));
+      expect(pillarMesh).toBeDefined();
+      expect(pillarMesh?.getTotalVertices()).toBe(6 * 24);
+      expect(pillar.colliders).toContain(pillarMesh);
+
+      const dampFloor = damp.meshes.find((mesh) => mesh.name.endsWith('.floor'));
+      expect(dampFloor?.material).toBe(materials.carpetWet);
+
+      for (const room of rooms) {
+        expect(room.spatialAnomaly.kind).toBe('ceiling-shift');
+        expect(room.spatialAnomaly.mesh.isEnabled()).toBe(false);
+        room.spatialAnomaly.mesh.setEnabled(true);
+        expect(room.spatialAnomaly.mesh.isEnabled()).toBe(true);
+        expect(room.spatialAnomaly.mesh.checkCollisions).toBe(false);
+      }
+    } finally {
+      for (const room of rooms) room.dispose();
+      materials.dispose();
+      expect(scene.meshes).toHaveLength(0);
       scene.dispose();
       engine.dispose();
     }

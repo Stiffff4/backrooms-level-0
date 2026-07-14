@@ -34,8 +34,10 @@ test('pointer lock inicia la partida, WASD mueve y Escape pausa', async ({ page 
   await page.goto('/?debug=1&noAudio=1&seed=phase-3-crossing');
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page.locator('#app')).toHaveAttribute('data-game-state', 'playing');
-  await page.waitForTimeout(350);
-  await page.screenshot({ path: 'test-results/phase1-gameplay.png' });
+  // Chromium's headless software WebGL backend performs one asynchronous
+  // context handoff on startup. Let Babylon finish that transparent restore
+  // before timing continuous input and FPS.
+  await page.waitForTimeout(2_000);
 
   const before = Number(await page.locator('#app').getAttribute('data-player-z'));
   await dispatchKey('keydown', 'KeyW');

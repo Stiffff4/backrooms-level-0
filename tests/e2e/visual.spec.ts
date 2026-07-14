@@ -83,10 +83,10 @@ test('la imagen inmóvil conserva píxeles estables y una regresión visual vers
   await page.waitForTimeout(150);
   const secondFrame = await page.screenshot();
   expect(secondFrame.equals(firstFrame)).toBe(true);
+  expect(runtimeErrors).toEqual([]);
   await expect(page).toHaveScreenshot('level-zero-default.png', {
     animations: 'disabled',
     maxDiffPixelRatio: 0.01,
     threshold: 0.15,
   });
-  expect(runtimeErrors).toEqual([]);
 });

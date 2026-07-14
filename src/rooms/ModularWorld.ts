@@ -26,6 +26,7 @@ const EMPTY_METRICS: ModularWorldMetrics = Object.freeze({
   colliderCount: 0,
   triggerCount: 0,
   lightAnchorCount: 0,
+  spatialAnomalyCount: 0,
   materialCount: 0,
   triangleCount: 0,
 });
@@ -54,6 +55,7 @@ export class ModularWorld {
   private readonly pooledViews = new Map<string, BuiltModularRoom>();
   private readonly instancesById = new Map<string, RoomInstance>();
   private readonly renderKeysById = new Map<string, string>();
+  private readonly spatialAnomalyRooms = new Set<string>();
   private readonly renderOffset = Vector3.Zero();
   private readonly loadLimit: number;
   private readonly poolLimit: number;
@@ -149,6 +151,14 @@ export class ModularWorld {
 
   public get lightAnchorRevision(): number {
     return this.lightAnchorRevisionValue;
+  }
+
+  public get spatialAnomalyCount(): number {
+    return this.spatialAnomalyRooms.size;
+  }
+
+  public get spatialAnomalyRoomIds(): readonly string[] {
+    return Object.freeze([...this.spatialAnomalyRooms]);
   }
 
   public get metrics(): ModularWorldMetrics {
@@ -248,6 +258,12 @@ export class ModularWorld {
     for (const [roomId, instance] of nextInstances) {
       this.instancesById.set(roomId, instance);
     }
+
+    for (const roomId of this.spatialAnomalyRooms) {
+      if (!nextInstances.has(roomId)) {
+        this.spatialAnomalyRooms.delete(roomId);
+      }
+    }
     for (const [roomId, renderKey] of nextRenderKeys) {
       this.renderKeysById.set(roomId, renderKey);
     }
@@ -298,6 +314,7 @@ export class ModularWorld {
     if (pooled !== undefined) {
       this.pooledViews.delete(roomId);
       pooled.root.setEnabled(true);
+      this.applySpatialAnomalyState(pooled);
       this.views.set(roomId, pooled);
       this.metricsSnapshot = this.calculateMetrics();
       this.lightAnchorRevisionValue += 1;
@@ -309,6 +326,40 @@ export class ModularWorld {
     this.metricsSnapshot = this.calculateMetrics();
     this.lightAnchorRevisionValue += 1;
     return view;
+  }
+
+  public setRoomSpatialAnomaly(roomId: string, enabled: boolean): boolean {
+    this.assertActive();
+    if (!this.instancesById.has(roomId)) {
+      throw new Error(`Unknown room instance: ${roomId}`);
+    }
+    const alreadyEnabled = this.spatialAnomalyRooms.has(roomId);
+    if (alreadyEnabled === enabled) {
+      return false;
+    }
+    if (enabled) {
+      this.spatialAnomalyRooms.add(roomId);
+    } else {
+      this.spatialAnomalyRooms.delete(roomId);
+    }
+    const view = this.views.get(roomId) ?? this.pooledViews.get(roomId);
+    if (view) {
+      this.applySpatialAnomalyState(view);
+    }
+    this.metricsSnapshot = this.calculateMetrics();
+    return true;
+  }
+
+  public clearSpatialAnomalies(): void {
+    this.assertActive();
+    if (this.spatialAnomalyRooms.size === 0) {
+      return;
+    }
+    this.spatialAnomalyRooms.clear();
+    for (const view of [...this.views.values(), ...this.pooledViews.values()]) {
+      this.applySpatialAnomalyState(view);
+    }
+    this.metricsSnapshot = this.calculateMetrics();
   }
 
   public unloadRoom(roomId: string): boolean {
@@ -383,6 +434,7 @@ export class ModularWorld {
           newlyCreatedViews.set(roomId, view);
         }
         view.root.setEnabled(true);
+        this.applySpatialAnomalyState(view);
         this.views.set(roomId, view);
         reservedPooledViews.delete(roomId);
       }
@@ -516,6 +568,7 @@ export class ModularWorld {
     this.disposePooledViews();
     this.instancesById.clear();
     this.renderKeysById.clear();
+    this.spatialAnomalyRooms.clear();
     this.graph = null;
     if (this.ownsMaterials) {
       this.materials.dispose();
@@ -535,7 +588,14 @@ export class ModularWorld {
       view.root.position.addInPlace(this.renderOffset);
       view.trigger.translate(this.renderOffset);
     }
+    this.applySpatialAnomalyState(view);
     return view;
+  }
+
+  private applySpatialAnomalyState(view: BuiltModularRoom): void {
+    const enabled = this.spatialAnomalyRooms.has(view.id);
+    view.spatialAnomaly.mesh.isVisible = enabled;
+    view.spatialAnomaly.mesh.setEnabled(enabled);
   }
 
   private createRenderKey(instance: RoomInstance, definition: RoomDefinition): string {
@@ -575,6 +635,7 @@ export class ModularWorld {
       colliderCount: roomViews.reduce((total, view) => total + view.colliders.length, 0),
       triggerCount: roomViews.length,
       lightAnchorCount: roomViews.reduce((total, view) => total + view.lightAnchors.length, 0),
+      spatialAnomalyCount: this.spatialAnomalyRooms.size,
       materialCount: this.materials.materialCount,
       triangleCount: roomViews.reduce((total, view) => total + view.triangleCount, 0),
     });

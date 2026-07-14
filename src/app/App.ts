@@ -7,6 +7,7 @@ import { LightingAudioBridge } from '../audio/LightingAudioBridge';
 import { ProceduralAudioBank, hashAudioSeed } from '../audio/ProceduralAudioBank';
 import { getRoomAudioProfile, toAmbientProfile } from '../audio/RoomAudioProfiles';
 import { gameConfig } from '../config/game.config';
+import { tensionConfig } from '../config/tension.config';
 import { GameClock } from '../game/GameClock';
 import { SessionStats } from '../game/SessionStats';
 import { DebugHud } from '../debug/DebugHud';
@@ -15,7 +16,11 @@ import { EngineBootstrap } from '../engine/EngineBootstrap';
 import { createGameplayScene } from '../engine/SceneFactory';
 import { PlayerController } from '../player/PlayerController';
 import { assertValidRoomGraph, generateRoomGraph } from '../procedural/RoomGraphGenerator';
-import { getRoomDefinition } from '../procedural/RoomCatalog';
+import {
+  ADVANCED_ROOM_DEFINITION_IDS,
+  getRoomDefinition,
+  getRoomDefinitions,
+} from '../procedural/RoomCatalog';
 import { hashSeed } from '../procedural/SeedBank';
 import type { RoomGraph, RoomInstance } from '../procedural/procedural.types';
 import { PixelRenderPipeline } from '../rendering/PixelRenderPipeline';
@@ -24,6 +29,15 @@ import { LightingDirector, type LightingFrameSnapshot } from '../lighting/Lighti
 import { FIXTURE_FLICKER_PROFILES, type FixtureFlickerProfile } from '../lighting/lighting.types';
 import { ModularWorld } from '../rooms/ModularWorld';
 import type { BuiltModularRoom } from '../rooms/rendering/rendering.types';
+import { TensionDirector } from '../tension/TensionDirector';
+import {
+  TENSION_EVENT_TYPES,
+  type TensionEvent,
+  type TensionEventType,
+  type TensionSnapshot,
+  type TensionUpdateInput,
+  type TensionUpdateResult,
+} from '../tension/tension.types';
 import { renderErrorScreen } from '../ui/ErrorScreen';
 import { CreditsDialog } from '../ui/CreditsDialog';
 import { PauseMenu } from '../ui/PauseMenu';
@@ -66,8 +80,11 @@ export class App {
   private visibilityGuard: StreamingVisibilityGuard | null = null;
   private lightingDirector: LightingDirector | null = null;
   private lightingSnapshot: LightingFrameSnapshot | null = null;
+  private tensionDirector: TensionDirector | null = null;
+  private tensionSnapshot: TensionSnapshot | null = null;
   private lastVisibility: StreamingVisibilityResult | null = null;
   private roomsById = new Map<string, RoomInstance>();
+  private readonly visitedDefinitionIds = new Set<string>();
   private streamingRoute: readonly string[] = [];
   private streamingRouteIndex = 0;
   private readonly recentlyLeftRooms = new Map<string, number>();
@@ -83,7 +100,15 @@ export class App {
   private footstepCount = 0;
   private layoutSignature = '';
   private currentRoomDefinitionId: string | null = null;
+  private advancedRoomCount = 0;
   private debugStreamingAdvanceToken = 0;
+  private debugTensionElapsedSeconds: number | null = null;
+  private lastMovementAtSeconds = 0;
+  private lastAppliedTensionRevision = -1;
+  private lastAppliedTensionIntensity = -1;
+  private lastPixelEffectKey = '';
+  private readonly tensionLightingRoomIds = new Set<string>();
+  private readonly tensionFixtureIds = new Set<string>();
   private disposed = false;
 
   private readonly handleDebugAdvanceStreaming = (event: Event): void => {
@@ -122,6 +147,29 @@ export class App {
     if (this.lightingSnapshot) {
       this.lightingAudioBridge?.update(this.lightingSnapshot);
     }
+  };
+
+  private readonly handleDebugTensionEvent = (event: Event): void => {
+    if (!this.debugOptions.debug || !this.tensionDirector) {
+      return;
+    }
+    const detail = (event as CustomEvent<{ type?: string | null; elapsedSeconds?: number }>).detail;
+    if (Number.isFinite(detail?.elapsedSeconds)) {
+      this.debugTensionElapsedSeconds = Math.max(0, detail?.elapsedSeconds ?? 0);
+    }
+    const requested = detail?.type ?? null;
+    const type = TENSION_EVENT_TYPES.includes(requested as TensionEventType)
+      ? (requested as TensionEventType)
+      : null;
+    const input = this.createTensionInput();
+    const result =
+      type === null
+        ? this.tensionDirector.clearTransientEvents(input)
+        : this.tensionDirector.forceEvent(type, input);
+    this.root.dataset.debugTensionEvent = type ?? 'none';
+    this.applyTensionResult(result);
+    this.updateLightingFrame();
+    this.updateAudioFrame();
   };
 
   private readonly handleWindowBlur = (): void => {
@@ -186,6 +234,7 @@ export class App {
         lightBudget: this.qualityManager.current.lightBudget,
         reducedFlashing: this.settings.value.reducedFlashing,
       });
+      this.tensionDirector = new TensionDirector(this.debugOptions.seed);
       this.roomGraph = generateRoomGraph({
         seed: this.debugOptions.seed,
         targetRooms: gameConfig.world.logicalRoomCount,
@@ -193,6 +242,10 @@ export class App {
       });
       assertValidRoomGraph(this.roomGraph);
       this.roomsById = new Map(this.roomGraph.rooms.map((room) => [room.id, room]));
+      const advancedDefinitionIds = new Set<string>(ADVANCED_ROOM_DEFINITION_IDS);
+      this.advancedRoomCount = this.roomGraph.rooms.filter((room) =>
+        advancedDefinitionIds.has(room.definitionId),
+      ).length;
       this.streamingRoute = this.buildDeepStreamingRoute(this.roomGraph);
       this.streamingRouteIndex = 0;
       this.layoutSignature = hashSeed(
@@ -244,6 +297,7 @@ export class App {
       this.syncRenderingSnapshot();
       const initialTransition = this.modularWorld.updatePlayerPosition(this.player.position);
       this.recordRoomEntry(initialTransition.roomId);
+      this.updateTensionFrame();
       this.updateLightingFrame();
       this.syncWorldDebugSnapshot();
       this.installUi();
@@ -262,6 +316,7 @@ export class App {
           'backrooms:debug-lighting-override',
           this.handleDebugLightingOverride,
         );
+        this.root.addEventListener('backrooms:debug-tension-event', this.handleDebugTensionEvent);
       }
 
       this.engineBootstrap.start(() => this.renderFrame());
@@ -297,6 +352,7 @@ export class App {
       'backrooms:debug-lighting-override',
       this.handleDebugLightingOverride,
     );
+    this.root.removeEventListener('backrooms:debug-tension-event', this.handleDebugTensionEvent);
     this.debugHud?.dispose();
     this.debugHud = null;
     this.pauseMenu?.dispose();
@@ -315,6 +371,9 @@ export class App {
     this.audioBank = null;
     this.pixelPipeline?.dispose();
     this.pixelPipeline = null;
+    this.tensionDirector?.dispose();
+    this.tensionDirector = null;
+    this.tensionSnapshot = null;
     this.lightingDirector?.dispose();
     this.lightingDirector = null;
     this.lightingSnapshot = null;
@@ -328,6 +387,7 @@ export class App {
     this.modularWorld = null;
     this.roomGraph = null;
     this.roomsById.clear();
+    this.visitedDefinitionIds.clear();
     this.streamingRoute = [];
     this.recentlyLeftRooms.clear();
     this.scene?.dispose();
@@ -359,6 +419,9 @@ export class App {
       this.player.subscribePointerLock((locked) => this.handlePointerLock(locked)),
       this.player.subscribeMovement((frame) => {
         this.stats.recordMovement(frame.distance, frame.sprinting);
+        if (frame.distance > 0) {
+          this.lastMovementAtSeconds = this.clock.elapsedSeconds;
+        }
         this.footstepCount += this.footsteps?.update(frame) ?? 0;
       }),
       this.settings.subscribe(({ current, changedKeys }) => {
@@ -386,6 +449,7 @@ export class App {
       this.player?.update(this.engineBootstrap.engine.getDeltaTime() / 1000);
       this.updateWorldFrame();
       this.updateLightingFrame();
+      this.updateTensionFrame();
       this.updateAudioFrame();
     }
     this.updateDebugSnapshot();
@@ -399,6 +463,7 @@ export class App {
       `ORIGIN ${this.floatingOrigin.metrics.rebaseCount} REBASES`,
       `RENDER ${this.qualityManager.presetName.toUpperCase()} ${renderMetrics?.bufferWidth ?? 0}x${renderMetrics?.bufferHeight ?? 0}`,
       `LIGHTS ${this.lightingSnapshot?.metrics.pool.activeLightCount ?? 0}/${this.lightingSnapshot?.metrics.pool.activeBudget ?? 0} / ${this.lightingSnapshot?.metrics.animatedFixtureCount ?? 0} FLICKER`,
+      `TENSION ${this.tensionSnapshot?.phase.toUpperCase() ?? 'OFF'} ${(this.tensionSnapshot?.intensity ?? 0).toFixed(2)} / ${this.tensionSnapshot?.activeEventType ?? 'QUIET'}`,
       `SEED ${this.debugOptions.seed}`,
     ]);
     this.scene.render();
@@ -435,6 +500,7 @@ export class App {
     const firstVisit = this.stats.recordRoomVisit(roomId);
     instance.visitState = 'visited';
     this.currentRoomDefinitionId = instance.definitionId;
+    this.visitedDefinitionIds.add(instance.definitionId);
     this.applyRoomAudioProfile(instance.definitionId);
     const routeIndex = this.streamingRoute.indexOf(roomId);
     if (routeIndex >= 0) {
@@ -456,10 +522,25 @@ export class App {
   private applyRoomAudioProfile(definitionId: string): void {
     const definition = getRoomDefinition(definitionId);
     const profile = getRoomAudioProfile(definition.audioProfile);
-    this.ambientDirector?.setProfile(toAmbientProfile(profile), 0.8);
+    const ambientProfile = toAmbientProfile(profile);
+    this.ambientDirector?.setProfile(
+      {
+        ...ambientProfile,
+        silenceFactor: Math.max(
+          ambientProfile.silenceFactor,
+          this.tensionSnapshot?.silenceFactor ?? 0,
+        ),
+      },
+      0.8,
+    );
+    this.ambientDirector?.setTension(this.tensionSnapshot?.intensity ?? 0, 1.2);
     this.footsteps?.setWetness(profile.wetness);
     this.root.dataset.roomAudioProfile = profile.reverbPreset;
     this.root.dataset.roomAudioProfileId = definition.audioProfile;
+    this.root.dataset.ambientSilenceFactor = Math.max(
+      ambientProfile.silenceFactor,
+      this.tensionSnapshot?.silenceFactor ?? 0,
+    ).toFixed(4);
   }
 
   private createChunkStreamer(): ChunkStreamer<BuiltModularRoom> {
@@ -549,6 +630,205 @@ export class App {
       originOffset: rebase.originOffset,
     });
     this.syncWorldDebugSnapshot();
+  }
+
+  private createTensionInput(): TensionUpdateInput {
+    const elapsedSeconds = this.debugTensionElapsedSeconds ?? this.clock.elapsedSeconds;
+    const definition = this.currentRoomDefinitionId
+      ? getRoomDefinition(this.currentRoomDefinitionId)
+      : null;
+    const world = this.modularWorld;
+    const visible = new Set([
+      ...(this.lastVisibility?.visibleRoomIds ?? []),
+      ...(this.lastVisibility?.visibleEntranceRoomIds ?? []),
+    ]);
+    const shifted = new Set(world?.spatialAnomalyRoomIds ?? []);
+    const layoutShiftCandidates = this.lastVisibility
+      ? (world?.loadedRoomIds ?? [])
+          .filter(
+            (roomId) =>
+              roomId !== world?.activeRoomId &&
+              !visible.has(roomId) &&
+              !this.recentlyLeftRooms.has(roomId) &&
+              !shifted.has(roomId),
+          )
+          .sort()
+      : [];
+    return {
+      elapsedSeconds,
+      uniqueRooms: this.stats.snapshot(elapsedSeconds).roomsVisited,
+      currentRoomId: world?.activeRoomId ?? null,
+      currentDefinitionId: this.currentRoomDefinitionId,
+      currentDefinitionTags: definition?.tags ?? [],
+      playerSpeed: this.player?.movementFrame.horizontalSpeed ?? 0,
+      secondsSinceMovement: Math.max(0, elapsedSeconds - this.lastMovementAtSeconds),
+      quality: this.qualityManager.presetName,
+      reducedFlashing: this.settings.value.reducedFlashing,
+      exitDistance: null,
+      layoutShiftCandidates,
+    };
+  }
+
+  private updateTensionFrame(): void {
+    if (!this.tensionDirector) {
+      return;
+    }
+    this.applyTensionResult(this.tensionDirector.update(this.createTensionInput()));
+  }
+
+  private applyTensionResult(result: TensionUpdateResult): void {
+    for (const event of result.startedEvents) {
+      this.root.dataset.tensionLastEventTarget = event.targetRoomId;
+      this.root.dataset.tensionLastEventType = event.type;
+      if (event.type === 'layout-shift') {
+        this.applySpatialTensionEvent(event);
+      }
+    }
+
+    const previousRevision = this.tensionSnapshot?.revision ?? -1;
+    this.tensionSnapshot = result.snapshot;
+    if (
+      result.snapshot.revision !== this.lastAppliedTensionRevision ||
+      result.snapshot.revision !== previousRevision
+    ) {
+      this.syncTensionLightingEffects(result.snapshot);
+      if (this.currentRoomDefinitionId) {
+        this.applyRoomAudioProfile(this.currentRoomDefinitionId);
+      }
+      this.lastAppliedTensionRevision = result.snapshot.revision;
+      this.updateLightingFrame();
+    }
+
+    if (Math.abs(result.snapshot.intensity - this.lastAppliedTensionIntensity) >= 0.015) {
+      this.lastAppliedTensionIntensity = result.snapshot.intensity;
+      this.ambientDirector?.setTension(result.snapshot.intensity, 1.6);
+      this.events.emit('tensionChanged', {
+        phase: result.snapshot.phase,
+        intensity: result.snapshot.intensity,
+        activeEventType: result.snapshot.activeEventType,
+      });
+    }
+    this.applyTensionPixelEffect(result.snapshot);
+    this.syncTensionDebugSnapshot();
+  }
+
+  private applySpatialTensionEvent(event: TensionEvent): void {
+    const world = this.modularWorld;
+    if (!world) {
+      return;
+    }
+    const visible = new Set([
+      ...(this.lastVisibility?.visibleRoomIds ?? []),
+      ...(this.lastVisibility?.visibleEntranceRoomIds ?? []),
+    ]);
+    if (
+      event.targetRoomId === world.activeRoomId ||
+      visible.has(event.targetRoomId) ||
+      !world.isRoomLoaded(event.targetRoomId)
+    ) {
+      throw new Error(
+        `Tension layout shift target ${event.targetRoomId} was not safely out of view.`,
+      );
+    }
+    world.setRoomSpatialAnomaly(event.targetRoomId, true);
+  }
+
+  private syncTensionLightingEffects(snapshot: TensionSnapshot): void {
+    const lighting = this.lightingDirector;
+    const world = this.modularWorld;
+    if (!lighting || !world) {
+      return;
+    }
+
+    const loadedAnchors = world.lightAnchors;
+    const loadedRoomIds = new Set(loadedAnchors.map((anchor) => anchor.roomId));
+    const loadedFixtureIds = new Set(loadedAnchors.map((anchor) => anchor.id));
+    for (const fixtureId of this.tensionFixtureIds) {
+      if (loadedFixtureIds.has(fixtureId)) {
+        lighting.setFixtureOverride(fixtureId, null);
+      }
+    }
+    for (const roomId of this.tensionLightingRoomIds) {
+      if (loadedRoomIds.has(roomId)) {
+        lighting.setRoomOverride(roomId, null);
+      }
+    }
+    this.tensionFixtureIds.clear();
+    this.tensionLightingRoomIds.clear();
+
+    const event = snapshot.activeEvents[0];
+    if (!event || !loadedRoomIds.has(event.targetRoomId)) {
+      return;
+    }
+    if (event.type === 'light-dip') {
+      lighting.setRoomOverride(event.targetRoomId, {
+        profile: 'slow-fluctuation',
+        visualScale: tensionConfig.effects.lightDipVisualScale,
+        audioScale: tensionConfig.effects.lightDipAudioScale,
+      });
+      this.tensionLightingRoomIds.add(event.targetRoomId);
+      return;
+    }
+    if (event.type !== 'blackout') {
+      return;
+    }
+
+    lighting.setRoomOverride(event.targetRoomId, { profile: 'off', enabled: true });
+    this.tensionLightingRoomIds.add(event.targetRoomId);
+    const playerPosition = this.player?.position;
+    const beacon = loadedAnchors
+      .filter((anchor) => anchor.roomId === event.targetRoomId && anchor.enabled)
+      .sort((left, right) => {
+        if (!playerPosition) {
+          return right.fixtureIndex - left.fixtureIndex;
+        }
+        return (
+          Vector3.DistanceSquared(right.node.getAbsolutePosition(), playerPosition) -
+          Vector3.DistanceSquared(left.node.getAbsolutePosition(), playerPosition)
+        );
+      })[0];
+    if (beacon) {
+      lighting.setFixtureOverride(beacon.id, {
+        profile: 'stable',
+        enabled: true,
+        visualScale: tensionConfig.effects.blackoutBeaconVisualScale,
+        audioScale: 0,
+      });
+      this.tensionFixtureIds.add(beacon.id);
+    }
+  }
+
+  private applyTensionPixelEffect(snapshot: TensionSnapshot): void {
+    const phase =
+      snapshot.visualEffectStrength > 0 ? Math.floor(snapshot.visualEffectPhase * 12) / 12 : 0;
+    const key = `${snapshot.visualEffectStrength.toFixed(5)}:${phase.toFixed(3)}`;
+    if (key === this.lastPixelEffectKey) {
+      return;
+    }
+    this.lastPixelEffectKey = key;
+    this.pixelPipeline?.setContextEffects({
+      anomalyStrength: snapshot.visualEffectStrength,
+      anomalyPhase: phase,
+    });
+  }
+
+  private syncTensionDebugSnapshot(): void {
+    const snapshot = this.tensionSnapshot;
+    this.root.dataset.tensionPhase = snapshot?.phase ?? 'orientation';
+    this.root.dataset.tensionIntensity = (snapshot?.intensity ?? 0).toFixed(4);
+    this.root.dataset.tensionActiveEvent = snapshot?.activeEventType ?? 'none';
+    this.root.dataset.tensionEventCount = String(snapshot?.eventCount ?? 0);
+    this.root.dataset.tensionBlackoutCount = String(snapshot?.blackoutCount ?? 0);
+    this.root.dataset.tensionLayoutShifts = String(snapshot?.layoutShiftCount ?? 0);
+    this.root.dataset.tensionSilenceFactor = (snapshot?.silenceFactor ?? 0).toFixed(4);
+    this.root.dataset.tensionVisualStrength = (snapshot?.visualEffectStrength ?? 0).toFixed(5);
+    this.root.dataset.tensionNextEventAt = (snapshot?.nextEventAtSeconds ?? 0).toFixed(2);
+    this.root.dataset.tensionSecondsWithoutVariation = (
+      snapshot?.secondsWithoutVariation ?? 0
+    ).toFixed(2);
+    this.root.dataset.worldSpatialAnomalies = String(this.modularWorld?.spatialAnomalyCount ?? 0);
+    this.root.dataset.worldSpatialAnomalyRooms =
+      this.modularWorld?.spatialAnomalyRoomIds.join(',') ?? '';
   }
 
   private updateLightingFrame(): void {
@@ -730,12 +1010,15 @@ export class App {
     this.root.dataset.layoutValid = graph ? 'true' : 'false';
     this.root.dataset.layoutSignature = this.layoutSignature;
     this.root.dataset.roomCount = String(graph?.rooms.length ?? 0);
+    this.root.dataset.roomDefinitionCount = String(getRoomDefinitions().length);
+    this.root.dataset.advancedRoomCount = String(this.advancedRoomCount);
     this.root.dataset.connectionCount = String(graph?.connections.length ?? 0);
     this.root.dataset.generationAttempts = String(graph?.generationStats.attemptedPlacements ?? 0);
     this.root.dataset.generationRejections = String(graph?.generationStats.rejectedOverlaps ?? 0);
     this.root.dataset.sealedSockets = String(graph?.generationStats.sealedSockets ?? 0);
     this.root.dataset.currentRoomId = world?.activeRoomId ?? '';
     this.root.dataset.currentRoomDefinition = this.currentRoomDefinitionId ?? '';
+    this.root.dataset.visitedRoomDefinitions = [...this.visitedDefinitionIds].sort().join(',');
     this.root.dataset.visitedRooms = String(stats.roomsVisited);
     this.root.dataset.worldMeshes = String(world?.metrics.meshCount ?? 0);
     this.root.dataset.worldColliders = String(world?.metrics.colliderCount ?? 0);
@@ -798,6 +1081,7 @@ export class App {
       this.scene.fogEnd = quality.fogEnd;
     }
     this.visibilityGuard?.setFogEnd(quality.fogEnd);
+    this.updateTensionFrame();
     this.updateLightingFrame();
     this.syncRenderingSnapshot();
     window.requestAnimationFrame(() => {
@@ -818,6 +1102,7 @@ export class App {
     this.root.dataset.renderBufferHeight = String(metrics?.bufferHeight ?? 0);
     this.root.dataset.renderDithering = String(effects?.dithering ?? quality.dithering);
     this.root.dataset.renderGrainStrength = String(effects?.grainStrength ?? quality.grainStrength);
+    this.root.dataset.renderAnomalyStrength = (effects?.anomalyStrength ?? 0).toFixed(5);
     this.root.dataset.renderNormalMaps = String(quality.normalMaps);
     this.root.dataset.renderAnisotropy = String(quality.anisotropy);
     this.root.dataset.renderLightBudget = String(quality.lightBudget);
@@ -840,10 +1125,21 @@ export class App {
     this.root.dataset.footstepCount = String(this.footstepCount);
     this.root.dataset.footstepPendingDistance = (this.footsteps?.pendingDistance ?? 0).toFixed(3);
     const lightingAudio = this.lightingAudioBridge?.metrics;
+    const ambient = this.ambientDirector?.debugSnapshot;
     this.root.dataset.lightingAudioVoices = String(lightingAudio?.activeVoiceCount ?? 0);
     this.root.dataset.lightingAudioVoiceBudget = String(lightingAudio?.voiceBudget ?? 0);
     this.root.dataset.lightingAudioPops = String(lightingAudio?.popCount ?? 0);
     this.root.dataset.lightingAudioModulation = (lightingAudio?.globalModulation ?? 0).toFixed(4);
+    this.root.dataset.ambientTension = (
+      ambient?.tension ??
+      this.tensionSnapshot?.intensity ??
+      0
+    ).toFixed(4);
+    this.root.dataset.ambientSilenceFactor = (
+      ambient?.silenceFactor ??
+      this.tensionSnapshot?.silenceFactor ??
+      0
+    ).toFixed(4);
   }
 
   private getAudioNodeCount(): number {
@@ -1040,8 +1336,21 @@ export class App {
     this.recentlyLeftRooms.clear();
     this.streamingRouteIndex = 0;
     this.stats.reset();
+    this.visitedDefinitionIds.clear();
     this.resetRoomVisits();
     this.clock.reset();
+    this.tensionDirector?.reset();
+    this.tensionSnapshot = null;
+    this.debugTensionElapsedSeconds = null;
+    this.lastMovementAtSeconds = 0;
+    this.lastAppliedTensionRevision = -1;
+    this.lastAppliedTensionIntensity = -1;
+    this.lastPixelEffectKey = '';
+    this.tensionLightingRoomIds.clear();
+    this.tensionFixtureIds.clear();
+    this.modularWorld.clearSpatialAnomalies();
+    this.pixelPipeline?.setContextEffects({ anomalyStrength: 0, anomalyPhase: 0 });
+    this.ambientDirector?.setTension(0, 0.5);
     this.lightingDirector?.reset();
     this.lightingSnapshot = null;
     this.lightingAudioBridge?.reset();
@@ -1052,6 +1361,7 @@ export class App {
     this.player.setLookRotation(this.modularWorld.spawnYaw);
     const transition = this.modularWorld.updatePlayerPosition(this.player.position);
     this.recordRoomEntry(transition.roomId);
+    this.updateTensionFrame();
     this.updateLightingFrame();
     this.syncWorldDebugSnapshot();
   }

@@ -14,6 +14,14 @@ export const ROOM_LIGHTING_PROFILE_IDS = [
   'room-large',
   'dead-end',
   'double-offset',
+  'arch-gallery',
+  'pillar-hall',
+  'low-ceiling',
+  'high-ceiling',
+  'damp-room',
+  'light-failure',
+  'blackout-edge',
+  'repetition-room',
 ] as const;
 
 export type RoomLightingProfileId = (typeof ROOM_LIGHTING_PROFILE_IDS)[number];
@@ -68,6 +76,20 @@ const noticeablyUnstable = [
   { profile: 'intermittent-failure', weight: 0.07 },
 ] as const;
 
+const failureHeavy = [
+  { profile: 'stable', weight: 0.18 },
+  { profile: 'microflicker', weight: 0.26 },
+  { profile: 'slow-fluctuation', weight: 0.34 },
+  { profile: 'intermittent-failure', weight: 0.22 },
+] as const;
+
+const distantDim = [
+  { profile: 'stable', weight: 0.3 },
+  { profile: 'microflicker', weight: 0.25 },
+  { profile: 'slow-fluctuation', weight: 0.35 },
+  { profile: 'intermittent-failure', weight: 0.1 },
+] as const;
+
 export const roomLightingProfiles: Readonly<
   Record<RoomLightingProfileId, Readonly<RoomLightingProfile>>
 > = Object.freeze({
@@ -83,6 +105,14 @@ export const roomLightingProfiles: Readonly<
   'room-large': profile('room-large', 0.96, 1, subtlyUnstable),
   'dead-end': profile('dead-end', 0.7, 0.8, noticeablyUnstable),
   'double-offset': profile('double-offset', 0.8, 0.9, subtlyUnstable),
+  'arch-gallery': profile('arch-gallery', 0.88, 0.94, subtlyUnstable),
+  'pillar-hall': profile('pillar-hall', 0.92, 0.98, subtlyUnstable),
+  'low-ceiling': profile('low-ceiling', 0.68, 0.82, mostlyStable),
+  'high-ceiling': profile('high-ceiling', 0.98, 1, subtlyUnstable),
+  'damp-room': profile('damp-room', 0.74, 0.84, noticeablyUnstable),
+  'light-failure': profile('light-failure', 0.7, 0.88, failureHeavy),
+  'blackout-edge': profile('blackout-edge', 0.42, 0.46, distantDim),
+  'repetition-room': profile('repetition-room', 0.84, 0.9, mostlyStable),
 });
 
 export function isRoomLightingProfileId(value: string): value is RoomLightingProfileId {

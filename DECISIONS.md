@@ -271,3 +271,48 @@ Los tests de una aplicación WebGL comparten GPU y temporizadores del host; siet
 introdujeron timeouts y desplazamientos falsos que desaparecieron al repetir cada caso aisladamente.
 La suite fija un worker: la cobertura sigue completa y movimiento, streaming, audio y screenshots se
 miden sin competencia artificial por el mismo dispositivo gráfico.
+
+## D-033 — Tensión reproducible como agenda lógica
+
+**Estado:** aceptada — Fase 7.
+
+`TensionDirector` recibe un snapshot de contexto y produce una agenda/eventos inmutables. El RNG solo
+se consume al programar una nueva ventana, nunca al renderizar, por lo que una seed y la misma ruta
+reproducen fase, tipo, duración y objetivo. Cinco fases temporales mantienen los primeros dos minutos
+estables y elevan intensidad sin depender del framerate.
+
+## D-034 — Contenido avanzado infrecuente sin sacrificar la espina
+
+**Estado:** aceptada — Fase 7.
+
+Los diez módulos avanzados usan `minDepth`, pesos bajos, `uncommon` y `maxConsecutive: 1`. Sus sockets
+principales atraviesan en línea; la ramificación global sigue perteneciendo a junctions diseñadas para
+ella. Así los arcos, pilares y cambios de altura aparecen durante una partida larga sin consumir ramas
+que reduzcan la ruta profunda exigida por streaming y salida.
+
+## D-035 — Mentira espacial visual, topología inmutable
+
+**Estado:** aceptada — Fase 7.
+
+Un layout shift habilita una pieza de techo preconstruida únicamente en una sala cargada, no activa y
+fuera del frustum/entradas visibles. La pieza no colisiona ni altera sockets, AABBs o transforms. El id
+se guarda en `ModularWorld`, se reaplica al pasar por LRU y se deshabilita mediante estado de nodo e
+`isVisible`; esta doble garantía evita que reactivar una raíz Babylon revele una anomalía no elegida.
+
+## D-036 — Un snapshot transitorio gobierna imagen y sonido
+
+**Estado:** aceptada — Fase 7.
+
+Solo un evento contextual puede estar activo. Su snapshot controla overrides de luminarias, proxy,
+buzzing, ambiente, silencio y postproceso, y se revierte al salir de sala o vencer la duración. El
+blackout se limita a uno por partida y conserva el fixture más lejano como referencia visual muda; la
+variante `reducedFlashing` reduce fuerza y duración dentro del mismo sistema.
+
+## D-037 — Fallback WebGL explícito para automatización headless
+
+**Estado:** aceptada — Fase 7.
+
+Chromium headless reciente dejó de activar automáticamente SwiftShader. Playwright solicita
+`--enable-unsafe-swiftshader` para el origen local confiable y deja terminar el único handoff inicial
+antes de medir input/FPS. Esto elimina pérdidas de contexto propias del runner sin cambiar flags,
+calidad ni ruta WebGL2 de la build que recibe el jugador.
