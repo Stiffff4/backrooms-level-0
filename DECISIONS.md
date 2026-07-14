@@ -228,3 +228,46 @@ misma imagen. `reducedFlashing` elimina grano y `dithering` puede desactivarse s
 luces de la fase siguiente. Los sistemas ya existentes consumen la política inmediatamente; el campo
 de luces queda tipado y probado para que `LightPool` lo haga efectivo en Fase 6 sin duplicar tablas de
 calidad ni cambiar la persistencia de ajustes.
+
+## D-028 — Emisión por vertex colors dentro de geometría combinada
+
+**Estado:** aceptada — Fase 6.
+
+Cada fixture recibe un slice RGBA no solapado en el buffer de colores de su mesh emisor combinado.
+`LightingDirector` actualiza solo los slices cuyo valor cambió y agrupa la subida por mesh. Esto hace
+visible cada curva sin recuperar un mesh o material por luminaria y conserva el batching de Fase 3.
+
+## D-029 — Pool físico fijo y presupuesto lógico por calidad
+
+**Estado:** aceptada — Fase 6.
+
+Se crean exactamente ocho `PointLight` al iniciar la escena y se reutilizan por id estable. Los presets
+habilitan 4, 6 u 8; visibilidad, sala activa, salida, flicker y distancia determinan una prioridad
+reproducible. Ninguna luz proyecta sombras y una sala apagada no invalida proxies asignados a salas
+vecinas precargadas.
+
+## D-030 — Curvas absolutas con semillas, nunca azar por frame
+
+**Estado:** aceptada — Fase 6.
+
+Las seis curvas fluorescentes se evalúan a 30 Hz usando tiempo absoluto y seed del fixture. Los fallos
+tienen ventanas e ids estables, lo que permite reproducirlos, pausar sin deriva y deduplicar eventos.
+`reducedFlashing` transforma esas mismas curvas y limita sus extremos en vez de mantener dos sistemas.
+
+## D-031 — Una muestra para luz, emisión y sonido
+
+**Estado:** aceptada — Fase 6.
+
+`LightingFrameSnapshot` es el único puente hacia Web Audio: determina intensidad global, hasta cuatro
+fuentes posicionales y pops de fallo. Las voces se preasignan y se reasignan; no existe un `PannerNode`
+por fixture. Los perfiles de habitación son exhaustivos para que iluminación, buzz, ambiente y reverb
+no diverjan al añadir módulos.
+
+## D-032 — Playwright serial para escenarios WebGL temporales
+
+**Estado:** aceptada — Fase 6.
+
+Los tests de una aplicación WebGL comparten GPU y temporizadores del host; siete workers simultáneos
+introdujeron timeouts y desplazamientos falsos que desaparecieron al repetir cada caso aisladamente.
+La suite fija un worker: la cobertura sigue completa y movimiento, streaming, audio y screenshots se
+miden sin competencia artificial por el mismo dispositivo gráfico.

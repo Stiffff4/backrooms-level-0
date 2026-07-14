@@ -33,6 +33,7 @@ export interface AmbientDebugSnapshot {
   readonly running: boolean;
   readonly paused: boolean;
   readonly nextPopInSeconds: number | null;
+  readonly lightingModulation: number;
 }
 
 const DEFAULT_PROFILE: AmbientProfile = {
@@ -158,6 +159,7 @@ export class AmbientDirector {
       paused: this.paused,
       nextPopInSeconds:
         this.autoPops && Number.isFinite(this.nextPopAt) ? Math.max(0, this.nextPopAt - now) : null,
+      lightingModulation: this.hum.lightingModulation,
     };
   }
 
@@ -246,6 +248,11 @@ export class AmbientDirector {
       return;
     }
     this.applyProfile(this.context.currentTime, clamp(transitionSeconds, 0, 10));
+  }
+
+  public setLightingModulation(intensity: number, transitionSeconds = 0.08): void {
+    this.assertUsable();
+    this.hum.setLightingModulation(intensity, transitionSeconds);
   }
 
   public setPaused(paused: boolean): void {

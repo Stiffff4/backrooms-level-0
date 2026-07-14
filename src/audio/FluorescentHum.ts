@@ -112,6 +112,7 @@ export class FluorescentHum {
   private started = false;
   private stopped = false;
   private paused = false;
+  private lightingIntensity = 1;
   private disposed = false;
 
   public constructor(
@@ -139,6 +140,10 @@ export class FluorescentHum {
 
   public get activePopCount(): number {
     return this.popVoices.size;
+  }
+
+  public get lightingModulation(): number {
+    return this.lightingIntensity;
   }
 
   public start(when = this.context.currentTime): void {
@@ -231,6 +236,18 @@ export class FluorescentHum {
       return;
     }
     this.applyOutputGain(this.context.currentTime, clamp(transitionSeconds, 0, 4));
+  }
+
+  public setLightingModulation(intensity: number, transitionSeconds = 0.08): void {
+    this.assertUsable();
+    const next = clamp(intensity, 0, 1);
+    if (Math.abs(next - this.lightingIntensity) < 0.001) {
+      return;
+    }
+    this.lightingIntensity = next;
+    if (this.started && !this.stopped && this.output) {
+      this.applyOutputGain(this.context.currentTime, clamp(transitionSeconds, 0.02, 2));
+    }
   }
 
   public playPop(when = this.context.currentTime, gain = 1): boolean {
@@ -370,7 +387,8 @@ export class FluorescentHum {
     if (!this.output) {
       return;
     }
-    const activeGain = this.profile.gain * (1 - this.profile.silenceFactor);
+    const activeGain =
+      this.profile.gain * (1 - this.profile.silenceFactor) * this.lightingIntensity;
     const target = this.paused ? activeGain * 0.025 : activeGain;
     automate(this.output.gain, target, when, transitionSeconds);
   }

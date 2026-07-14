@@ -3,7 +3,9 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { AmbientDirector } from '../audio/AmbientDirector';
 import { FootstepSystem } from '../audio/FootstepSystem';
 import { GameAudioEngine } from '../audio/GameAudioEngine';
+import { LightingAudioBridge } from '../audio/LightingAudioBridge';
 import { ProceduralAudioBank, hashAudioSeed } from '../audio/ProceduralAudioBank';
+import { getRoomAudioProfile, toAmbientProfile } from '../audio/RoomAudioProfiles';
 import { gameConfig } from '../config/game.config';
 import { GameClock } from '../game/GameClock';
 import { SessionStats } from '../game/SessionStats';
@@ -13,10 +15,13 @@ import { EngineBootstrap } from '../engine/EngineBootstrap';
 import { createGameplayScene } from '../engine/SceneFactory';
 import { PlayerController } from '../player/PlayerController';
 import { assertValidRoomGraph, generateRoomGraph } from '../procedural/RoomGraphGenerator';
+import { getRoomDefinition } from '../procedural/RoomCatalog';
 import { hashSeed } from '../procedural/SeedBank';
 import type { RoomGraph, RoomInstance } from '../procedural/procedural.types';
 import { PixelRenderPipeline } from '../rendering/PixelRenderPipeline';
 import { QualityManager } from '../rendering/QualityManager';
+import { LightingDirector, type LightingFrameSnapshot } from '../lighting/LightingDirector';
+import { FIXTURE_FLICKER_PROFILES, type FixtureFlickerProfile } from '../lighting/lighting.types';
 import { ModularWorld } from '../rooms/ModularWorld';
 import type { BuiltModularRoom } from '../rooms/rendering/rendering.types';
 import { renderErrorScreen } from '../ui/ErrorScreen';
@@ -59,6 +64,8 @@ export class App {
   private modularWorld: ModularWorld | null = null;
   private chunkStreamer: ChunkStreamer<BuiltModularRoom> | null = null;
   private visibilityGuard: StreamingVisibilityGuard | null = null;
+  private lightingDirector: LightingDirector | null = null;
+  private lightingSnapshot: LightingFrameSnapshot | null = null;
   private lastVisibility: StreamingVisibilityResult | null = null;
   private roomsById = new Map<string, RoomInstance>();
   private streamingRoute: readonly string[] = [];
@@ -71,6 +78,7 @@ export class App {
   private debugHud: DebugHud | null = null;
   private audioBank: ProceduralAudioBank | null = null;
   private ambientDirector: AmbientDirector | null = null;
+  private lightingAudioBridge: LightingAudioBridge | null = null;
   private footsteps: FootstepSystem | null = null;
   private footstepCount = 0;
   private layoutSignature = '';
@@ -93,6 +101,27 @@ export class App {
         this.showFatalError(error);
       }
     });
+  };
+
+  private readonly handleDebugLightingOverride = (event: Event): void => {
+    if (!this.debugOptions.debug || !this.lightingDirector || !this.modularWorld) {
+      return;
+    }
+    const requested = (event as CustomEvent<{ profile?: string | null }>).detail?.profile ?? null;
+    const profile: FixtureFlickerProfile | null =
+      requested !== null && FIXTURE_FLICKER_PROFILES.includes(requested as FixtureFlickerProfile)
+        ? (requested as FixtureFlickerProfile)
+        : null;
+    const roomId = this.modularWorld.activeRoomId;
+    if (!roomId) {
+      return;
+    }
+    this.lightingDirector.setRoomOverride(roomId, profile === null ? null : { profile });
+    this.root.dataset.debugLightingOverride = profile ?? 'none';
+    this.updateLightingFrame();
+    if (this.lightingSnapshot) {
+      this.lightingAudioBridge?.update(this.lightingSnapshot);
+    }
   };
 
   private readonly handleWindowBlur = (): void => {
@@ -153,6 +182,10 @@ export class App {
       });
       this.scene = createGameplayScene(this.engineBootstrap.engine);
       this.scene.fogEnd = this.qualityManager.current.fogEnd;
+      this.lightingDirector = new LightingDirector(this.scene, {
+        lightBudget: this.qualityManager.current.lightBudget,
+        reducedFlashing: this.settings.value.reducedFlashing,
+      });
       this.roomGraph = generateRoomGraph({
         seed: this.debugOptions.seed,
         targetRooms: gameConfig.world.logicalRoomCount,
@@ -211,6 +244,7 @@ export class App {
       this.syncRenderingSnapshot();
       const initialTransition = this.modularWorld.updatePlayerPosition(this.player.position);
       this.recordRoomEntry(initialTransition.roomId);
+      this.updateLightingFrame();
       this.syncWorldDebugSnapshot();
       this.installUi();
       this.installSubscriptions();
@@ -223,6 +257,10 @@ export class App {
         this.root.addEventListener(
           'backrooms:debug-advance-streaming',
           this.handleDebugAdvanceStreaming,
+        );
+        this.root.addEventListener(
+          'backrooms:debug-lighting-override',
+          this.handleDebugLightingOverride,
         );
       }
 
@@ -255,6 +293,10 @@ export class App {
       'backrooms:debug-advance-streaming',
       this.handleDebugAdvanceStreaming,
     );
+    this.root.removeEventListener(
+      'backrooms:debug-lighting-override',
+      this.handleDebugLightingOverride,
+    );
     this.debugHud?.dispose();
     this.debugHud = null;
     this.pauseMenu?.dispose();
@@ -265,12 +307,17 @@ export class App {
     this.titleScreen = null;
     this.footsteps?.dispose();
     this.footsteps = null;
+    this.lightingAudioBridge?.dispose();
+    this.lightingAudioBridge = null;
     this.ambientDirector?.dispose();
     this.ambientDirector = null;
     this.audioBank?.dispose();
     this.audioBank = null;
     this.pixelPipeline?.dispose();
     this.pixelPipeline = null;
+    this.lightingDirector?.dispose();
+    this.lightingDirector = null;
+    this.lightingSnapshot = null;
     this.player?.dispose();
     this.player = null;
     this.chunkStreamer?.dispose();
@@ -338,6 +385,7 @@ export class App {
     if (this.stateMachine.state === 'playing') {
       this.player?.update(this.engineBootstrap.engine.getDeltaTime() / 1000);
       this.updateWorldFrame();
+      this.updateLightingFrame();
       this.updateAudioFrame();
     }
     this.updateDebugSnapshot();
@@ -350,6 +398,7 @@ export class App {
       `STREAM ${this.chunkStreamer?.metrics.activeRoomCount ?? 0} ACTIVE / ${this.chunkStreamer?.metrics.preloadRoomCount ?? 0} PRELOAD / ${this.modularWorld?.pooledRoomCount ?? 0} POOLED`,
       `ORIGIN ${this.floatingOrigin.metrics.rebaseCount} REBASES`,
       `RENDER ${this.qualityManager.presetName.toUpperCase()} ${renderMetrics?.bufferWidth ?? 0}x${renderMetrics?.bufferHeight ?? 0}`,
+      `LIGHTS ${this.lightingSnapshot?.metrics.pool.activeLightCount ?? 0}/${this.lightingSnapshot?.metrics.pool.activeBudget ?? 0} / ${this.lightingSnapshot?.metrics.animatedFixtureCount ?? 0} FLICKER`,
       `SEED ${this.debugOptions.seed}`,
     ]);
     this.scene.render();
@@ -386,6 +435,7 @@ export class App {
     const firstVisit = this.stats.recordRoomVisit(roomId);
     instance.visitState = 'visited';
     this.currentRoomDefinitionId = instance.definitionId;
+    this.applyRoomAudioProfile(instance.definitionId);
     const routeIndex = this.streamingRoute.indexOf(roomId);
     if (routeIndex >= 0) {
       this.streamingRouteIndex = routeIndex;
@@ -401,6 +451,15 @@ export class App {
     for (const room of this.roomGraph.rooms) {
       room.visitState = room.id === this.roomGraph.startRoomId ? 'visible' : 'unvisited';
     }
+  }
+
+  private applyRoomAudioProfile(definitionId: string): void {
+    const definition = getRoomDefinition(definitionId);
+    const profile = getRoomAudioProfile(definition.audioProfile);
+    this.ambientDirector?.setProfile(toAmbientProfile(profile), 0.8);
+    this.footsteps?.setWetness(profile.wetness);
+    this.root.dataset.roomAudioProfile = profile.reverbPreset;
+    this.root.dataset.roomAudioProfileId = definition.audioProfile;
   }
 
   private createChunkStreamer(): ChunkStreamer<BuiltModularRoom> {
@@ -490,6 +549,40 @@ export class App {
       originOffset: rebase.originOffset,
     });
     this.syncWorldDebugSnapshot();
+  }
+
+  private updateLightingFrame(): void {
+    const player = this.player;
+    const world = this.modularWorld;
+    const director = this.lightingDirector;
+    if (!player || !world || !director) {
+      return;
+    }
+    this.lightingSnapshot = director.update({
+      anchors: world.lightAnchors,
+      anchorRevision: world.lightAnchorRevision,
+      activeRoomId: world.activeRoomId,
+      visibleRoomIds: this.lastVisibility?.visibleRoomIds ?? [],
+      playerPosition: player.position,
+      absoluteTimeSeconds: this.clock.elapsedSeconds,
+    });
+    this.syncLightingDebugSnapshot();
+  }
+
+  private syncLightingDebugSnapshot(): void {
+    const snapshot = this.lightingSnapshot;
+    const metrics = snapshot?.metrics;
+    const pool = metrics?.pool;
+    this.root.dataset.lightPoolCapacity = String(pool?.capacity ?? 0);
+    this.root.dataset.lightPoolBudget = String(pool?.activeBudget ?? 0);
+    this.root.dataset.lightPoolActive = String(pool?.activeLightCount ?? 0);
+    this.root.dataset.activeRoomLightProxies = String(metrics?.activeRoomProxyCount ?? 0);
+    this.root.dataset.lightPoolReassignments = String(pool?.reassignments ?? 0);
+    this.root.dataset.lightingFixtures = String(metrics?.fixtureCount ?? 0);
+    this.root.dataset.lightingAnimatedFixtures = String(metrics?.animatedFixtureCount ?? 0);
+    this.root.dataset.lightingEmitterUploads = String(metrics?.emitterUploadCount ?? 0);
+    this.root.dataset.lightingReducedFlashing = String(metrics?.reducedFlashing ?? false);
+    this.root.dataset.lightingAudioIntensity = (snapshot?.globalAudioIntensity ?? 0).toFixed(4);
   }
 
   private buildDeepStreamingRoute(graph: RoomGraph): readonly string[] {
@@ -590,6 +683,9 @@ export class App {
     }
 
     this.ambientDirector?.update();
+    if (this.lightingSnapshot) {
+      this.lightingAudioBridge?.update(this.lightingSnapshot);
+    }
     if (!this.audioEngine.context) {
       return;
     }
@@ -598,6 +694,7 @@ export class App {
     const position = player.camera.globalPosition;
     player.camera.getDirectionToRef(this.audioLocalForward, this.audioForward);
     this.audioEngine.updateListener({ position, forward: this.audioForward });
+    this.syncAudioDebugSnapshot();
   }
 
   private updateDebugSnapshot(): void {
@@ -694,10 +791,14 @@ export class App {
       normalMaps: quality.normalMaps,
       anisotropy: quality.anisotropy,
     });
+    this.lightingDirector?.setLightBudget(quality.lightBudget);
+    this.lightingDirector?.setReducedFlashing(settings.reducedFlashing);
+    this.lightingAudioBridge?.setVoiceBudget(this.getLightingAudioVoiceBudget());
     if (this.scene) {
       this.scene.fogEnd = quality.fogEnd;
     }
     this.visibilityGuard?.setFogEnd(quality.fogEnd);
+    this.updateLightingFrame();
     this.syncRenderingSnapshot();
     window.requestAnimationFrame(() => {
       if (!this.disposed) {
@@ -719,7 +820,7 @@ export class App {
     this.root.dataset.renderGrainStrength = String(effects?.grainStrength ?? quality.grainStrength);
     this.root.dataset.renderNormalMaps = String(quality.normalMaps);
     this.root.dataset.renderAnisotropy = String(quality.anisotropy);
-    this.root.dataset.renderLightBudget = String(quality.futureLightBudget);
+    this.root.dataset.renderLightBudget = String(quality.lightBudget);
     this.root.dataset.fogStart = String(this.scene?.fogStart ?? 0);
     this.root.dataset.fogEnd = String(this.scene?.fogEnd ?? quality.fogEnd);
     this.root.dataset.texturesCriticalReady = String(textures?.criticalReady ?? false);
@@ -738,14 +839,31 @@ export class App {
     this.root.dataset.audioMixState = snapshot.paused || !snapshot.focused ? 'paused' : 'active';
     this.root.dataset.footstepCount = String(this.footstepCount);
     this.root.dataset.footstepPendingDistance = (this.footsteps?.pendingDistance ?? 0).toFixed(3);
+    const lightingAudio = this.lightingAudioBridge?.metrics;
+    this.root.dataset.lightingAudioVoices = String(lightingAudio?.activeVoiceCount ?? 0);
+    this.root.dataset.lightingAudioVoiceBudget = String(lightingAudio?.voiceBudget ?? 0);
+    this.root.dataset.lightingAudioPops = String(lightingAudio?.popCount ?? 0);
+    this.root.dataset.lightingAudioModulation = (lightingAudio?.globalModulation ?? 0).toFixed(4);
   }
 
   private getAudioNodeCount(): number {
     return (
       this.audioEngine.nodeCount +
       (this.ambientDirector?.nodeCount ?? 0) +
+      (this.lightingAudioBridge?.nodeCount ?? 0) +
       (this.footsteps?.activeVoiceCount ?? 0) * 3
     );
+  }
+
+  private getLightingAudioVoiceBudget(): 2 | 3 | 4 {
+    switch (this.qualityManager.presetName) {
+      case 'low':
+        return 2;
+      case 'default':
+        return 3;
+      case 'high':
+        return 4;
+    }
   }
 
   private async enterGame(): Promise<void> {
@@ -788,6 +906,11 @@ export class App {
       return;
     }
 
+    const initialAudioProfile = this.currentRoomDefinitionId
+      ? toAmbientProfile(
+          getRoomAudioProfile(getRoomDefinition(this.currentRoomDefinitionId).audioProfile),
+        )
+      : undefined;
     const bank = new ProceduralAudioBank(context, { seed: this.debugOptions.seed });
     const ambientDirector = new AmbientDirector(
       {
@@ -797,6 +920,9 @@ export class App {
         eventsBus: eventsBus.input,
       },
       bank,
+      initialAudioProfile === undefined
+        ? { autoPops: false }
+        : { autoPops: false, profile: initialAudioProfile },
     );
     const footsteps = new FootstepSystem(context, footstepsBus.input, {
       seed: hashAudioSeed(this.debugOptions.seed),
@@ -808,8 +934,20 @@ export class App {
     this.footsteps = footsteps;
     const paused = this.stateMachine.state !== 'playing' && this.stateMachine.state !== 'entering';
     ambientDirector.start();
+    this.lightingAudioBridge = new LightingAudioBridge(
+      { context, lightsBus: lightsBus.input },
+      bank,
+      ambientDirector,
+      this.getLightingAudioVoiceBudget(),
+    );
+    if (this.lightingSnapshot) {
+      this.lightingAudioBridge.update(this.lightingSnapshot);
+    }
     ambientDirector.setPaused(paused);
     footsteps.setPaused(paused);
+    if (this.currentRoomDefinitionId) {
+      this.applyRoomAudioProfile(this.currentRoomDefinitionId);
+    }
   }
 
   private async resumeGame(): Promise<void> {
@@ -904,6 +1042,9 @@ export class App {
     this.stats.reset();
     this.resetRoomVisits();
     this.clock.reset();
+    this.lightingDirector?.reset();
+    this.lightingSnapshot = null;
+    this.lightingAudioBridge?.reset();
     this.footstepCount = 0;
     this.footsteps?.resetAfterRebase();
     this.streamAround(this.roomGraph.startRoomId);
@@ -911,6 +1052,7 @@ export class App {
     this.player.setLookRotation(this.modularWorld.spawnYaw);
     const transition = this.modularWorld.updatePlayerPosition(this.player.position);
     this.recordRoomEntry(transition.roomId);
+    this.updateLightingFrame();
     this.syncWorldDebugSnapshot();
   }
 

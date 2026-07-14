@@ -8,7 +8,10 @@
 
 ## Activos
 
-- Ningún defecto bloqueante o no bloqueante conocido tras la Fase 5.
+- Ningún defecto bloqueante conocido tras la Fase 6.
+- **No bloqueante:** el chunk principal alcanzó 1,117.13 kB sin comprimir y activa el aviso informativo
+  configurado en 1,100 kB. Su tamaño gzip es 270.96 kB y está muy por debajo del budget de 30 MB; la
+  inspección y posible división segura quedan registradas para la Fase 9.
 
 ## Pendientes de QA manual acumulativos
 
@@ -24,6 +27,9 @@
 - La regresión visual automatizada confirma píxeles inmóviles estables, presets y ausencia de blur;
   la percepción subjetiva de shimmer durante giros lentos, legibilidad en monitores con gamma distinta
   y comodidad de la paleta durante una sesión larga quedan para la pasada manual acumulativa de Fase 9.
+- Curvas, sincronización visual/sonora, budgets y `reducedFlashing` están cubiertos automáticamente;
+  la comodidad subjetiva del microflicker y la localización de cuatro voces con audífonos permanece en
+  la escucha humana acumulativa de Fase 9.
 - Aunque las capturas E2E verifican ambos lados de una conexión, la percepción subjetiva de bumps,
   seams o z-fighting en todas las combinaciones de módulos queda en la pasada manual acumulativa de
   Fase 9.

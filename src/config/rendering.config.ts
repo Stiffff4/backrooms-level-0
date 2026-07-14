@@ -10,8 +10,7 @@ export interface RenderQualityPreset {
   readonly grainStrength: number;
   readonly anisotropy: 1 | 2 | 4;
   readonly normalMaps: boolean;
-  /** Reserved for the proxied-light allocator introduced by the lighting phase. */
-  readonly futureLightBudget: 4 | 6 | 8;
+  readonly lightBudget: 4 | 6 | 8;
 }
 
 const low = Object.freeze({
@@ -22,7 +21,7 @@ const low = Object.freeze({
   grainStrength: 0,
   anisotropy: 1,
   normalMaps: false,
-  futureLightBudget: 4,
+  lightBudget: 4,
 } satisfies RenderQualityPreset);
 
 const defaultPreset = Object.freeze({
@@ -33,7 +32,7 @@ const defaultPreset = Object.freeze({
   grainStrength: 0.008,
   anisotropy: 2,
   normalMaps: true,
-  futureLightBudget: 6,
+  lightBudget: 6,
 } satisfies RenderQualityPreset);
 
 const high = Object.freeze({
@@ -44,7 +43,7 @@ const high = Object.freeze({
   grainStrength: 0.006,
   anisotropy: 4,
   normalMaps: true,
-  futureLightBudget: 8,
+  lightBudget: 8,
 } satisfies RenderQualityPreset);
 
 export const renderQualityPresets: Readonly<Record<QualityPresetName, RenderQualityPreset>> =

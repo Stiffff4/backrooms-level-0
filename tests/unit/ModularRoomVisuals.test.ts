@@ -99,6 +99,56 @@ describe('ModularRoomBuilder visual UVs', () => {
       expect(Math.max(...wallUvs) - Math.min(...wallUvs)).toBeGreaterThan(1);
       expect(first.meshes.length).toBeLessThanOrEqual(9);
       expect(materials.materialCount).toBe(11);
+
+      const animatedAnchors = first.lightAnchors.filter(
+        (anchor) => anchor.enabled && anchor.emitterBinding !== null,
+      );
+      expect(animatedAnchors.length).toBeGreaterThan(0);
+      expect(first.lightAnchors.map((anchor) => anchor.flickerSeed)).toEqual(
+        second.lightAnchors.map((anchor) => anchor.flickerSeed),
+      );
+      const emitterMesh = animatedAnchors[0]?.emitterBinding?.mesh;
+      if (emitterMesh === undefined) {
+        throw new Error('Visual test room did not expose an animated emitter mesh.');
+      }
+      const colorData = emitterMesh.getVerticesData(VertexBuffer.ColorKind);
+      if (colorData === null) {
+        throw new Error('Animated emitter mesh did not preserve its vertex colors.');
+      }
+      const sortedBindings = animatedAnchors
+        .map((anchor) => anchor.emitterBinding)
+        .filter((binding) => binding !== null)
+        .sort((left, right) => left.colorOffset - right.colorOffset);
+      expect(sortedBindings.every((binding) => binding.mesh === emitterMesh)).toBe(true);
+      expect(sortedBindings[0]?.colorOffset).toBe(0);
+      for (let index = 1; index < sortedBindings.length; index += 1) {
+        const previous = sortedBindings[index - 1];
+        const current = sortedBindings[index];
+        expect(current?.colorOffset).toBe(
+          (previous?.colorOffset ?? 0) + (previous?.colorLength ?? 0),
+        );
+      }
+      const finalBinding = sortedBindings.at(-1);
+      expect((finalBinding?.colorOffset ?? 0) + (finalBinding?.colorLength ?? 0)).toBe(
+        colorData.length,
+      );
+
+      if (sortedBindings.length > 1) {
+        const firstBinding = sortedBindings[0];
+        const secondBinding = sortedBindings[1];
+        if (firstBinding && secondBinding) {
+          const changedColors = Float32Array.from(colorData);
+          changedColors.fill(
+            0.25,
+            firstBinding.colorOffset,
+            firstBinding.colorOffset + firstBinding.colorLength,
+          );
+          emitterMesh.updateVerticesData(VertexBuffer.ColorKind, changedColors);
+          const updatedColors = emitterMesh.getVerticesData(VertexBuffer.ColorKind);
+          expect(updatedColors?.[firstBinding.colorOffset]).toBeCloseTo(0.25, 5);
+          expect(updatedColors?.[secondBinding.colorOffset]).toBeCloseTo(1, 5);
+        }
+      }
     } finally {
       first.dispose();
       second.dispose();

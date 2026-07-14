@@ -14,7 +14,7 @@ Implementación activa. La fuente de verdad es `MASTER_PLAN.md`.
 | 3 — Módulos                 | Completada | `feat: add procedural room generation`      |
 | 4 — Streaming               | Completada | `feat: add streamed infinite world`         |
 | 5 — Visual pixelado         | Completada | `feat: implement pixel rendering pipeline`  |
-| 6 — Iluminación             | Pendiente  | —                                           |
+| 6 — Iluminación             | Completada | `feat: add fluorescent lighting system`     |
 | 7 — Tensión                 | Pendiente  | —                                           |
 | 8 — Salida y final          | Pendiente  | —                                           |
 | 9 — Optimización y QA       | Pendiente  | —                                           |
@@ -208,3 +208,40 @@ en 1,100 kB, después de medir el bundle y sin modificar los presupuestos de pro
 - Build bajo subruta `VITE_BASE_PATH=/threshold` servido correctamente: HTML, JS y 12/12 texturas
   respondieron 200. Los PNG y su manifiesto ocupan 108,254 bytes.
 - Bundle: 1,073.68 kB JS sin comprimir, 261.04 kB gzip; build en 403 ms y dentro del budget.
+
+## Fase 6 — Iluminación fluorescente
+
+- Cada luminaria es una entidad lógica determinista con perfiles `stable`, `microflicker`,
+  `slow-fluctuation`, `intermittent-failure`, `off` y `exit`, muestreados a 30 Hz desde tiempo
+  absoluto; no existe aleatoriedad por frame.
+- Emisores visuales animados mediante slices RGBA independientes dentro de los meshes combinados:
+  se conserva un draw call por material/sala y se realiza como máximo una subida de color por mesh
+  modificado.
+- `LightPool` fijo de ocho `PointLight` sin sombras, con presupuestos efectivos de 4/6/8 según el
+  preset, selección estable por visibilidad, distancia, sala activa, anomalía y salida, y reutilización
+  sin crear luces durante el juego.
+- Perfiles exhaustivos de iluminación y audio para los doce módulos, con intensidad de proxy, ganancia
+  de buzz, ambiente y reverberación coherentes con cada tipología.
+- Cuatro voces Web Audio posicionales preasignadas; los presets usan 2/3/4, el zumbido global sigue el
+  promedio de la sala activa y los pops de fallo se deduplican mediante ids deterministas de evento.
+- La misma muestra controla emisión, proxy, buzz y evento. El override de depuración demuestra que
+  apagar una sala deja intensidad visual y sonora en cero sin apagar luces válidas de salas vecinas.
+- `reducedFlashing` modifica las curvas del mismo controlador y limita fallos agresivos, sin mantener
+  un pipeline visual o sonoro alternativo.
+- HUD y datasets exponen fixtures, uploads, capacidad/presupuesto/asignaciones del pool, proxies de la
+  sala activa, voces espaciales e intensidad compartida para diagnóstico automatizado.
+
+### Validación
+
+- `npm run validate`: correcto; assets reproducibles, TypeScript strict, ESLint, 29 archivos/119 tests
+  y build de producción (539 módulos).
+- Unit tests: 25 casos focales de perfiles, overrides, accesibilidad, slices, selección/reuso del pool,
+  perfiles de sala y posiciones tras floating origin; además 3 casos de integración director/audio.
+- `npm run test:e2e`: 13/13 en Chromium con un worker WebGL; incluye budgets 4/6/8, cambio en vivo de
+  `reducedFlashing`, audio desbloqueado por gesto y override conjunto de emisores/proxies/buzz.
+- Regresión visual versionada renovada e inspeccionada a 1280×720: las paredes reciben luz amarilla
+  localizada, luminarias y pasillos conservan lectura, y dos frames inmóviles siguen siendo idénticos.
+- El pool conserva exactamente ocho objetos Babylon durante toda la sesión, nunca habilita más del
+  presupuesto y mantiene sombras desactivadas; las cuatro voces de audio también se crean una vez.
+- Bundle principal: 1,117.13 kB JS sin comprimir y 270.96 kB gzip; continúa muy por debajo del budget
+  de descarga, aunque el umbral informativo de chunk se revisará en la optimización final.

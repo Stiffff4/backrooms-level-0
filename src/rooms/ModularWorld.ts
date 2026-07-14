@@ -62,6 +62,7 @@ export class ModularWorld {
   private yaw = 0;
   private currentRoomId: string | null = null;
   private metricsSnapshot: ModularWorldMetrics = EMPTY_METRICS;
+  private lightAnchorRevisionValue = 0;
   private disposed = false;
 
   public constructor(
@@ -144,6 +145,10 @@ export class ModularWorld {
 
   public get lightAnchors(): readonly RoomLightAnchor[] {
     return Object.freeze([...this.views.values()].flatMap((view) => view.lightAnchors));
+  }
+
+  public get lightAnchorRevision(): number {
+    return this.lightAnchorRevisionValue;
   }
 
   public get metrics(): ModularWorldMetrics {
@@ -255,6 +260,7 @@ export class ModularWorld {
     );
     this.yaw = this.calculateSpawnYaw(startInstance, startDefinition);
     this.metricsSnapshot = this.calculateMetrics();
+    this.lightAnchorRevisionValue += 1;
   }
 
   /** Compatibility helper: registers the graph and loads every room within the configured limit. */
@@ -294,12 +300,14 @@ export class ModularWorld {
       pooled.root.setEnabled(true);
       this.views.set(roomId, pooled);
       this.metricsSnapshot = this.calculateMetrics();
+      this.lightAnchorRevisionValue += 1;
       return pooled;
     }
 
     const view = this.createView(roomId);
     this.views.set(roomId, view);
     this.metricsSnapshot = this.calculateMetrics();
+    this.lightAnchorRevisionValue += 1;
     return view;
   }
 
@@ -316,6 +324,7 @@ export class ModularWorld {
       this.currentRoomId = null;
     }
     this.metricsSnapshot = this.calculateMetrics();
+    this.lightAnchorRevisionValue += 1;
     return true;
   }
 
@@ -413,6 +422,9 @@ export class ModularWorld {
       this.views.set(roomId, view);
     }
     this.metricsSnapshot = this.calculateMetrics();
+    if (loadedRoomIds.length > 0 || unloadedRoomIds.length > 0) {
+      this.lightAnchorRevisionValue += 1;
+    }
 
     return Object.freeze({
       loadedRoomIds: Object.freeze(loadedRoomIds),
@@ -423,12 +435,16 @@ export class ModularWorld {
 
   public unloadAllRooms(): void {
     this.assertActive();
+    const hadLoadedRooms = this.views.size > 0;
     for (const [roomId, view] of this.views) {
       this.cacheView(roomId, view);
     }
     this.views.clear();
     this.currentRoomId = null;
     this.metricsSnapshot = this.calculateMetrics();
+    if (hadLoadedRooms) {
+      this.lightAnchorRevisionValue += 1;
+    }
   }
 
   public purgePool(): void {

@@ -264,6 +264,21 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
     this.carpetWet.roughness = 0.72;
     this.fixtureEmitter.disableLighting = true;
     this.fixtureEmitterOff.disableLighting = true;
+    for (const illuminated of [
+      this.wall,
+      this.wallStained,
+      this.carpet,
+      this.carpetWet,
+      this.ceiling,
+      this.trim,
+      this.ceilingGrid,
+      this.fixtureHousing,
+      this.column,
+    ]) {
+      // The pool owns the live 4/6/8 budget. Keeping the shader ceiling fixed
+      // prevents material recompiles when the quality preset changes.
+      illuminated.maxSimultaneousLights = 8;
+    }
     this.owned = Object.freeze([
       this.wall,
       this.wallStained,

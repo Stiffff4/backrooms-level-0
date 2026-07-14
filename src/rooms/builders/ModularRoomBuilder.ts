@@ -537,6 +537,8 @@ export class ModularRoomBuilder {
     const housingBoxes: Mesh[] = [];
     const onBoxes: Mesh[] = [];
     const offBoxes: Mesh[] = [];
+    const onColorSlices = new Map<string, { readonly offset: number; readonly length: number }>();
+    let onColorLength = 0;
     for (const [fixtureIndex, fixture] of fixtures.entries()) {
       const uvOffset = this.createUvOffset(instance.seed, 211 + fixtureIndex);
       housingBoxes.push(
@@ -563,6 +565,17 @@ export class ModularRoomBuilder {
         },
         fixture.enabled ? this.materials.fixtureEmitter : this.materials.fixtureEmitterOff,
       );
+      if (fixture.enabled) {
+        const colorLength = emitter.getTotalVertices() * 4;
+        const colors = new Float32Array(colorLength);
+        colors.fill(1);
+        emitter.setVerticesData(VertexBuffer.ColorKind, colors, true);
+        onColorSlices.set(
+          fixture.id,
+          Object.freeze({ offset: onColorLength, length: colorLength }),
+        );
+        onColorLength += colorLength;
+      }
       (fixture.enabled ? onBoxes : offBoxes).push(emitter);
     }
 
@@ -572,6 +585,14 @@ export class ModularRoomBuilder {
     const onEmitters =
       onBoxes.length > 0 ? this.mergeMeshes(`${instance.id}.fixtures.on`, onBoxes, root) : housing;
     if (onBoxes.length > 0) {
+      if (!onEmitters.isVerticesDataPresent(VertexBuffer.ColorKind)) {
+        throw new Error(`Merged fixture emitters lost vertex colors for ${instance.id}.`);
+      }
+      const mergedColors = onEmitters.getVerticesData(VertexBuffer.ColorKind);
+      if (mergedColors === null || mergedColors.length !== onColorLength) {
+        throw new Error(`Merged fixture color slices are invalid for ${instance.id}.`);
+      }
+      onEmitters.markVerticesDataAsUpdatable(VertexBuffer.ColorKind, true);
       meshes.push(onEmitters);
     }
     const offEmitters =
@@ -582,16 +603,27 @@ export class ModularRoomBuilder {
       meshes.push(offEmitters);
     }
 
-    const anchors: RoomLightAnchor[] = fixtures.map((fixture) => {
+    const anchors: RoomLightAnchor[] = fixtures.map((fixture, fixtureIndex) => {
       const node = new TransformNode(`${fixture.id}.light-anchor`, this.scene);
       node.parent = root;
       node.position.copyFrom(fixture.position);
+      const colorSlice = onColorSlices.get(fixture.id);
       return Object.freeze({
         id: fixture.id,
         roomId: instance.id,
+        fixtureIndex,
+        flickerSeed: this.hash(instance.seed, 4099 + fixtureIndex),
         node,
         localPosition: fixture.position.clone(),
         emitter: fixture.enabled ? onEmitters : offEmitters,
+        emitterBinding:
+          fixture.enabled && colorSlice
+            ? Object.freeze({
+                mesh: onEmitters,
+                colorOffset: colorSlice.offset,
+                colorLength: colorSlice.length,
+              })
+            : null,
         enabled: fixture.enabled,
         lightingProfile: definition.lightingProfile,
       });

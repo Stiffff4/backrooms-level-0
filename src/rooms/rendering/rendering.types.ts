@@ -1,5 +1,6 @@
 import type { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
+import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import type { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type {
   GridFootprint,
@@ -8,12 +9,22 @@ import type {
   RoomInstance,
 } from '../../procedural/procedural.types';
 
+export interface FixtureEmitterBinding {
+  readonly mesh: Mesh;
+  /** Offset and length in RGBA float components inside the merged color buffer. */
+  readonly colorOffset: number;
+  readonly colorLength: number;
+}
+
 export interface RoomLightAnchor {
   readonly id: string;
   readonly roomId: string;
+  readonly fixtureIndex: number;
+  readonly flickerSeed: number;
   readonly node: TransformNode;
   readonly localPosition: Vector3;
   readonly emitter: AbstractMesh;
+  readonly emitterBinding: FixtureEmitterBinding | null;
   readonly enabled: boolean;
   readonly lightingProfile: string;
 }

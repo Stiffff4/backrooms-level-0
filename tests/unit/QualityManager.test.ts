@@ -16,7 +16,7 @@ describe('QualityManager', () => {
       grainStrength: 0,
       anisotropy: 1,
       normalMaps: false,
-      futureLightBudget: 4,
+      lightBudget: 4,
     });
     expect(renderQualityPresets.default).toEqual({
       name: 'default',
@@ -26,7 +26,7 @@ describe('QualityManager', () => {
       grainStrength: 0.008,
       anisotropy: 2,
       normalMaps: true,
-      futureLightBudget: 6,
+      lightBudget: 6,
     });
     expect(renderQualityPresets.high).toEqual({
       name: 'high',
@@ -36,7 +36,7 @@ describe('QualityManager', () => {
       grainStrength: 0.006,
       anisotropy: 4,
       normalMaps: true,
-      futureLightBudget: 8,
+      lightBudget: 8,
     });
     expect(Object.isFrozen(renderQualityPresets)).toBe(true);
     expect(Object.isFrozen(renderQualityPresets.default)).toBe(true);
