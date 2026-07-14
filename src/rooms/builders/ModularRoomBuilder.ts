@@ -55,6 +55,7 @@ interface FixtureRecipe {
 }
 
 export const MODULAR_WALL_THICKNESS = 0.2;
+const WALL_THICKNESS = MODULAR_WALL_THICKNESS;
 const FLOOR_THICKNESS = 0.16;
 const FLOOR_JOIN_OVERLAP = 0.12;
 const TRIM_HEIGHT = 0.14;
@@ -165,7 +166,9 @@ export class ModularRoomBuilder {
         position: new Vector3(0, -FLOOR_THICKNESS / 2, 0),
         uvOffset: this.createUvOffset(instance.seed, 11),
       },
-      this.materials.carpet,
+      definition.tags.includes('damp') || this.isWet(instance.seed)
+        ? this.materials.carpetWet
+        : this.materials.carpet,
     );
     floor.parent = root;
     floor.checkCollisions = false;
@@ -202,27 +205,53 @@ export class ModularRoomBuilder {
     ceiling.checkCollisions = true;
 
     const wallBoxes: Mesh[] = [];
+    const rotatedWallBoxes: Mesh[] = [];
     const trimBoxes: Mesh[] = [];
     for (const side of this.getWallSides(definition)) {
       const openings = this.getConnectedOpenings(instance, side);
-      this.appendWallSide(instance.id, instance.seed, height, side, openings, wallBoxes, trimBoxes);
+      this.appendWallSide(
+        instance.id,
+        instance.seed,
+        height,
+        side,
+        openings,
+        this.sideUsesRotatedWallpaper(side) ? rotatedWallBoxes : wallBoxes,
+        trimBoxes,
+      );
     }
 
-    const wallMaterial = this.materials.wall;
+    const wallMaterial = this.useStainedWalls(instance.seed)
+      ? this.materials.wallStained
+      : this.materials.wall;
+    const rotatedWallMaterial = this.useStainedWalls(instance.seed)
+      ? this.materials.wallStainedRotated
+      : this.materials.wallRotated;
     for (const wall of wallBoxes) {
       wall.material = wallMaterial;
+    }
+    for (const wall of rotatedWallBoxes) {
+      wall.material = rotatedWallMaterial;
     }
     for (const trim of trimBoxes) {
       trim.material = this.materials.trim;
     }
 
-    const walls = this.mergeMeshes(`${instance.id}.walls`, wallBoxes, root);
+    const wallMeshes: Mesh[] = [];
+    if (wallBoxes.length > 0) {
+      const walls = this.mergeMeshes(`${instance.id}.walls.primary`, wallBoxes, root);
+      walls.checkCollisions = true;
+      wallMeshes.push(walls);
+    }
+    if (rotatedWallBoxes.length > 0) {
+      const rotatedWalls = this.mergeMeshes(`${instance.id}.walls.rotated`, rotatedWallBoxes, root);
+      rotatedWalls.checkCollisions = true;
+      wallMeshes.push(rotatedWalls);
+    }
     const trim = this.mergeMeshes(`${instance.id}.trim`, trimBoxes, root);
-    walls.checkCollisions = true;
 
     return {
-      meshes: Object.freeze([floor, ceiling, walls, trim]),
-      colliders: Object.freeze([floorCollider, ceiling, walls]),
+      meshes: Object.freeze([floor, ceiling, ...wallMeshes, trim]),
+      colliders: Object.freeze([floorCollider, ceiling, ...wallMeshes]),
     };
   }
 
@@ -336,7 +365,7 @@ export class ModularRoomBuilder {
             opening.end,
             lintelHeight,
             roomHeight - lintelHeight / 2,
-            MODULAR_WALL_THICKNESS,
+            WALL_THICKNESS,
             uvOffset,
             WALL_UV_METERS_PER_TILE,
           ),
@@ -384,7 +413,7 @@ export class ModularRoomBuilder {
         end,
         roomHeight,
         roomHeight / 2,
-        MODULAR_WALL_THICKNESS,
+        WALL_THICKNESS,
         uvOffset,
         WALL_UV_METERS_PER_TILE,
       ),
@@ -397,7 +426,7 @@ export class ModularRoomBuilder {
         end,
         TRIM_HEIGHT,
         TRIM_HEIGHT / 2,
-        MODULAR_WALL_THICKNESS + TRIM_DEPTH,
+        WALL_THICKNESS + TRIM_DEPTH,
         uvOffset,
         TRIM_UV_METERS_PER_TILE,
       ),
@@ -759,10 +788,8 @@ export class ModularRoomBuilder {
     let index = 0;
     for (let row = 0; row < rows; row += 1) {
       for (let column = 0; column < columns; column += 1) {
-        // Every fluorescent fixture remains powered. Variation is expressed by
-        // brief deterministic flicker profiles rather than permanently dark
-        // tubes, matching the classic Level 0 reference.
-        const enabled = true;
+        const jitter = this.hash(instance.seed, index);
+        const enabled = fixtures.length === 0 || jitter % 9 !== 0;
         fixtures.push({
           id: `${instance.id}.fixture.${String(index)}`,
           position: new Vector3(
@@ -915,6 +942,11 @@ export class ModularRoomBuilder {
     }
   }
 
+
+  private sideUsesRotatedWallpaper(side: WallSide): boolean {
+    return side.horizontal === false;
+  }
+
   private quarterTurnRadians(rotation: QuarterTurn): number {
     return rotation * (Math.PI / 2);
   }
@@ -939,6 +971,14 @@ export class ModularRoomBuilder {
     value ^= value >>> 15;
     value = Math.imul(value, 0x846ca68b);
     return (value ^ (value >>> 16)) >>> 0;
+  }
+
+  private useStainedWalls(seed: number): boolean {
+    return this.hash(seed, 51) % 5 === 0;
+  }
+
+  private isWet(seed: number): boolean {
+    return this.hash(seed, 83) % 6 === 0;
   }
 }
 

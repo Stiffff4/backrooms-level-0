@@ -1,39 +1,39 @@
 {
   "manifestVersion": 1,
   "generator": {
-    "name": "backrooms-level-zero-original-texture-generator",
-    "version": "1.2.0",
-    "seed": "level-zero-threshold-textures-v2"
+    "name": "mixed-asset-update",
+    "version": "1.1.0",
+    "seed": "user-supplied-level-0-texture"
   },
   "license": {
-    "spdx": "CC0-1.0",
-    "source": "Original procedural artwork generated locally by this repository."
+    "spdx": "NOASSERTION",
+    "source": "Repository-generated assets plus user-supplied Level 0 texture replacement."
   },
   "assets": [
     {
       "id": "wall-paper",
       "file": "wall-paper.png",
       "role": "wall-albedo-base",
-      "width": 128,
-      "height": 128,
+      "width": 1024,
+      "height": 1024,
       "colorSpace": "srgb",
       "tileableAxes": "xy",
-      "seed": "level-zero-threshold-textures-v2/wall-paper",
-      "generatorVersion": "1.2.0",
-      "sha256": "c4516ffc2ac80fffc71dce0907de3931f01d533ed427c7ac7adacb737431a371",
+      "seed": "user-supplied-level-0-texture",
+      "generatorVersion": "external",
+      "sha256": "1211066c405f75c8260165cdc458c80a0a735df959ad36cf1381dc99f6911185",
       "license": "CC0-1.0"
     },
     {
       "id": "wall-stained",
       "file": "wall-stained.png",
       "role": "wall-albedo-stained",
-      "width": 128,
-      "height": 128,
+      "width": 1024,
+      "height": 1024,
       "colorSpace": "srgb",
       "tileableAxes": "xy",
-      "seed": "level-zero-threshold-textures-v2/wall-stained",
-      "generatorVersion": "1.2.0",
-      "sha256": "4fb4a59abbf1024b6e43b329083f478030edf5c77959afb3a6065c2a753f33b2",
+      "seed": "user-supplied-level-0-texture",
+      "generatorVersion": "external",
+      "sha256": "1211066c405f75c8260165cdc458c80a0a735df959ad36cf1381dc99f6911185",
       "license": "CC0-1.0"
     },
     {
@@ -44,9 +44,9 @@
       "height": 128,
       "colorSpace": "linear",
       "tileableAxes": "xy",
-      "seed": "level-zero-threshold-textures-v2/wall-normal",
-      "generatorVersion": "1.2.0",
-      "sha256": "f24e713a7be0902836766cfc26110433c1f5a9ead64a4cb765831e8bd84e2e14",
+      "seed": "level-zero-threshold-textures-v1/wall-normal",
+      "generatorVersion": "1.0.0",
+      "sha256": "007c749efc637ffffd01ceec6af825e7b991a28d3793dbf18c2e92dff4d32243",
       "license": "CC0-1.0"
     },
     {
@@ -57,9 +57,9 @@
       "height": 128,
       "colorSpace": "srgb",
       "tileableAxes": "xy",
-      "seed": "level-zero-threshold-textures-v2/carpet",
-      "generatorVersion": "1.2.0",
-      "sha256": "bfc57ac45d9d7cea8a91a1ca2aba7e9e338dad3ef85be0bdc8872935b78a48ee",
+      "seed": "level-zero-threshold-textures-v1/carpet",
+      "generatorVersion": "1.0.0",
+      "sha256": "1de3f8bea2946d32fdc4c2e7409e061f33767d25dd375a38823796933ea949fe",
       "license": "CC0-1.0"
     },
     {
@@ -70,9 +70,9 @@
       "height": 128,
       "colorSpace": "srgb",
       "tileableAxes": "xy",
-      "seed": "level-zero-threshold-textures-v2/carpet-wet",
-      "generatorVersion": "1.2.0",
-      "sha256": "6823a286950aa428b6e1a3c800f4d29531a51bed938bd7d0992510b6a6a4ac4d",
+      "seed": "level-zero-threshold-textures-v1/carpet-wet",
+      "generatorVersion": "1.0.0",
+      "sha256": "6cc735252c989947b4ec481b9b8a416e505a8685d58beb86a5dd548ae3916618",
       "license": "CC0-1.0"
     },
     {
@@ -83,9 +83,9 @@
       "height": 128,
       "colorSpace": "linear",
       "tileableAxes": "xy",
-      "seed": "level-zero-threshold-textures-v2/carpet-normal",
-      "generatorVersion": "1.2.0",
-      "sha256": "ffe42ba97c5232f20389dc1ff9810c3408f7b070459b1c32fcc0be6fb5eff2f1",
+      "seed": "level-zero-threshold-textures-v1/carpet-normal",
+      "generatorVersion": "1.0.0",
+      "sha256": "63577122d744dde1963b9aeb55fe925d6f1b4c36f5f3d8f6bbe0e9ab70cae50c",
       "license": "CC0-1.0"
     },
     {
@@ -96,9 +96,9 @@
       "height": 128,
       "colorSpace": "srgb",
       "tileableAxes": "xy",
-      "seed": "level-zero-threshold-textures-v2/ceiling-tile",
-      "generatorVersion": "1.2.0",
-      "sha256": "13d87770cca2637561694b171b257bb0267bb7e57110d82e4cd3c82a921a8b4d",
+      "seed": "level-zero-threshold-textures-v1/ceiling-tile",
+      "generatorVersion": "1.0.0",
+      "sha256": "b7b9b920c1b8b141226f721c1b52c91395719a913fd5a1d439525da3652a1137",
       "license": "CC0-1.0"
     },
     {
@@ -109,9 +109,9 @@
       "height": 32,
       "colorSpace": "srgb",
       "tileableAxes": "xy",
-      "seed": "level-zero-threshold-textures-v2/trim",
-      "generatorVersion": "1.2.0",
-      "sha256": "ae9d6fa61c7725340634177f58c499f0df5fb363880e559ee49649f5da01a95e",
+      "seed": "level-zero-threshold-textures-v1/trim",
+      "generatorVersion": "1.0.0",
+      "sha256": "cf709865747ee5fa65efa23dad164c270b3946a200e24d582c8359317c699b43",
       "license": "CC0-1.0"
     },
     {
@@ -122,9 +122,9 @@
       "height": 64,
       "colorSpace": "srgb",
       "tileableAxes": "xy",
-      "seed": "level-zero-threshold-textures-v2/fixture-housing",
-      "generatorVersion": "1.2.0",
-      "sha256": "42002f029b3fcc416f804cc3396c1293555d49dabb73f0b6ffe836e389030dec",
+      "seed": "level-zero-threshold-textures-v1/fixture-housing",
+      "generatorVersion": "1.0.0",
+      "sha256": "6a8a2939a5e6846eb5f22da09065238a3eaf0e0a3337be4bfdff1a4b616ec89b",
       "license": "CC0-1.0"
     },
     {
@@ -135,9 +135,9 @@
       "height": 64,
       "colorSpace": "srgb",
       "tileableAxes": "xy",
-      "seed": "level-zero-threshold-textures-v2/fixture-tube",
-      "generatorVersion": "1.2.0",
-      "sha256": "721422f3c6fbdadaaa845e197f24ef7b9d7ff349240de1b2c2ec6e1d09f23b37",
+      "seed": "level-zero-threshold-textures-v1/fixture-tube",
+      "generatorVersion": "1.0.0",
+      "sha256": "e1355dbc1247805591b1b6a8e25e3e501517abf0411a6a61fe6ec0d7dc2e9e66",
       "license": "CC0-1.0"
     },
     {
@@ -148,22 +148,22 @@
       "height": 64,
       "colorSpace": "srgb",
       "tileableAxes": "xy",
-      "seed": "level-zero-threshold-textures-v2/fixture-tube-off",
-      "generatorVersion": "1.2.0",
-      "sha256": "8b840cef7e1368e1167d7db480f30b6971c41d21f5a988381927d05f67214591",
+      "seed": "level-zero-threshold-textures-v1/fixture-tube-off",
+      "generatorVersion": "1.0.0",
+      "sha256": "956b4f7b531b849eca28da27a2cd6755ea26619654584a2b51510872797eff19",
       "license": "CC0-1.0"
     },
     {
       "id": "column",
       "file": "column.png",
       "role": "column-albedo",
-      "width": 128,
-      "height": 128,
+      "width": 1024,
+      "height": 1024,
       "colorSpace": "srgb",
       "tileableAxes": "xy",
-      "seed": "level-zero-threshold-textures-v2/column",
-      "generatorVersion": "1.2.0",
-      "sha256": "bfedbd56d4a93ffe4ac0ea7cc32ac4f9fa77d23dd5cd9d0e5b024de106f993bc",
+      "seed": "user-supplied-level-0-texture",
+      "generatorVersion": "external",
+      "sha256": "1211066c405f75c8260165cdc458c80a0a735df959ad36cf1381dc99f6911185",
       "license": "CC0-1.0"
     }
   ]
