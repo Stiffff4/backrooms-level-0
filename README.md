@@ -48,11 +48,14 @@ Opciones útiles para diagnóstico local:
 ```text
 ?debug=1&seed=threshold-001
 ?debug=1&quality=low
+?debug=1&fastExit=1&seed=exit-visual-qa
 ?debug=1&exitNow=1&noAudio=1&seed=release-smoke
 ```
 
-`exitNow=1` solo se acepta en desarrollo o cuando también se declara `debug=1`. Estas opciones son
-para QA; no cambian la ruta normal de una partida.
+`fastExit=1` conserva el flujo real de elegibilidad y materialización, pero vuelve la salida elegible
+en segundos y la garantiza antes de ~22 s. `exitNow=1` reserva directamente el próximo candidato.
+Ambas opciones solo se aceptan en desarrollo o cuando también se declara `debug=1`. Son opciones de
+QA y no cambian la ruta normal de una partida.
 
 ## Validación completa
 

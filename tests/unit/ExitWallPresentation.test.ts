@@ -40,9 +40,9 @@ afterEach(() => {
 });
 
 describe('ExitWallPresentation', () => {
-  it('construye una pared de papel y discontinuidades sin colliders ni luz dinámica', () => {
+  it('construye una capa de papel integrada sin colliders ni luz dinámica', () => {
     const { scene, material, presentation } = createFixture();
-    expect(presentation.meshes).toHaveLength(10);
+    expect(presentation.meshes).toHaveLength(1);
     expect(presentation.meshes.every((mesh) => !mesh.checkCollisions && !mesh.isPickable)).toBe(
       true,
     );
@@ -64,13 +64,13 @@ describe('ExitWallPresentation', () => {
     const otherSample = { ...other.update(8.375, 2.1) };
     expect(firstSample).toEqual(secondSample);
     expect(otherSample.lightResponse).not.toBeCloseTo(firstSample.lightResponse, 6);
-    expect(firstSample.lightResponse).toBeGreaterThanOrEqual(0.66);
-    expect(firstSample.glitchStrength).toBeLessThan(0.3);
+    expect(firstSample.lightResponse).toBeGreaterThanOrEqual(0.32);
+    expect(firstSample.glitchStrength).toBeLessThan(0.14);
 
     first.setReducedFlashing(true);
     const reduced = { ...first.update(8.375, 2.1) };
     expect(reduced.reducedFlashingApplied).toBe(true);
-    expect(reduced.lightResponse).toBeGreaterThanOrEqual(0.9);
+    expect(reduced.lightResponse).toBeGreaterThanOrEqual(0.42);
     expect(reduced.glitchStrength).toBeLessThan(firstSample.glitchStrength);
   });
 
@@ -85,9 +85,9 @@ describe('ExitWallPresentation', () => {
     presentation.setTransitionProgress(1);
     const transitioning = presentation.update(4.1, 0.2);
     expect(transitioning.transitionProgress).toBe(1);
-    expect(transitioning.emissiveStrength).toBeLessThanOrEqual(0.18);
-    expect(presentation.root.scaling.x).toBeGreaterThanOrEqual(0.978);
-    expect(presentation.root.scaling.x).toBeLessThanOrEqual(1.022);
+    expect(transitioning.emissiveStrength).toBeLessThanOrEqual(0.02);
+    expect(presentation.root.scaling.x).toBeGreaterThanOrEqual(0.988);
+    expect(presentation.root.scaling.x).toBeLessThanOrEqual(1.012);
     expect(() => presentation.setTransitionProgress(Number.NaN)).toThrow(RangeError);
   });
 

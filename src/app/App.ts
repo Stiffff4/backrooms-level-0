@@ -7,6 +7,7 @@ import { LightingAudioBridge } from '../audio/LightingAudioBridge';
 import { ProceduralAudioBank, hashAudioSeed } from '../audio/ProceduralAudioBank';
 import { getRoomAudioProfile, toAmbientProfile } from '../audio/RoomAudioProfiles';
 import { gameConfig } from '../config/game.config';
+import { fastDebugExitConfig } from '../config/exit.config';
 import { lightingConfig } from '../config/lighting.config';
 import { tensionConfig } from '../config/tension.config';
 import { GameClock } from '../game/GameClock';
@@ -340,7 +341,10 @@ export class App {
         reducedFlashing: this.settings.value.reducedFlashing,
       });
       this.tensionDirector = new TensionDirector(this.debugOptions.seed);
-      this.exitDirector = new ExitDirector(this.debugOptions.seed);
+      this.exitDirector = new ExitDirector(
+        this.debugOptions.seed,
+        this.debugOptions.fastExit ? fastDebugExitConfig : undefined,
+      );
       if (this.debugOptions.exitNow) {
         this.exitDirector.forceNextCandidate('debug');
       }

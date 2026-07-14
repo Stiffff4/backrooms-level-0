@@ -15,7 +15,8 @@ describe('RoomLightingProfiles', () => {
     expect(catalogProfiles).toEqual([...ROOM_LIGHTING_PROFILE_IDS].sort());
     for (const id of catalogProfiles) {
       const resolved = getRoomLightingProfile(id);
-      expect(resolved.proxyIntensity).toBeGreaterThan(0);
+      expect(resolved.proxyIntensity).toBeCloseTo(0.92, 6);
+      expect(resolved.audioGain).toBeCloseTo(0.95, 6);
       expect(
         resolved.fixtureProfiles.reduce((total, entry) => total + entry.weight, 0),
       ).toBeCloseTo(1, 6);

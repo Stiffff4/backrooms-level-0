@@ -56,63 +56,39 @@ function profile(
   });
 }
 
-const mostlyStable = [
-  { profile: 'stable', weight: 0.72 },
-  { profile: 'microflicker', weight: 0.24 },
-  { profile: 'slow-fluctuation', weight: 0.04 },
-] as const;
-
-const subtlyUnstable = [
-  { profile: 'stable', weight: 0.52 },
-  { profile: 'microflicker', weight: 0.35 },
-  { profile: 'slow-fluctuation', weight: 0.12 },
-  { profile: 'intermittent-failure', weight: 0.01 },
-] as const;
-
-const noticeablyUnstable = [
-  { profile: 'stable', weight: 0.35 },
-  { profile: 'microflicker', weight: 0.34 },
-  { profile: 'slow-fluctuation', weight: 0.24 },
-  { profile: 'intermittent-failure', weight: 0.07 },
-] as const;
-
-const failureHeavy = [
-  { profile: 'stable', weight: 0.18 },
-  { profile: 'microflicker', weight: 0.26 },
-  { profile: 'slow-fluctuation', weight: 0.34 },
-  { profile: 'intermittent-failure', weight: 0.22 },
-] as const;
-
-const distantDim = [
-  { profile: 'stable', weight: 0.3 },
-  { profile: 'microflicker', weight: 0.25 },
-  { profile: 'slow-fluctuation', weight: 0.35 },
-  { profile: 'intermittent-failure', weight: 0.1 },
+/**
+ * Level 0's fixtures remain visibly powered. Most are perfectly steady and a
+ * small deterministic subset performs a brief, shallow flicker without ever
+ * reading as an extinguished tube.
+ */
+const uniformlyLit = [
+  { profile: 'stable', weight: 0.95 },
+  { profile: 'intermittent-failure', weight: 0.05 },
 ] as const;
 
 export const roomLightingProfiles: Readonly<
   Record<RoomLightingProfileId, Readonly<RoomLightingProfile>>
 > = Object.freeze({
-  'corridor-standard': profile('corridor-standard', 0.82, 0.9, mostlyStable),
-  'corridor-wide': profile('corridor-wide', 0.86, 0.94, subtlyUnstable),
-  'corridor-long': profile('corridor-long', 0.88, 0.96, subtlyUnstable),
-  'corner-standard': profile('corner-standard', 0.8, 0.9, mostlyStable),
-  'offset-standard': profile('offset-standard', 0.78, 0.88, subtlyUnstable),
-  'junction-standard': profile('junction-standard', 0.9, 0.98, mostlyStable),
-  'junction-large': profile('junction-large', 0.94, 1, subtlyUnstable),
-  'room-small': profile('room-small', 0.76, 0.86, subtlyUnstable),
-  'standard-medium': profile('standard-medium', 0.84, 0.92, mostlyStable),
-  'room-large': profile('room-large', 0.96, 1, subtlyUnstable),
-  'dead-end': profile('dead-end', 0.7, 0.8, noticeablyUnstable),
-  'double-offset': profile('double-offset', 0.8, 0.9, subtlyUnstable),
-  'arch-gallery': profile('arch-gallery', 0.88, 0.94, subtlyUnstable),
-  'pillar-hall': profile('pillar-hall', 0.92, 0.98, subtlyUnstable),
-  'low-ceiling': profile('low-ceiling', 0.68, 0.82, mostlyStable),
-  'high-ceiling': profile('high-ceiling', 0.98, 1, subtlyUnstable),
-  'damp-room': profile('damp-room', 0.74, 0.84, noticeablyUnstable),
-  'light-failure': profile('light-failure', 0.7, 0.88, failureHeavy),
-  'blackout-edge': profile('blackout-edge', 0.42, 0.46, distantDim),
-  'repetition-room': profile('repetition-room', 0.84, 0.9, mostlyStable),
+  'corridor-standard': profile('corridor-standard', 0.92, 0.95, uniformlyLit),
+  'corridor-wide': profile('corridor-wide', 0.92, 0.95, uniformlyLit),
+  'corridor-long': profile('corridor-long', 0.92, 0.95, uniformlyLit),
+  'corner-standard': profile('corner-standard', 0.92, 0.95, uniformlyLit),
+  'offset-standard': profile('offset-standard', 0.92, 0.95, uniformlyLit),
+  'junction-standard': profile('junction-standard', 0.92, 0.95, uniformlyLit),
+  'junction-large': profile('junction-large', 0.92, 0.95, uniformlyLit),
+  'room-small': profile('room-small', 0.92, 0.95, uniformlyLit),
+  'standard-medium': profile('standard-medium', 0.92, 0.95, uniformlyLit),
+  'room-large': profile('room-large', 0.92, 0.95, uniformlyLit),
+  'dead-end': profile('dead-end', 0.92, 0.95, uniformlyLit),
+  'double-offset': profile('double-offset', 0.92, 0.95, uniformlyLit),
+  'arch-gallery': profile('arch-gallery', 0.92, 0.95, uniformlyLit),
+  'pillar-hall': profile('pillar-hall', 0.92, 0.95, uniformlyLit),
+  'low-ceiling': profile('low-ceiling', 0.92, 0.95, uniformlyLit),
+  'high-ceiling': profile('high-ceiling', 0.92, 0.95, uniformlyLit),
+  'damp-room': profile('damp-room', 0.92, 0.95, uniformlyLit),
+  'light-failure': profile('light-failure', 0.92, 0.95, uniformlyLit),
+  'blackout-edge': profile('blackout-edge', 0.92, 0.95, uniformlyLit),
+  'repetition-room': profile('repetition-room', 0.92, 0.95, uniformlyLit),
 });
 
 export function isRoomLightingProfileId(value: string): value is RoomLightingProfileId {

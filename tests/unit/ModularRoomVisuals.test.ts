@@ -210,7 +210,7 @@ describe('ModularRoomBuilder visual UVs', () => {
       expect(pillar.colliders).toContain(pillarMesh);
 
       const dampFloor = damp.meshes.find((mesh) => mesh.name.endsWith('.floor'));
-      expect(dampFloor?.material).toBe(materials.carpetWet);
+      expect(dampFloor?.material).toBe(materials.carpet);
 
       for (const room of rooms) {
         expect(room.spatialAnomaly.kind).toBe('ceiling-shift');

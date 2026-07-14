@@ -156,13 +156,12 @@ export class LightingAudioBridge {
     this.globalModulation = clamp(frame.globalAudioIntensity, 0, 1);
     this.ambient.setLightingModulation(this.globalModulation, GAIN_RAMP_SECONDS);
     this.reconcileVoices(frame.spatialSources, now);
+    // Flicker remains a visual/buzz modulation only. The former one-shot
+    // ballast pop was read as a firecracker and distracted from the Level 0
+    // ambience, so event ids are consumed without creating a transient voice.
     for (const event of frame.events) {
-      if (this.seenEventIds.has(event.eventId)) {
-        continue;
-      }
-      this.rememberEvent(event.eventId);
-      if (this.ambient.playFluorescentPop(now, 0.3 + clamp(event.intensity, 0, 1) * 0.45)) {
-        this.popCount += 1;
+      if (!this.seenEventIds.has(event.eventId)) {
+        this.rememberEvent(event.eventId);
       }
     }
   }

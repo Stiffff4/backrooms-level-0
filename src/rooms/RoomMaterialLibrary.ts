@@ -198,42 +198,38 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
     }
     this.textureRegistrationComplete = true;
 
-    this.wall = this.create('wall', new Color3(0.72, 0.65, 0.34), new Color3(0.035, 0.03, 0.01));
+    this.wall = this.create('wall', new Color3(0.98, 0.97, 0.88), new Color3(0.025, 0.024, 0.018));
     this.wallStained = this.create(
       'wall-stained',
-      new Color3(0.68, 0.61, 0.32),
-      new Color3(0.033, 0.028, 0.01),
+      new Color3(0.96, 0.95, 0.86),
+      new Color3(0.024, 0.023, 0.017),
     );
     this.carpet = this.create(
       'carpet',
-      new Color3(0.31, 0.29, 0.15),
-      new Color3(0.01, 0.009, 0.003),
+      new Color3(0.96, 0.94, 0.86),
+      new Color3(0.018, 0.016, 0.011),
     );
     this.carpetWet = this.create(
       'carpet-wet',
-      new Color3(0.2, 0.19, 0.105),
-      new Color3(0.007, 0.006, 0.002),
+      new Color3(0.96, 0.94, 0.86),
+      new Color3(0.018, 0.016, 0.011),
     );
-    this.ceiling = this.create(
-      'ceiling',
-      new Color3(0.67, 0.65, 0.47),
-      new Color3(0.02, 0.018, 0.009),
-    );
-    this.trim = this.create('trim', new Color3(0.39, 0.34, 0.15), new Color3(0.01, 0.008, 0.003));
+    this.ceiling = this.create('ceiling', new Color3(1, 1, 0.97), new Color3(0.065, 0.064, 0.056));
+    this.trim = this.create('trim', new Color3(0.78, 0.72, 0.56), new Color3(0.015, 0.013, 0.009));
     this.ceilingGrid = this.create(
       'ceiling-grid',
-      new Color3(0.34, 0.32, 0.21),
-      new Color3(0.009, 0.008, 0.004),
+      new Color3(0.47, 0.47, 0.42),
+      new Color3(0.012, 0.012, 0.01),
     );
     this.fixtureHousing = this.create(
       'fixture-housing',
-      new Color3(0.5, 0.48, 0.35),
-      new Color3(0.02, 0.018, 0.009),
+      new Color3(0.7, 0.7, 0.64),
+      new Color3(0.02, 0.02, 0.017),
     );
     this.fixtureEmitter = this.create(
       'fixture-emitter',
-      new Color3(0.98, 0.96, 0.76),
-      new Color3(0.9, 0.82, 0.49),
+      new Color3(1, 1, 0.92),
+      new Color3(0.96, 0.95, 0.78),
     );
     this.fixtureEmitterOff = this.create(
       'fixture-emitter-off',
@@ -242,14 +238,14 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
     );
     this.column = this.create(
       'column',
-      new Color3(0.62, 0.56, 0.29),
-      new Color3(0.03, 0.025, 0.009),
+      new Color3(0.98, 0.97, 0.88),
+      new Color3(0.025, 0.024, 0.018),
     );
 
     this.wall.diffuseTexture = this.requireTexture('wallPaper');
     this.wallStained.diffuseTexture = this.requireTexture('wallStained');
     this.carpet.diffuseTexture = this.requireTexture('carpet');
-    this.carpetWet.diffuseTexture = this.requireTexture('carpetWet');
+    this.carpetWet.diffuseTexture = this.requireTexture('carpet');
     this.ceiling.diffuseTexture = this.requireTexture('ceilingTile');
     this.trim.diffuseTexture = this.requireTexture('trim');
     this.ceilingGrid.diffuseTexture = this.requireTexture('trim');
@@ -259,9 +255,10 @@ export class RoomMaterialLibrary implements RoomMaterialSet {
     this.fixtureEmitterOff.diffuseTexture = this.requireTexture('fixtureTubeOff');
     this.column.diffuseTexture = this.requireTexture('column');
 
-    this.carpetWet.specularColor.set(0.09, 0.085, 0.055);
-    this.carpetWet.specularPower = 18;
-    this.carpetWet.roughness = 0.72;
+    this.carpet.specularColor.set(0.015, 0.014, 0.011);
+    this.carpetWet.specularColor.copyFrom(this.carpet.specularColor);
+    this.carpetWet.specularPower = this.carpet.specularPower;
+    this.carpetWet.roughness = this.carpet.roughness;
     this.fixtureEmitter.disableLighting = true;
     this.fixtureEmitterOff.disableLighting = true;
     for (const illuminated of [

@@ -11,9 +11,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { constants as zlibConstants, deflateSync } from 'node:zlib';
 
-export const ASSET_GENERATOR_VERSION = '1.1.0';
+export const ASSET_GENERATOR_VERSION = '1.2.0';
 export const ASSET_MANIFEST_VERSION = 1;
-export const ASSET_SEED = 'level-zero-threshold-textures-v1';
+export const ASSET_SEED = 'level-zero-threshold-textures-v2';
 export const ASSET_LICENSE = 'CC0-1.0';
 export const GENERATED_ASSET_DIRECTORY = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -84,13 +84,16 @@ export interface GeneratedAssetBundle {
 }
 
 const PALETTE = Object.freeze({
-  agedYellow: [188, 174, 103, 255] as const,
-  nicotineBeige: [158, 143, 84, 255] as const,
-  sickCream: [205, 197, 139, 255] as const,
-  dampBrown: [91, 80, 57, 255] as const,
-  greenGray: [104, 109, 86, 255] as const,
-  fluorescentWhite: [221, 229, 194, 255] as const,
-  softShadow: [65, 64, 52, 255] as const,
+  agedYellow: [207, 197, 139, 255] as const,
+  nicotineBeige: [218, 210, 159, 255] as const,
+  sickCream: [231, 228, 208, 255] as const,
+  dampBrown: [139, 125, 94, 255] as const,
+  greenGray: [151, 151, 118, 255] as const,
+  fluorescentWhite: [245, 245, 220, 255] as const,
+  softShadow: [76, 74, 61, 255] as const,
+  carpetTan: [164, 149, 116, 255] as const,
+  carpetFiber: [139, 126, 98, 255] as const,
+  ceilingSeam: [126, 128, 116, 255] as const,
 });
 
 function clampByte(value: number): number {
@@ -187,63 +190,6 @@ function torusDistance(value: number, center: number, size: number): number {
   return Math.min(distance, size - distance);
 }
 
-function stainField(
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  seed: number,
-  blobs: number,
-): number {
-  let field = 0;
-  for (let index = 0; index < blobs; index += 1) {
-    const centerX = hashUnit(seed, index, 11) * width;
-    const centerY = hashUnit(seed, index, 29) * height;
-    const radiusX = width * (0.08 + hashUnit(seed, index, 47) * 0.14);
-    const radiusY = height * (0.08 + hashUnit(seed, index, 71) * 0.18);
-    const dx = torusDistance(x, centerX, width) / radiusX;
-    const dy = torusDistance(y, centerY, height) / radiusY;
-    const distance = dx * dx + dy * dy;
-    if (distance < 1) {
-      field = Math.max(field, smoothStep(1 - distance));
-    }
-  }
-  return field;
-}
-
-/**
- * Smaller, irregular wall damp patches biased toward skirting boards and
- * corners. This avoids the large circular "spray paint" blobs produced by the
- * generic stain field while keeping the texture deterministic and tileable.
- */
-function wallStainField(x: number, y: number, width: number, height: number, seed: number): number {
-  let field = 0;
-  const blobs = 5;
-  for (let index = 0; index < blobs; index += 1) {
-    const edgeBias = hashUnit(seed, index, 89);
-    const centerX = hashUnit(seed, index, 11) * width;
-    const centerY =
-      index < 4
-        ? height * (0.62 + hashUnit(seed, index, 29) * 0.32)
-        : hashUnit(seed, index, 29) * height;
-    const radiusX = width * (0.025 + hashUnit(seed, index, 47) * 0.065);
-    const radiusY = height * (0.035 + hashUnit(seed, index, 71) * 0.095);
-    const dx = torusDistance(x, centerX, width) / radiusX;
-    const dy = torusDistance(y, centerY, height) / radiusY;
-    const warpedDistance =
-      dx * dx * (0.82 + edgeBias * 0.36) +
-      dy * dy +
-      Math.sin((x + index * 17) * 0.19) * 0.08 +
-      Math.sin((y - index * 13) * 0.23) * 0.07;
-    if (warpedDistance < 1) {
-      const irregularity =
-        0.55 + fractalNoise(x, y, width, height, seed ^ (index * 0x45d9f3b)) * 0.55;
-      field = Math.max(field, smoothStep(1 - warpedDistance) * irregularity);
-    }
-  }
-  return Math.min(1, field);
-}
-
 function createImage(
   width: number,
   height: number,
@@ -316,12 +262,12 @@ function normalMap(width: number, height: number, heights: Float32Array): PixelI
 
 function wallHeight(width: number, height: number, seed: number): Float32Array {
   return heightMap(width, height, (x, y) => {
-    const clusterX = Math.floor(x / 2) * 2;
-    const clusterY = Math.floor(y / 2) * 2;
-    const seam = x % 32 <= 1 ? -0.12 : 0;
-    const paper = fractalNoise(clusterX, clusterY, width, height, seed) * 0.16;
-    const weave = Math.sin((x / width) * Math.PI * 16) * 0.018;
-    return 0.5 + paper + weave + seam;
+    const paper = fractalNoise(x, y, width, height, seed) * 0.08;
+    const repeatX = positiveModulo(x, 24) - 12;
+    const repeatY = positiveModulo(y, 18);
+    const chevron = repeatY < 9 ? repeatY * 0.48 : (18 - repeatY) * 0.48;
+    const motif = Math.abs(Math.abs(repeatX) - chevron) < 0.85 && Math.abs(repeatX) < 5;
+    return 0.5 + paper + (motif ? 0.055 : 0);
   });
 }
 
@@ -330,24 +276,31 @@ function buildWall(seed: number, stained: boolean): PixelImage {
   const height = 128;
   return enforceTileable(
     createImage(width, height, (x, y) => {
-      const clusterX = Math.floor(x / 2) * 2;
-      const clusterY = Math.floor(y / 2) * 2;
-      const noise = fractalNoise(clusterX, clusterY, width, height, seed);
-      const stripe = (Math.sin((x / width) * Math.PI * 16) + 1) * 0.5;
-      const panelTone = hashUnit(seed, Math.floor(x / 32), Math.floor(y / 64)) - 0.5;
-      let color = mixColor(PALETTE.nicotineBeige, PALETTE.agedYellow, 0.55 + noise * 0.32);
-      color = shade(color, stripe * 5 + panelTone * 7);
-      if (x % 32 <= 1) {
-        color = mixColor(color, PALETTE.softShadow, 0.22);
+      const noise = fractalNoise(x, y, width, height, seed) - 0.5;
+      let color = shade(PALETTE.nicotineBeige, noise * 7);
+
+      // Repeating narrow chevrons and pin dots approximate the classic Level 0
+      // wallpaper without copying the reference photograph itself.
+      const repeatX = positiveModulo(x, 24) - 12;
+      const repeatY = positiveModulo(y, 18);
+      const chevron = repeatY < 9 ? repeatY * 0.48 : (18 - repeatY) * 0.48;
+      const diagonal = Math.abs(Math.abs(repeatX) - chevron) < 0.72 && Math.abs(repeatX) < 5;
+      const centerDash = Math.abs(repeatX) < 0.72 && (repeatY <= 2 || repeatY >= 16);
+      const pinDot = repeatX * repeatX + (repeatY - 9) * (repeatY - 9) < 1.15;
+      if (diagonal || centerDash || pinDot) {
+        color = mixColor(color, PALETTE.greenGray, 0.28);
       }
-      const smallSpot = hashUnit(seed, Math.floor(x / 4), Math.floor(y / 4));
-      if (smallSpot > 0.965) {
-        color = mixColor(color, PALETTE.dampBrown, 0.16);
+
+      const secondaryDot = positiveModulo(x + 12, 24) === 0 && positiveModulo(y + 4, 18) === 0;
+      if (secondaryDot) {
+        color = mixColor(color, PALETTE.greenGray, 0.2);
       }
+
       if (stained) {
-        const stain = wallStainField(x, y, width, height, seed ^ 0x43a9f12b);
-        color = mixColor(color, PALETTE.dampBrown, stain * 0.34);
-        color = mixColor(color, PALETTE.greenGray, Math.max(0, stain - 0.74) * 0.12);
+        const sparseAge = hashUnit(seed ^ 0x43a9f12b, Math.floor(x / 3), Math.floor(y / 3));
+        if (sparseAge > 0.992) {
+          color = mixColor(color, PALETTE.dampBrown, 0.09);
+        }
       }
       return color;
     }),
@@ -356,30 +309,21 @@ function buildWall(seed: number, stained: boolean): PixelImage {
 
 function carpetHeight(width: number, height: number, seed: number): Float32Array {
   return heightMap(width, height, (x, y) => {
-    const broad = fractalNoise(x, y, width, height, seed) * 0.12;
-    const fibers = Math.sin(((x * 3 + y) / 8) * Math.PI * 2) * 0.025;
+    const broad = fractalNoise(x, y, width, height, seed) * 0.055;
+    const fibers = Math.sin(((x * 5 + y * 2) / 10) * Math.PI * 2) * 0.018;
     return 0.48 + broad + fibers;
   });
 }
 
-function buildCarpet(seed: number, wet: boolean): PixelImage {
+function buildCarpet(seed: number): PixelImage {
   const width = 128;
   const height = 128;
   return enforceTileable(
     createImage(width, height, (x, y) => {
-      const clusterX = Math.floor(x / 2) * 2;
-      const clusterY = Math.floor(y / 2) * 2;
-      const noise = fractalNoise(clusterX, clusterY, width, height, seed);
-      const fiber = (Math.sin(((x * 3 + y) / 8) * Math.PI * 2) + 1) * 0.5;
-      let color = mixColor(PALETTE.dampBrown, PALETTE.nicotineBeige, 0.28 + noise * 0.34);
-      color = shade(color, fiber * 6 - 3);
-      const dampness = stainField(x, y, width, height, seed ^ 0x6d40c53a, wet ? 7 : 3);
-      color = mixColor(color, PALETTE.softShadow, dampness * (wet ? 0.48 : 0.18));
-      if (wet) {
-        color = mixColor(color, PALETTE.greenGray, dampness * 0.22);
-        const sheen = Math.max(0, dampness - 0.55) * 12;
-        color = shade(color, sheen);
-      }
+      const noise = fractalNoise(x, y, width, height, seed) - 0.5;
+      const fiber = (Math.sin(((x * 5 + y * 2) / 10) * Math.PI * 2) + 1) * 0.5;
+      let color = mixColor(PALETTE.carpetFiber, PALETTE.carpetTan, 0.72 + noise * 0.14);
+      color = shade(color, fiber * 4 - 2);
       return color;
     }),
   );
@@ -395,12 +339,9 @@ function buildCeiling(seed: number): PixelImage {
       const panelY = Math.floor(y / 32);
       const panelVariation = hashUnit(seed, panelX, panelY) - 0.5;
       const noise = fractalNoise(x, y, width, height, seed) - 0.5;
-      let color = shade(PALETTE.sickCream, panelVariation * 10 + noise * 7);
+      let color = shade(PALETTE.sickCream, panelVariation * 5 + noise * 4);
       if (seam) {
-        color = mixColor(color, PALETTE.greenGray, 0.42);
-      }
-      if (hashUnit(seed, Math.floor(x / 8), Math.floor(y / 8)) > 0.985) {
-        color = mixColor(color, PALETTE.dampBrown, 0.16);
+        color = mixColor(color, PALETTE.ceilingSeam, 0.48);
       }
       return color;
     }),
@@ -455,14 +396,22 @@ function buildColumn(seed: number): PixelImage {
   const height = 128;
   return enforceTileable(
     createImage(width, height, (x, y) => {
-      const curve = (Math.cos((x / width) * Math.PI * 2) + 1) * 0.5;
-      const noise = fractalNoise(x, y, width, height, seed) - 0.5;
-      let color = mixColor(PALETTE.nicotineBeige, PALETTE.agedYellow, 0.34 + curve * 0.36);
-      color = shade(color, noise * 12);
-      const grime = stainField(x, y, width, height, seed ^ 0x2bb0d0ac, 4);
-      color = mixColor(color, PALETTE.dampBrown, grime * 0.26);
+      const noise = fractalNoise(x, y, width, height, seed ^ 0x2bb0d0ac) - 0.5;
+      let color = mixColor(PALETTE.sickCream, PALETTE.nicotineBeige, 0.74);
+      color = shade(color, noise * 6);
+
+      const repeatX = positiveModulo(x, 24) - 12;
+      const repeatY = positiveModulo(y, 18);
+      const chevron = repeatY < 9 ? repeatY * 0.48 : (18 - repeatY) * 0.48;
+      const diagonal = Math.abs(Math.abs(repeatX) - chevron) < 0.68 && Math.abs(repeatX) < 5;
+      const centerDash = Math.abs(repeatX) < 0.72 && (repeatY <= 2 || repeatY >= 16);
+      const pinDot = repeatX * repeatX + (repeatY - 9) * (repeatY - 9) < 1.15;
+      if (diagonal || centerDash || pinDot) {
+        color = mixColor(color, PALETTE.greenGray, 0.24);
+      }
+
       if (x % 32 <= 1) {
-        color = mixColor(color, PALETTE.softShadow, 0.18);
+        color = mixColor(color, PALETTE.softShadow, 0.08);
       }
       return color;
     }),
@@ -508,7 +457,7 @@ const RECIPES: readonly AssetRecipe[] = [
     height: 128,
     colorSpace: 'srgb',
     tileableAxes: 'xy',
-    build: (seed) => buildCarpet(seed, false),
+    build: buildCarpet,
   },
   {
     id: 'carpet-wet',
@@ -518,7 +467,7 @@ const RECIPES: readonly AssetRecipe[] = [
     height: 128,
     colorSpace: 'srgb',
     tileableAxes: 'xy',
-    build: (seed) => buildCarpet(seed, true),
+    build: buildCarpet,
   },
   {
     id: 'carpet-normal',

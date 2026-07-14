@@ -70,9 +70,9 @@ describe('LightPool', () => {
         expect(light.intensity).toBe(0);
         expect(light.range).toBe(LIGHT_POOL_RANGE);
         expect(light.shadowEnabled).toBe(false);
-        expect(light.diffuse.g).toBeGreaterThan(light.diffuse.r);
-        expect(light.diffuse.r).toBeGreaterThan(light.diffuse.b);
-        expect(light.specular.g).toBeGreaterThan(light.specular.b);
+        expect(light.diffuse.r).toBeGreaterThanOrEqual(light.diffuse.g);
+        expect(light.diffuse.g).toBeGreaterThan(light.diffuse.b);
+        expect(light.specular.r).toBeGreaterThan(light.specular.b);
       }
     } finally {
       pool.dispose();
@@ -278,8 +278,8 @@ describe('LightPool', () => {
       for (const assignment of pool.assignments) {
         expect(assignment.light.range).toBe(LIGHT_POOL_RANGE);
         expect(assignment.light.shadowEnabled).toBe(false);
-        expect(assignment.light.diffuse.asArray()).toEqual([0.88, 0.94, 0.58]);
-        expect(assignment.light.specular.asArray()).toEqual([0.18, 0.2, 0.1]);
+        expect(assignment.light.diffuse.asArray()).toEqual([0.98, 0.96, 0.78]);
+        expect(assignment.light.specular.asArray()).toEqual([0.18, 0.18, 0.13]);
       }
     } finally {
       pool.dispose();

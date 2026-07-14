@@ -10,12 +10,12 @@ export const LIGHT_POOL_MAX_BUDGET = LIGHT_POOL_CAPACITY;
 export const LIGHT_POOL_RANGE = 12;
 export const LIGHT_POOL_MIN_INTENSITY = 0;
 export const LIGHT_POOL_MAX_INTENSITY = 1.25;
-const REASSIGNMENT_START_SCALE = 0.12;
+const REASSIGNMENT_START_SCALE = 0.72;
 const RETAINED_INTENSITY_RESPONSE = 0.42;
-const REASSIGNED_INTENSITY_RESPONSE = 0.24;
+const REASSIGNED_INTENSITY_RESPONSE = 0.58;
 
-const PROXY_DIFFUSE = Object.freeze({ r: 0.88, g: 0.94, b: 0.58 });
-const PROXY_SPECULAR = Object.freeze({ r: 0.18, g: 0.2, b: 0.1 });
+const PROXY_DIFFUSE = Object.freeze({ r: 0.98, g: 0.96, b: 0.78 });
+const PROXY_SPECULAR = Object.freeze({ r: 0.18, g: 0.18, b: 0.13 });
 
 /**
  * Integration boundary between streamed fixtures and the bounded Babylon light

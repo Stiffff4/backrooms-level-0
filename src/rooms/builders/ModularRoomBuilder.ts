@@ -165,9 +165,7 @@ export class ModularRoomBuilder {
         position: new Vector3(0, -FLOOR_THICKNESS / 2, 0),
         uvOffset: this.createUvOffset(instance.seed, 11),
       },
-      definition.tags.includes('damp') || this.isWet(instance.seed)
-        ? this.materials.carpetWet
-        : this.materials.carpet,
+      this.materials.carpet,
     );
     floor.parent = root;
     floor.checkCollisions = false;
@@ -210,9 +208,7 @@ export class ModularRoomBuilder {
       this.appendWallSide(instance.id, instance.seed, height, side, openings, wallBoxes, trimBoxes);
     }
 
-    const wallMaterial = this.useStainedWalls(instance.seed)
-      ? this.materials.wallStained
-      : this.materials.wall;
+    const wallMaterial = this.materials.wall;
     for (const wall of wallBoxes) {
       wall.material = wallMaterial;
     }
@@ -763,8 +759,10 @@ export class ModularRoomBuilder {
     let index = 0;
     for (let row = 0; row < rows; row += 1) {
       for (let column = 0; column < columns; column += 1) {
-        const jitter = this.hash(instance.seed, index);
-        const enabled = fixtures.length === 0 || jitter % 9 !== 0;
+        // Every fluorescent fixture remains powered. Variation is expressed by
+        // brief deterministic flicker profiles rather than permanently dark
+        // tubes, matching the classic Level 0 reference.
+        const enabled = true;
         fixtures.push({
           id: `${instance.id}.fixture.${String(index)}`,
           position: new Vector3(
@@ -941,14 +939,6 @@ export class ModularRoomBuilder {
     value ^= value >>> 15;
     value = Math.imul(value, 0x846ca68b);
     return (value ^ (value >>> 16)) >>> 0;
-  }
-
-  private useStainedWalls(seed: number): boolean {
-    return this.hash(seed, 51) % 7 === 0;
-  }
-
-  private isWet(seed: number): boolean {
-    return this.hash(seed, 83) % 6 === 0;
   }
 }
 

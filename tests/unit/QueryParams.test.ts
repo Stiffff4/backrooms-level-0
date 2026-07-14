@@ -16,4 +16,10 @@ describe('parseDebugOptions', () => {
     expect(parseDebugOptions(query, 'production').exitNow).toBe(true);
     expect(parseDebugOptions(query, 'development').exitNow).toBe(true);
   });
+
+  it('habilita el pacing acelerado de salida solo en desarrollo o debug', () => {
+    expect(parseDebugOptions('?fastExit=1', 'development').fastExit).toBe(true);
+    expect(parseDebugOptions('?fastExit=1', 'production').fastExit).toBe(false);
+    expect(parseDebugOptions('?debug=1&fastExit=1', 'production').fastExit).toBe(true);
+  });
 });

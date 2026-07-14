@@ -151,6 +151,9 @@ Para un smoke corto usa:
 ```
 
 `exitNow` reserva el próximo candidato compatible; explora hacia delante hasta encontrarlo.
+Para una prueba rápida que conserve el pacing real del director usa
+`/?debug=1&fastExit=1&seed=manual-exit-fast`: la salida se vuelve elegible en 5 s y queda garantizada
+antes de 22 s o 7 habitaciones.
 
 - [ ] La pared conserva el papel tapiz y presenta irregularidad/flicker sin verse como portal neón.
 - [ ] El audio guía al acercarse sin stinger fuerte.

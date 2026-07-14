@@ -182,15 +182,16 @@ describe('LightingAudioBridge', () => {
     expect(bridge.voiceSnapshots[0]?.y).toBeCloseTo(2.8, 5);
     expect(bridge.voiceSnapshots[0]?.z).toBeCloseTo(0, 5);
     expect(ambient.modulations.at(-1)).toBeCloseTo(0.8, 5);
-    expect(ambient.popGains).toHaveLength(1);
+    expect(ambient.popGains).toHaveLength(0);
 
     bridge.update(first);
     expect(bridge.metrics.updateCount).toBe(1);
-    expect(ambient.popGains).toHaveLength(1);
+    expect(ambient.popGains).toHaveLength(0);
     bridge.update(frame(['a', 'b', 'c'], 'failure:a:1'));
-    expect(ambient.popGains).toHaveLength(1);
+    expect(ambient.popGains).toHaveLength(0);
     bridge.update(frame(['d', 'b', 'c'], 'failure:d:2'));
-    expect(ambient.popGains).toHaveLength(2);
+    expect(ambient.popGains).toHaveLength(0);
+    expect(bridge.metrics.popCount).toBe(0);
     expect(bridge.metrics.reassignmentCount).toBeGreaterThan(0);
 
     bridge.setVoiceBudget(2);

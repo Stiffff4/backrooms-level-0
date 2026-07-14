@@ -9,21 +9,21 @@ Las texturas PNG se generan de forma determinista mediante
 `tools/generate-assets/generate.ts`. `public/assets/generated/manifest.json` registra versión del
 generador, semilla, dimensiones, función, SHA-256 y licencia SPDX de cada salida.
 
-| Archivo                                        | Autor/procedencia                             | URL de origen | Licencia | Modificaciones                             | Descarga  |
-| ---------------------------------------------- | --------------------------------------------- | ------------- | -------- | ------------------------------------------ | --------- |
-| `public/assets/generated/wall-paper.png`       | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Receta original de albedo de papel tapiz   | No aplica |
-| `public/assets/generated/wall-stained.png`     | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Variante original con manchas y humedad    | No aplica |
-| `public/assets/generated/wall-normal.png`      | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Normal map derivado de la receta original  | No aplica |
-| `public/assets/generated/carpet.png`           | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Albedo original de alfombra seca           | No aplica |
-| `public/assets/generated/carpet-wet.png`       | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Variante original de humedad               | No aplica |
-| `public/assets/generated/carpet-normal.png`    | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Normal map derivado de la receta original  | No aplica |
-| `public/assets/generated/ceiling-tile.png`     | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Albedo original de panel de techo          | No aplica |
-| `public/assets/generated/trim.png`             | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Albedo original de zócalo                  | No aplica |
-| `public/assets/generated/fixture-housing.png`  | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Carcasa original de luminaria              | No aplica |
-| `public/assets/generated/fixture-tube.png`     | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Emissive original de tubo encendido        | No aplica |
-| `public/assets/generated/fixture-tube-off.png` | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Variante original de tubo apagado          | No aplica |
-| `public/assets/generated/column.png`           | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Albedo original de pilares                 | No aplica |
-| `public/favicon.svg`                           | Contribuyentes del proyecto; SVG local        | No aplica     | CC0-1.0  | Marca geométrica “T” creada para THRESHOLD | No aplica |
+| Archivo                                        | Autor/procedencia                             | URL de origen | Licencia | Modificaciones                                 | Descarga  |
+| ---------------------------------------------- | --------------------------------------------- | ------------- | -------- | ---------------------------------------------- | --------- |
+| `public/assets/generated/wall-paper.png`       | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Receta original de albedo de papel tapiz       | No aplica |
+| `public/assets/generated/wall-stained.png`     | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Variante original con manchas y humedad        | No aplica |
+| `public/assets/generated/wall-normal.png`      | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Normal map derivado de la receta original      | No aplica |
+| `public/assets/generated/carpet.png`           | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Albedo original de alfombra seca               | No aplica |
+| `public/assets/generated/carpet-wet.png`       | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Alias uniforme compatible con slots históricos | No aplica |
+| `public/assets/generated/carpet-normal.png`    | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Normal map derivado de la receta original      | No aplica |
+| `public/assets/generated/ceiling-tile.png`     | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Albedo original de panel de techo              | No aplica |
+| `public/assets/generated/trim.png`             | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Albedo original de zócalo                      | No aplica |
+| `public/assets/generated/fixture-housing.png`  | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Carcasa original de luminaria                  | No aplica |
+| `public/assets/generated/fixture-tube.png`     | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Emissive original de tubo encendido            | No aplica |
+| `public/assets/generated/fixture-tube-off.png` | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Variante original de tubo apagado              | No aplica |
+| `public/assets/generated/column.png`           | Contribuyentes del proyecto; generación local | No aplica     | CC0-1.0  | Albedo original de pilares                     | No aplica |
+| `public/favicon.svg`                           | Contribuyentes del proyecto; SVG local        | No aplica     | CC0-1.0  | Marca geométrica “T” creada para THRESHOLD     | No aplica |
 
 La dedicación CC0 se refiere a esos archivos originales. No relicencia el contenido adaptado
 descrito en [`LICENSE-CONTENT.md`](LICENSE-CONTENT.md).

@@ -3,6 +3,7 @@ export interface DebugOptions {
   debug: boolean;
   quality: 'low' | 'default' | 'high' | null;
   exitNow: boolean;
+  fastExit: boolean;
   noAudio: boolean;
 }
 
@@ -31,6 +32,7 @@ export function parseDebugOptions(
     debug,
     quality,
     exitNow: (environment === 'development' || debug) && params.get('exitNow') === '1',
+    fastExit: (environment === 'development' || debug) && params.get('fastExit') === '1',
     noAudio: params.get('noAudio') === '1',
   };
 }

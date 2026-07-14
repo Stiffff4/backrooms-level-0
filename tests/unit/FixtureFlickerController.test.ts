@@ -131,17 +131,20 @@ describe('FixtureFlickerController', () => {
     const failures = times.map((time) => controller.evaluate('failure', time));
     const exit = times.map((time) => controller.evaluate('exit', time));
 
-    expect(Math.min(...micro)).toBeGreaterThanOrEqual(0.976);
-    expect(range(micro)).toBeGreaterThan(0.015);
-    expect(range(slow)).toBeGreaterThan(0.15);
-    expect(Math.min(...failures.map((sample) => sample.visualIntensity))).toBeLessThan(0.4);
+    expect(Math.min(...micro)).toBeGreaterThanOrEqual(0.965);
+    expect(range(micro)).toBeGreaterThan(0.02);
+    expect(range(slow)).toBeGreaterThan(0.03);
+    expect(Math.min(...failures.map((sample) => sample.visualIntensity))).toBeLessThan(0.95);
+    expect(Math.min(...failures.map((sample) => sample.visualIntensity))).toBeGreaterThanOrEqual(
+      0.84,
+    );
     expect(failures.some((sample) => sample.failureActive)).toBe(true);
     expect(range(exit.map((sample) => sample.visualIntensity))).toBeGreaterThan(0.1);
     expect(Math.min(...exit.map((sample) => sample.visualIntensity))).toBeGreaterThanOrEqual(0.84);
 
-    for (const sample of failures.filter((candidate) => candidate.visualIntensity < 0.5)) {
+    for (const sample of failures.filter((candidate) => candidate.visualIntensity < 0.96)) {
       expect(sample.failureActive).toBe(true);
-      expect(sample.audioIntensity).toBeLessThan(0.65);
+      expect(sample.audioIntensity).toBeLessThan(0.98);
     }
   });
 
@@ -158,11 +161,14 @@ describe('FixtureFlickerController', () => {
     const reducedSamples = times.map((time) => reduced.evaluate('failure', time));
     const reducedVisual = reducedSamples.map((sample) => sample.visualIntensity);
 
-    expect(Math.min(...normalSamples.map((sample) => sample.visualIntensity))).toBeLessThan(0.4);
+    expect(Math.min(...normalSamples.map((sample) => sample.visualIntensity))).toBeLessThan(0.95);
+    expect(
+      Math.min(...normalSamples.map((sample) => sample.visualIntensity)),
+    ).toBeGreaterThanOrEqual(0.84);
     expect(Math.min(...reducedVisual)).toBeGreaterThanOrEqual(
       lightingConfig.curves['intermittent-failure'].reducedVisualFloor,
     );
-    expect(range(reducedVisual)).toBeGreaterThan(0.02);
+    expect(range(reducedVisual)).toBeGreaterThan(0.005);
     expect(reducedSamples.some((sample) => sample.failureActive)).toBe(true);
     expect(reducedSamples.every((sample) => sample.reducedFlashingApplied)).toBe(true);
     expect(reduced.evaluate('off', 12).visualIntensity).toBe(0);
@@ -171,7 +177,7 @@ describe('FixtureFlickerController', () => {
     expect(reduced.evaluate('failure', 91.25)).toEqual(normal.evaluate('failure', 91.25));
   });
 
-  it('combina overrides de sala y fixture para blackout/salida y reset los retira idempotentemente', () => {
+  it('combina overrides de sala y fixture sin apagar la sala y reset los retira idempotentemente', () => {
     const controller = new FixtureFlickerController();
     controller.syncDescriptors([
       fixture('a', 'stable', 'a', 'room-blackout'),
@@ -179,13 +185,12 @@ describe('FixtureFlickerController', () => {
     ]);
     expect(controller.setRoomOverride('room-blackout', lightingConfig.blackoutOverride)).toBe(true);
     expect(controller.evaluate('a', 4)).toMatchObject({
-      effectiveProfile: 'off',
-      enabled: false,
-      visualIntensity: 0,
-      audioIntensity: 0,
+      effectiveProfile: 'microflicker',
+      enabled: true,
       overrideScope: 'room',
     });
-    expect(controller.evaluate('b', 4).visualIntensity).toBe(0);
+    expect(controller.evaluate('a', 4).visualIntensity).toBeGreaterThanOrEqual(0.965);
+    expect(controller.evaluate('b', 4).visualIntensity).toBeGreaterThanOrEqual(0.965);
 
     expect(controller.setFixtureOverride('a', lightingConfig.exitOverride)).toBe(true);
     expect(controller.evaluate('a', 4)).toMatchObject({
@@ -292,7 +297,7 @@ describe('FixtureFlickerController', () => {
 
     expect(starts.length).toBeGreaterThan(0);
     expect(starts.length).toBeLessThanOrEqual(16);
-    expect(Math.min(...runLengths)).toBeGreaterThan(30);
+    expect(Math.min(...runLengths)).toBeGreaterThan(10);
     expect(maxNormalDelta).toBeLessThan(0.14);
     expect(maxReducedDelta).toBeLessThan(0.035);
   });

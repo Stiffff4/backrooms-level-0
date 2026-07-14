@@ -106,9 +106,10 @@ describe('RoomMaterialLibrary', () => {
       expect(library.wall.diffuseTexture).toBe(library.getTexture('wallPaper'));
       expect(library.wallStained.diffuseTexture).toBe(library.getTexture('wallStained'));
       expect(library.carpet.diffuseTexture).toBe(library.getTexture('carpet'));
+      expect(library.carpetWet.diffuseTexture).toBe(library.getTexture('carpet'));
       expect(library.ceiling.diffuseTexture).toBe(library.getTexture('ceilingTile'));
       expect(library.fixtureEmitter.emissiveTexture).toBe(library.getTexture('fixtureTube'));
-      expect(library.carpetWet.specularColor.r).toBeGreaterThan(library.carpet.specularColor.r);
+      expect(library.carpetWet.specularColor.r).toBeCloseTo(library.carpet.specularColor.r, 6);
 
       for (const id of ROOM_TEXTURE_IDS) {
         const texture = library.getTexture(id);

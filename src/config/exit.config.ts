@@ -51,3 +51,29 @@ export const exitConfig: ExitDirectorConfig = {
     minimumRoomDepthFromSpawn: 2,
   },
 };
+
+/**
+ * Accelerated-but-real exit pacing for visual QA. Unlike `exitNow=1`, this
+ * still exercises eligibility, candidate selection, materialization and the
+ * final trigger instead of reserving the very next candidate immediately.
+ */
+export const fastDebugExitConfig: ExitDirectorConfig = {
+  eligibility: {
+    minimumElapsedSeconds: 5,
+    minimumUniqueRooms: 2,
+  },
+  probability: {
+    initialChance: 0.55,
+    chancePerMinuteAfterEligibility: 0.15,
+    uniqueRoomsPerStep: 1,
+    chancePerRoomStep: 0.08,
+    maximumChancePerCandidate: 0.95,
+  },
+  guarantee: {
+    forceElapsedSeconds: 22,
+    forceUniqueRooms: 7,
+    lateRejectionsStartSeconds: 12,
+    maximumLateRejections: 2,
+  },
+  candidate: { ...exitConfig.candidate },
+};
