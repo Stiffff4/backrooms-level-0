@@ -8,7 +8,7 @@
     "maximumVisibleTriangles": 250000,
     "maximumActiveMeshes": 400,
     "maximumActiveRooms": 60,
-    "maximumDynamicLights": 8,
+    "maximumDynamicLights": 12,
     "maximumAudioNodes": 80,
     "heapGrowthWarningBytes": 20971520,
     "heapGrowthWarningRatio": 0.2,

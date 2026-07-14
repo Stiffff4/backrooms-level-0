@@ -20,7 +20,7 @@ describe('RuntimePerformanceMonitor', () => {
       maximumVisibleTriangles: 250_000,
       maximumActiveMeshes: 400,
       maximumActiveRooms: 60,
-      maximumDynamicLights: 8,
+      maximumDynamicLights: 12,
       maximumAudioNodes: 80,
     });
     expect(performanceConfig.build.maximumInitialTransferBytes).toBe(30 * 1_024 * 1_024);
@@ -92,7 +92,7 @@ describe('RuntimePerformanceMonitor', () => {
   it('fails hard render, streaming, lighting and audio budget regressions', () => {
     const monitor = new RuntimePerformanceMonitor(120, 120);
     for (let index = 0; index < 120; index += 1) {
-      monitor.recordFrame(21, 251, 250_001, 401, 61, 9, 81);
+      monitor.recordFrame(21, 251, 250_001, 401, 61, 13, 81);
     }
 
     const evaluation = monitor.evaluate();
