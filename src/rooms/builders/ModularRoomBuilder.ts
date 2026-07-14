@@ -788,7 +788,7 @@ export class ModularRoomBuilder {
           position,
           uvOffset: this.createUvOffset(instance.seed, 101 + index),
         },
-        this.materials.column,
+        this.materials.wall,
       ),
     );
     const columns = this.mergeMeshes(`${instance.id}.columns`, boxes, root);
@@ -850,7 +850,7 @@ export class ModularRoomBuilder {
               ),
               uvOffset: this.createUvOffset(instance.seed, uvSalt + segment),
             },
-            this.materials.column,
+            this.materials.wall,
           ),
         );
       }
@@ -865,7 +865,7 @@ export class ModularRoomBuilder {
               position: new Vector3(side * (width / 2 - 0.2), 1.21, z),
               uvOffset: this.createUvOffset(instance.seed, uvSalt + 11 + side),
             },
-            this.materials.column,
+            this.materials.wall,
           ),
         );
       }
