@@ -70,6 +70,7 @@ const TRIM_UV_METERS_PER_TILE = 1;
 const FIXTURE_UV_METERS_PER_TILE = 0.5;
 const COLUMN_UV_METERS_PER_TILE = 1.2;
 const WALL_SURFACE_EPSILON = 0.002;
+const VISUAL_CEILING_HEIGHT_BONUS = 0.45;
 
 /**
  * Builds one visual representation of a logical room. The room graph remains
@@ -156,7 +157,8 @@ export class ModularRoomBuilder {
     definition: RoomDefinition,
     root: TransformNode,
   ): { readonly meshes: readonly AbstractMesh[]; readonly colliders: readonly AbstractMesh[] } {
-    const { width, depth, height } = definition.footprint;
+    const { width, depth } = definition.footprint;
+    const height = this.getVisualRoomHeight(definition);
     const floor = this.createBox(
       {
         name: `${instance.id}.floor`,
@@ -204,6 +206,7 @@ export class ModularRoomBuilder {
 
     const wallBoxes: Mesh[] = [];
     const wallSurfacePlanes: Mesh[] = [];
+    const wallCapPlanes: Mesh[] = [];
     const trimBoxes: Mesh[] = [];
     for (const side of this.getWallSides(definition)) {
       const openings = this.getConnectedOpenings(instance, side);
@@ -215,6 +218,7 @@ export class ModularRoomBuilder {
         openings,
         wallBoxes,
         wallSurfacePlanes,
+        wallCapPlanes,
         trimBoxes,
       );
     }
@@ -222,6 +226,9 @@ export class ModularRoomBuilder {
     const wallMaterial = this.materials.wall;
     for (const surface of wallSurfacePlanes) {
       surface.material = wallMaterial;
+    }
+    for (const cap of wallCapPlanes) {
+      cap.material = wallMaterial;
     }
     for (const trim of trimBoxes) {
       trim.material = this.materials.trim;
@@ -231,10 +238,11 @@ export class ModularRoomBuilder {
     walls.isVisible = false;
     walls.checkCollisions = true;
     const wallSurfaces = this.mergeMeshes(`${instance.id}.wall-surfaces`, wallSurfacePlanes, root);
+    const wallCaps = this.mergeMeshes(`${instance.id}.wall-caps`, wallCapPlanes, root);
     const trim = this.mergeMeshes(`${instance.id}.trim`, trimBoxes, root);
 
     return {
-      meshes: Object.freeze([floor, ceiling, wallSurfaces, trim]),
+      meshes: Object.freeze([floor, ceiling, wallSurfaces, wallCaps, trim]),
       colliders: Object.freeze([floorCollider, ceiling, walls]),
     };
   }
@@ -319,6 +327,7 @@ export class ModularRoomBuilder {
     openings: readonly Opening[],
     wallBoxes: Mesh[],
     wallSurfacePlanes: Mesh[],
+    wallCapPlanes: Mesh[],
     trimBoxes: Mesh[],
   ): void {
     let cursor = -side.length / 2;
@@ -335,6 +344,7 @@ export class ModularRoomBuilder {
           segmentIndex,
           wallBoxes,
           wallSurfacePlanes,
+          wallCapPlanes,
           trimBoxes,
           uvOffset,
         );
@@ -366,6 +376,38 @@ export class ModularRoomBuilder {
             roomHeight - lintelHeight / 2,
           ),
         );
+        wallCapPlanes.push(
+          this.createWallEndCap(
+            `${roomId}.${side.id}.lintel-cap.start.${segmentIndex}`,
+            side,
+            opening.start,
+            lintelHeight,
+            roomHeight - lintelHeight / 2,
+            -1,
+          ),
+          this.createWallEndCap(
+            `${roomId}.${side.id}.lintel-cap.end.${segmentIndex}`,
+            side,
+            opening.end,
+            lintelHeight,
+            roomHeight - lintelHeight / 2,
+            1,
+          ),
+          this.createWallHorizontalCap(
+            `${roomId}.${side.id}.lintel-cap.top.${segmentIndex}`,
+            side,
+            opening.start,
+            opening.end,
+            roomHeight - WALL_SURFACE_EPSILON,
+          ),
+          this.createWallHorizontalCap(
+            `${roomId}.${side.id}.lintel-cap.bottom.${segmentIndex}`,
+            side,
+            opening.start,
+            opening.end,
+            roomHeight - lintelHeight - WALL_SURFACE_EPSILON,
+          ),
+        );
       }
       cursor = Math.max(cursor, opening.end);
       segmentIndex += 1;
@@ -381,6 +423,7 @@ export class ModularRoomBuilder {
         segmentIndex,
         wallBoxes,
         wallSurfacePlanes,
+        wallCapPlanes,
         trimBoxes,
         uvOffset,
       );
@@ -396,6 +439,7 @@ export class ModularRoomBuilder {
     index: number,
     wallBoxes: Mesh[],
     wallSurfacePlanes: Mesh[],
+    wallCapPlanes: Mesh[],
     trimBoxes: Mesh[],
     uvOffset: UvOffset,
   ): void {
@@ -426,6 +470,31 @@ export class ModularRoomBuilder {
         roomHeight / 2,
       ),
     );
+    wallCapPlanes.push(
+      this.createWallEndCap(
+        `${roomId}.${side.id}.wall-cap.start.${index}`,
+        side,
+        start,
+        roomHeight,
+        roomHeight / 2,
+        -1,
+      ),
+      this.createWallEndCap(
+        `${roomId}.${side.id}.wall-cap.end.${index}`,
+        side,
+        end,
+        roomHeight,
+        roomHeight / 2,
+        1,
+      ),
+      this.createWallHorizontalCap(
+        `${roomId}.${side.id}.wall-cap.top.${index}`,
+        side,
+        start,
+        end,
+        roomHeight - WALL_SURFACE_EPSILON,
+      ),
+    );
     trimBoxes.push(
       this.createSideBox(
         `${roomId}.${side.id}.trim.${index}`,
@@ -439,6 +508,102 @@ export class ModularRoomBuilder {
         TRIM_UV_METERS_PER_TILE,
       ),
     );
+  }
+
+
+  private createWallHorizontalCap(
+    name: string,
+    side: WallSide,
+    start: number,
+    end: number,
+    y: number,
+  ): Mesh {
+    const length = end - start;
+    const center = (start + end) / 2;
+    const insetCoordinate =
+      side.coordinate - Math.sign(side.coordinate) * (MODULAR_WALL_THICKNESS / 2);
+    const mesh = MeshBuilder.CreatePlane(
+      name,
+      {
+        width: length,
+        height: MODULAR_WALL_THICKNESS,
+        sideOrientation: Mesh.DOUBLESIDE,
+      },
+      this.scene,
+    );
+    mesh.rotation.x = Math.PI / 2;
+    if (!side.horizontal) {
+      mesh.rotation.y = Math.PI / 2;
+    }
+    mesh.position.copyFrom(
+      new Vector3(
+        side.horizontal ? center : insetCoordinate,
+        y,
+        side.horizontal ? insetCoordinate : center,
+      ),
+    );
+    const baseUvs = mesh.getVerticesData(VertexBuffer.UVKind);
+    if (baseUvs !== null) {
+      const tiledUvs = new Float32Array(baseUvs.length);
+      const uTiles = length / WALL_UV_METERS_PER_TILE;
+      const vTiles = MODULAR_WALL_THICKNESS / WALL_UV_METERS_PER_TILE;
+      for (let index = 0; index < baseUvs.length; index += 2) {
+        tiledUvs[index] = (baseUvs[index] ?? 0) * uTiles;
+        tiledUvs[index + 1] = (baseUvs[index + 1] ?? 0) * vTiles;
+      }
+      mesh.setVerticesData(VertexBuffer.UVKind, tiledUvs, true);
+    }
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+    return mesh;
+  }
+
+
+  private createWallEndCap(
+    name: string,
+    side: WallSide,
+    edge: number,
+    height: number,
+    centerY: number,
+    direction: -1 | 1,
+  ): Mesh {
+    const insetCoordinate =
+      side.coordinate - Math.sign(side.coordinate) * (MODULAR_WALL_THICKNESS / 2 + WALL_SURFACE_EPSILON);
+    const mesh = MeshBuilder.CreatePlane(
+      name,
+      {
+        width: MODULAR_WALL_THICKNESS + WALL_SURFACE_EPSILON * 2,
+        height,
+        sideOrientation: Mesh.DOUBLESIDE,
+      },
+      this.scene,
+    );
+    mesh.position.copyFrom(
+      new Vector3(
+        side.horizontal ? edge : insetCoordinate,
+        centerY,
+        side.horizontal ? insetCoordinate : edge,
+      ),
+    );
+    if (side.horizontal) {
+      mesh.rotation.y = direction > 0 ? -Math.PI / 2 : Math.PI / 2;
+    } else {
+      mesh.rotation.y = direction > 0 ? 0 : Math.PI;
+    }
+    const baseUvs = mesh.getVerticesData(VertexBuffer.UVKind);
+    if (baseUvs !== null) {
+      const tiledUvs = new Float32Array(baseUvs.length);
+      const uTiles = MODULAR_WALL_THICKNESS / WALL_UV_METERS_PER_TILE;
+      const vTiles = height / WALL_UV_METERS_PER_TILE;
+      for (let index = 0; index < baseUvs.length; index += 2) {
+        tiledUvs[index] = (baseUvs[index] ?? 0) * uTiles;
+        tiledUvs[index + 1] = (baseUvs[index + 1] ?? 0) * vTiles;
+      }
+      mesh.setVerticesData(VertexBuffer.UVKind, tiledUvs, true);
+    }
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+    return mesh;
   }
 
 
@@ -540,7 +705,8 @@ export class ModularRoomBuilder {
     definition: RoomDefinition,
     root: TransformNode,
   ): readonly AbstractMesh[] {
-    const { width, depth, height } = definition.footprint;
+    const { width, depth } = definition.footprint;
+    const height = this.getVisualRoomHeight(definition);
     const boxes: Mesh[] = [];
     const uvOffset = this.createUvOffset(instance.seed, 71);
     let gridIndex = 0;
@@ -598,7 +764,8 @@ export class ModularRoomBuilder {
       return { meshes: Object.freeze([]), colliders: Object.freeze([]) };
     }
 
-    const { width, depth, height } = definition.footprint;
+    const { width, depth } = definition.footprint;
+    const height = this.getVisualRoomHeight(definition);
     const insetX = Math.max(1.5, width * 0.22);
     const insetZ = Math.max(1.5, depth * 0.22);
     const positions = definition.tags.includes('pillar-grid')
@@ -633,7 +800,8 @@ export class ModularRoomBuilder {
   }
 
   private createPillarGridPositions(definition: RoomDefinition): readonly Vector3[] {
-    const { width, depth, height } = definition.footprint;
+    const { width, depth } = definition.footprint;
+    const height = this.getVisualRoomHeight(definition);
     const xPositions = [-width * 0.22, width * 0.22];
     const zPositions = definition.tags.includes('large')
       ? [-depth * 0.27, 0, depth * 0.27]
@@ -652,7 +820,8 @@ export class ModularRoomBuilder {
       return { meshes: Object.freeze([]), colliders: Object.freeze([]) };
     }
 
-    const { width, depth, height } = definition.footprint;
+    const { width, depth } = definition.footprint;
+    const height = this.getVisualRoomHeight(definition);
     const boxes: Mesh[] = [];
     const frameSpacing = 3.6;
     const frameCount = Math.max(2, Math.floor((depth - 2) / frameSpacing));
@@ -846,7 +1015,8 @@ export class ModularRoomBuilder {
     instance: RoomInstance,
     definition: RoomDefinition,
   ): readonly FixtureRecipe[] {
-    const { width, depth, height } = definition.footprint;
+    const { width, depth } = definition.footprint;
+    const height = this.getVisualRoomHeight(definition);
     const columns = Math.max(1, Math.floor(width / 4));
     const rows = Math.max(1, Math.floor(depth / 3.4));
     const spacingX = width / columns;
@@ -872,6 +1042,10 @@ export class ModularRoomBuilder {
       }
     }
     return fixtures;
+  }
+
+  private getVisualRoomHeight(definition: RoomDefinition): number {
+    return definition.footprint.height + VISUAL_CEILING_HEIGHT_BONUS;
   }
 
   private createTrigger(instance: RoomInstance, definition: RoomDefinition): RoomEntryTrigger {
